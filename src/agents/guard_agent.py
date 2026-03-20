@@ -123,12 +123,24 @@ def _parse_safety_response(response_text: str) -> SafetyReport:
                     )
                 )
 
+            # Coerce list items to strings (LLM may return dicts)
+            def _to_str_list(items: list) -> list[str]:
+                result = []
+                for item in items:
+                    if isinstance(item, str):
+                        result.append(item)
+                    elif isinstance(item, dict):
+                        result.append(str(item.get("message", item)))
+                    else:
+                        result.append(str(item))
+                return result
+
             return SafetyReport(
                 warnings=warnings,
-                required_ppe=data.get("required_ppe", []),
-                incompatibilities=data.get("incompatibilities", []),
-                disposal_notes=data.get("disposal_notes", []),
-                storage_notes=data.get("storage_notes", []),
+                required_ppe=_to_str_list(data.get("required_ppe", [])),
+                incompatibilities=_to_str_list(data.get("incompatibilities", [])),
+                disposal_notes=_to_str_list(data.get("disposal_notes", [])),
+                storage_notes=_to_str_list(data.get("storage_notes", [])),
                 requires_fume_hood=data.get("requires_fume_hood", False),
                 requires_inert_atmosphere=data.get(
                     "requires_inert_atmosphere", False
