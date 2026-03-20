@@ -87,16 +87,16 @@ def pubchem_lookup(query: str) -> dict:
         )
 
         key = f"{label}_{name}" if name else label
-        props[key] = val
+        props[key.strip()] = val
 
     result = {
         "cid": cid,
-        "iupac_name": props.get("IUPAC Name_Preferred", props.get("IUPAC Name_")),
-        "molecular_formula": props.get("Molecular Formula_"),
-        "molecular_weight": props.get("Molecular Weight_"),
-        "smiles": props.get("SMILES_Canonical"),
+        "iupac_name": props.get("IUPAC Name_Preferred", props.get("IUPAC Name_CAS-like Style")),
+        "molecular_formula": props.get("Molecular Formula"),
+        "molecular_weight": props.get("Molecular Weight"),
+        "smiles": props.get("SMILES_Canonical", props.get("SMILES_Absolute")),
         "inchi": props.get("InChI_Standard"),
-        "charge": props.get("Charge_"),
+        "charge": props.get("Charge"),
     }
 
     return {k: v for k, v in result.items() if v is not None}
