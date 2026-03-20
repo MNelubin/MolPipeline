@@ -80,9 +80,9 @@ def rxn_retrosynthesis(smiles: str, max_steps: int = 5) -> dict:
     if not prediction_id:
         return {"error": f"No prediction_id returned: {response}"}
 
-    # Poll for results (typically ~2 minutes)
-    for attempt in range(30):
-        time.sleep(10)
+    # Poll for results — short timeout since the caller has its own timeout
+    for attempt in range(6):
+        time.sleep(8)
         try:
             results = rxn.get_predict_automatic_retrosynthesis_results(
                 prediction_id
@@ -97,7 +97,7 @@ def rxn_retrosynthesis(smiles: str, max_steps: int = 5) -> dict:
             return {"error": f"RXN prediction failed: {results}"}
         # else still RUNNING, continue polling
 
-    return {"error": "RXN prediction timed out (5 min)"}
+    return {"error": "RXN prediction still processing (caller will timeout)"}
 
 
 def _parse_rxn_results(results: dict, target_smiles: str) -> dict:

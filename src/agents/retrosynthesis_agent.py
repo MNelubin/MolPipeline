@@ -96,32 +96,43 @@ async def run_retrosynthesis(
 
 
 async def _query_all_sources(smiles: str) -> dict[str, dict]:
-    """Query IBM RXN, ASKCOS, and ORD in parallel."""
-    tasks = {}
+    """Query IBM RXN, ASKCOS, and ORD in parallel with timeouts."""
+    loop = asyncio.get_event_loop()
+    results = {}
 
+    # Define tasks with individual timeouts
+    api_tasks = {}
     if RXN_API_KEY:
-        tasks["ibm_rxn"] = asyncio.get_event_loop().run_in_executor(
-            None, _call_rxn, smiles
+        api_tasks["ibm_rxn"] = (
+            loop.run_in_executor(None, _call_rxn, smiles),
+            60,  # 60s timeout for RXN (it polls internally)
         )
 
-    tasks["askcos"] = asyncio.get_event_loop().run_in_executor(
-        None, _call_askcos, smiles
+    api_tasks["askcos"] = (
+        loop.run_in_executor(None, _call_askcos, smiles),
+        120,  # 120s for ASKCOS tree search
     )
 
-    tasks["ord"] = asyncio.get_event_loop().run_in_executor(
-        None, _call_ord, smiles
+    api_tasks["ord"] = (
+        loop.run_in_executor(None, _call_ord, smiles),
+        15,  # 15s for ORD search
     )
 
-    results = {}
+    # Run all with individual timeouts
+    async def _run_with_timeout(name, future, timeout):
+        try:
+            return name, await asyncio.wait_for(future, timeout=timeout)
+        except asyncio.TimeoutError:
+            return name, {"error": f"{name} timed out after {timeout}s"}
+        except Exception as e:
+            return name, {"error": str(e)}
+
     gathered = await asyncio.gather(
-        *tasks.values(), return_exceptions=True
+        *[_run_with_timeout(n, f, t) for n, (f, t) in api_tasks.items()]
     )
 
-    for name, result in zip(tasks.keys(), gathered):
-        if isinstance(result, Exception):
-            results[name] = {"error": str(result)}
-        else:
-            results[name] = result
+    for name, result in gathered:
+        results[name] = result
 
     return results
 
