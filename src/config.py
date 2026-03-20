@@ -45,6 +45,9 @@ RXN_API_KEY = os.getenv("RXN_API_KEY", "")
 RXN_BASE_URL = os.getenv("RXN_BASE_URL", "https://rxn.res.ibm.com")
 RXN_PROJECT_NAME = "chemist-agent"
 
+# SOCKS proxy (for geo-blocked services like IBM RXN)
+SOCKS_PROXY = os.getenv("SOCKS_PROXY", "")
+
 # ASKCOS (self-hosted)
 ASKCOS_BASE_URL = os.getenv("ASKCOS_BASE_URL", "http://localhost:9100")
 

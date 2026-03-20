@@ -1,22 +1,54 @@
-"""IBM RXN for Chemistry API — real retrosynthesis predictions."""
+"""IBM RXN for Chemistry API — real retrosynthesis predictions.
 
+Note: IBM RXN uses CloudFront which may geo-block certain regions.
+If blocked, the tool returns an error and the retrosynthesis agent
+falls back to ASKCOS / LLM.
+"""
+
+import logging
 import time
 
 from langchain_core.tools import tool
 
-from src.config import RXN_API_KEY, RXN_PROJECT_NAME
+import os
+
+from src.config import RXN_API_KEY, RXN_PROJECT_NAME, SOCKS_PROXY
+
+logger = logging.getLogger(__name__)
 
 _wrapper = None
+_init_failed = False
+
+
+def _setup_proxy():
+    """Configure SOCKS proxy for IBM RXN if set."""
+    if SOCKS_PROXY:
+        os.environ.setdefault("HTTP_PROXY", SOCKS_PROXY)
+        os.environ.setdefault("HTTPS_PROXY", SOCKS_PROXY)
+        logger.info(f"Using SOCKS proxy for IBM RXN: {SOCKS_PROXY[:30]}...")
 
 
 def _get_rxn():
     """Lazy-init the RXN wrapper."""
-    global _wrapper
+    global _wrapper, _init_failed
+    if _init_failed:
+        raise RuntimeError("IBM RXN previously failed to initialize (geo-blocked?)")
     if _wrapper is None:
+        _setup_proxy()
         from rxn4chemistry import RXN4ChemistryWrapper
 
         _wrapper = RXN4ChemistryWrapper(api_key=RXN_API_KEY)
-        _wrapper.create_project(RXN_PROJECT_NAME)
+        resp = _wrapper.create_project(RXN_PROJECT_NAME)
+        # Detect CloudFront geo-block
+        resp_str = str(resp.get("response", ""))
+        if "403 ERROR" in resp_str or "CloudFront" in resp_str:
+            _init_failed = True
+            _wrapper = None
+            raise RuntimeError("IBM RXN geo-blocked from this server")
+        if not _wrapper.project_id:
+            _init_failed = True
+            _wrapper = None
+            raise RuntimeError(f"IBM RXN project creation failed: {resp_str[:200]}")
         time.sleep(2)
     return _wrapper
 
