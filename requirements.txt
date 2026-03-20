@@ -19,5 +19,8 @@ uvicorn>=0.32.0
 # UI
 streamlit>=1.40.0
 
+# Retrosynthesis APIs
+rxn4chemistry>=1.0.0
+
 # Utils
 python-dotenv>=1.0.0

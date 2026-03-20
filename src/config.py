@@ -40,6 +40,14 @@ CHROMA_COLLECTION_PROCEDURES = "procedures"
 CHROMA_COLLECTION_TECHNIQUES = "techniques"
 RAG_TOP_K = 5
 
+# IBM RXN for Chemistry
+RXN_API_KEY = os.getenv("RXN_API_KEY", "")
+RXN_BASE_URL = os.getenv("RXN_BASE_URL", "https://rxn.res.ibm.com")
+RXN_PROJECT_NAME = "chemist-agent"
+
+# ASKCOS (self-hosted)
+ASKCOS_BASE_URL = os.getenv("ASKCOS_BASE_URL", "http://localhost:9100")
+
 # Retrosynthesis
 MAX_RETRO_DEPTH = 5  # max steps in retrosynthesis tree
 RETRO_TOP_N = 5  # top-N predictions per step
