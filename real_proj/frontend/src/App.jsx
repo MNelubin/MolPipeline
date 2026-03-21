@@ -48,6 +48,7 @@ export default function App() {
     phase,
     pipelineState,
     error,
+    threadId,
     startAnalysis,
     confirmSynthesis,
     selectPathway,
@@ -238,7 +239,7 @@ export default function App() {
               {!isRunning && phase === 'completed' && experimentProtocol && (
                 <>
                   <ProtocolGraph protocol={experimentProtocol} />
-                  <ExperimentProtocol protocol={experimentProtocol} moleculeInfo={moleculeInfo} />
+                  <ExperimentProtocol protocol={experimentProtocol} moleculeInfo={moleculeInfo} sessionId={threadId} />
                 </>
               )}
 

@@ -24,32 +24,42 @@ def stoichiometry_node(state: dict[str, Any]) -> dict[str, Any]:
             state["target_amount"], state["smiles"]
     Writes: state["calculations"]
     """
+    from ..journal import AgentJournal
+    j = AgentJournal.for_session(state.get("session_id", "default"))
+
     pathways = state.get("synthesis_pathways", [])
     selected_idx = state.get("selected_pathway")
     target_amount = state.get("target_amount")
     target_smiles = state.get("smiles", "")
 
     if selected_idx is None or not pathways:
-        return {
-            "calculations": {"error": "Путь синтеза не выбран.", "steps": []},
-        }
-
+        return {"calculations": {"error": "Путь синтеза не выбран.", "steps": []}}
     if selected_idx < 0 or selected_idx >= len(pathways):
-        return {
-            "calculations": {"error": f"Неверный индекс пути: {selected_idx}", "steps": []},
-        }
+        return {"calculations": {"error": f"Неверный индекс пути: {selected_idx}", "steps": []}}
 
     pathway = pathways[selected_idx]
-
     target_mass_g = 1.0
     if target_amount:
         target_mass_g = target_amount.get("value", 1.0)
 
-    tree = pathway.get("tree")
-    if tree and tree.get("children"):
-        return _calc_from_tree(tree, target_mass_g, target_smiles)
+    with j.step("stoichiometry"):
+        tree = pathway.get("tree")
+        if tree and tree.get("children"):
+            result = _calc_from_tree(tree, target_mass_g, target_smiles)
+        else:
+            result = _calc_single_step(pathway, target_mass_g, target_smiles)
 
-    return _calc_single_step(pathway, target_mass_g, target_smiles)
+        calc = result.get("calculations", {})
+        steps_count = len(calc.get("steps", []))
+        buyable_count = len(calc.get("all_buyable_reagents", []))
+        j.decision(
+            "stoichiometry",
+            f"Стехиометрия рассчитана: {steps_count} стадий, цель {target_mass_g:.2f} г",
+            {"steps_count": steps_count or 1, "target_mass_g": target_mass_g,
+             "buyable_reagents": buyable_count, "pathway_idx": selected_idx},
+        )
+
+    return result
 
 
 def _calc_from_tree(

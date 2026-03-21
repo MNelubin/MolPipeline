@@ -273,7 +273,9 @@ function generatePrintHtml(protocol, moleculeInfo) {
 </html>`
 }
 
-export default function ExperimentProtocol({ protocol, moleculeInfo }) {
+const API_BASE = import.meta.env.VITE_API_URL || 'https://hack.humaneconomy.ru'
+
+export default function ExperimentProtocol({ protocol, moleculeInfo, sessionId }) {
   if (!protocol) return null
 
   const reagentTable = protocol.buyable_reagent_table || []
@@ -289,6 +291,23 @@ export default function ExperimentProtocol({ protocol, moleculeInfo }) {
     win.document.close()
     win.focus()
     setTimeout(() => { win.print() }, 600)
+  }
+
+  const handleDownloadJournal = async () => {
+    if (!sessionId) return
+    try {
+      const res = await fetch(`${API_BASE}/journal/${sessionId}/md`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `journal_${sessionId}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('Не удалось скачать журнал: ' + e.message)
+    }
   }
 
   return (
@@ -321,26 +340,47 @@ export default function ExperimentProtocol({ protocol, moleculeInfo }) {
             {sections.length} стадии
           </span>
         )}
-        <button
-          onClick={handleDownloadPdf}
-          style={{
-            marginLeft: 'auto',
-            padding: '6px 14px',
-            fontSize: 12,
-            fontFamily: 'var(--font-mono)',
-            background: 'var(--bg-2)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--r-sm)',
-            color: 'var(--text-2)',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 2v9M4 7l4 4 4-4M2 14h12" />
-          </svg>
-          Скачать PDF
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {sessionId && (
+            <button
+              onClick={handleDownloadJournal}
+              title="Скачать журнал агента (Markdown)"
+              style={{
+                padding: '6px 14px', fontSize: 12,
+                fontFamily: 'var(--font-mono)',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-sm)',
+                color: 'var(--text-3)',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 2h7l3 3v9H3z" /><path d="M10 2v3h3" /><path d="M6 7h4M6 10h4M6 13h2" />
+              </svg>
+              Журнал агента
+            </button>
+          )}
+          <button
+            onClick={handleDownloadPdf}
+            style={{
+              padding: '6px 14px', fontSize: 12,
+              fontFamily: 'var(--font-mono)',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-sm)',
+              color: 'var(--text-2)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 2v9M4 7l4 4 4-4M2 14h12" />
+            </svg>
+            Скачать PDF
+          </button>
+        </div>
       </div>
 
       {/* ── Summary reagent table (only for multi-step) ── */}

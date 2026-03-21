@@ -24,6 +24,9 @@ def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
             state["calculations"], state["molecule_info"]
     Writes: state["experiment_protocol"], state["final_answer"]
     """
+    from ..journal import AgentJournal
+    j = AgentJournal.for_session(state.get("session_id", "default"))
+
     pathways = state.get("synthesis_pathways", [])
     selected_idx = state.get("selected_pathway")
     calculations = state.get("calculations", {})
@@ -36,15 +39,30 @@ def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
 
     pathway = pathways[min(selected_idx, len(pathways) - 1)]
     mol_name = molecule_info.get("name", "целевая молекула")
-
     calc_steps = calculations.get("steps", [])
 
-    if calc_steps:
-        protocol = _build_multistep_protocol(pathway, calc_steps, calculations, mol_name)
-    else:
-        protocol = _build_single_step_protocol(pathway, calculations, mol_name)
+    with j.step("experiment_planner"):
+        if calc_steps:
+            protocol = _build_multistep_protocol(pathway, calc_steps, calculations, mol_name)
+        else:
+            protocol = _build_single_step_protocol(pathway, calculations, mol_name)
+
+        sections = protocol.get("reaction_sections", [])
+        total_steps = sum(len(s.get("procedure_steps", [])) for s in sections)
+        j.decision(
+            "experiment_planner",
+            f"Протокол сформирован: {len(sections)} стадий, ~{total_steps} шагов процедуры",
+            {"sections_count": len(sections), "procedure_steps_total": total_steps,
+             "is_multistep": protocol.get("is_multistep", False), "molecule": mol_name},
+        )
 
     protocol_text = _format_protocol_text(protocol, mol_name)
+
+    # Finalize journal with markdown export
+    try:
+        j.export_markdown()
+    except Exception:
+        pass
 
     existing_answer = state.get("final_answer", "")
     proto_marker = "=" * 60 + "\n  ПРОТОКОЛ ЭКСПЕРИМЕНТА:"

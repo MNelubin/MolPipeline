@@ -7,6 +7,7 @@ export function useInteractivePipeline() {
   const [phase, setPhase] = useState(null)        // card_ready | select_pathway | completed
   const [pipelineState, setPipelineState] = useState(null)
   const [error, setError] = useState(null)
+  const [threadId, setThreadId] = useState(null)
   const threadIdRef = useRef(null)
 
   const reset = useCallback(() => {
@@ -14,6 +15,7 @@ export function useInteractivePipeline() {
     setPhase(null)
     setPipelineState(null)
     setError(null)
+    setThreadId(null)
     threadIdRef.current = null
   }, [])
 
@@ -51,6 +53,7 @@ export function useInteractivePipeline() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
       const data = await res.json()
       threadIdRef.current = data.thread_id
+      setThreadId(data.thread_id)
       _applyResponse(data)
     } catch (e) {
       setError(e.message)
@@ -90,7 +93,7 @@ export function useInteractivePipeline() {
     phase,
     pipelineState,
     error,
-    threadId: threadIdRef.current,
+    threadId,
     startAnalysis,
     confirmSynthesis,
     selectPathway,

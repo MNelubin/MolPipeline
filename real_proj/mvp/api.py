@@ -19,6 +19,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, PlainTextResponse
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
@@ -261,8 +262,15 @@ def _run_auto(query: str) -> dict[str, Any]:
 
 def _run_interactive_start(query: str, thread_id: str) -> dict[str, Any]:
     """Start an interactive session — runs until first interrupt."""
+    from .journal import AgentJournal
+    # Wipe any old journal for this thread so it starts fresh
+    j = AgentJournal.for_session(thread_id)
+    if j.path.exists():
+        j.path.unlink()
+    AgentJournal.close_session(thread_id)
+
     config = {"configurable": {"thread_id": thread_id}}
-    _graph.invoke({"query": query}, config=config)
+    _graph.invoke({"query": query, "session_id": thread_id}, config=config)
     return _get_state(config)
 
 
@@ -501,3 +509,39 @@ async def tree_expand(req: TreeExpandRequest):
                 stats.get("elapsed_sec", 0))
 
     return TreeExpandResponse(tree=clean_result["tree"], stats=clean_result["stats"])
+
+
+# ── Journal endpoints ─────────────────────────────────────────────────────────
+
+@app.get("/journal/{session_id}/md")
+async def journal_markdown(session_id: str):
+    """Return the agent journal for a session as a Markdown file download."""
+    from .journal import AgentJournal, LOGS_DIR
+    safe_id = session_id.replace("..", "").replace("/", "").replace("\\", "")
+    j = AgentJournal.for_session(safe_id)
+    if not j.path.exists():
+        raise HTTPException(status_code=404, detail=f"No journal for session '{safe_id}'")
+    try:
+        md_path = j.export_markdown()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return FileResponse(
+        path=str(md_path),
+        media_type="text/markdown",
+        filename=f"journal_{safe_id}.md",
+    )
+
+
+@app.get("/journal/{session_id}/jsonl")
+async def journal_jsonl(session_id: str):
+    """Return the raw JSONL journal file."""
+    from .journal import AgentJournal
+    safe_id = session_id.replace("..", "").replace("/", "").replace("\\", "")
+    j = AgentJournal.for_session(safe_id)
+    if not j.path.exists():
+        raise HTTPException(status_code=404, detail=f"No journal for session '{safe_id}'")
+    return FileResponse(
+        path=str(j.path),
+        media_type="application/x-ndjson",
+        filename=f"journal_{safe_id}.jsonl",
+    )

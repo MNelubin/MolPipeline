@@ -27,6 +27,10 @@ def retrosynthesis_node(state: dict[str, Any]) -> dict[str, Any]:
     Reads:  state["smiles"], state["molecule_info"]
     Writes: state["retro_result"], state["final_answer"] (overwrites retro section)
     """
+    import time as _time
+    from ..journal import AgentJournal
+    j = AgentJournal.for_session(state.get("session_id", "default"))
+
     smiles = state.get("smiles", "")
     molecule_info = state.get("molecule_info", {})
     mol_name = molecule_info.get("name", "Неизвестно")
@@ -38,49 +42,63 @@ def retrosynthesis_node(state: dict[str, Any]) -> dict[str, Any]:
 
     logger.info("[retro] searching routes for %s (%s)", mol_name, smiles[:30])
 
-    result = search_and_rank(smiles, top_n=5)
-    routes = result.get("routes", [])
-    sources = result.get("sources_used", [])
-    total = result.get("total_found", 0)
+    with j.step("retrosynthesis"):
+        t0 = _time.monotonic()
+        result = search_and_rank(smiles, top_n=5)
+        elapsed_search = int((_time.monotonic() - t0) * 1000)
 
-    logger.info(
-        "[retro] found %d total, showing top %d from %s",
-        total, len(routes), ", ".join(sources) or "none",
-    )
+        routes = result.get("routes", [])
+        sources = result.get("sources_used", [])
+        total = result.get("total_found", 0)
 
-    for route in routes:
-        procedure_steps = format_procedure_russian(route)
-        route["procedure_steps_ru"] = procedure_steps
+        j.tool_call(
+            "retrosynthesis", "search_and_rank",
+            args={"smiles": smiles[:40], "top_n": 5},
+            result_summary=f"{len(routes)} маршрутов из {', '.join(sources) or 'нет'}",
+            duration_ms=elapsed_search,
+        )
 
-    # Expand top routes into full trees (recursive decomposition to buyable reagents)
-    for i, route in enumerate(routes[:_MAX_ROUTES_TO_EXPAND]):
-        reactants = route.get("reactants", "")
-        if not reactants:
-            continue
-        try:
-            tree_result = expand_tree(
-                smiles, reactants,
-                max_depth=_TREE_MAX_DEPTH,
-                timeout_sec=_TREE_TIMEOUT_SEC,
-            )
-            route["tree"] = tree_result.get("tree", {})
-            route["tree_stats"] = tree_result.get("stats", {})
-            stats = route["tree_stats"]
-            logger.info(
-                "[retro] tree #%d: %d nodes, %d buyable, %d unresolved, depth=%d",
-                i + 1, stats.get("total_nodes", 0),
-                stats.get("buyable_count", 0),
-                stats.get("unresolved_count", 0),
-                stats.get("max_depth_reached", 0),
-            )
-        except Exception as e:
-            logger.warning("[retro] tree expansion failed for route #%d: %s", i + 1, e)
-            route["tree"] = None
-            route["tree_stats"] = None
+        logger.info("[retro] found %d total, showing top %d from %s", total, len(routes), ", ".join(sources) or "none")
+
+        for route in routes:
+            procedure_steps = format_procedure_russian(route)
+            route["procedure_steps_ru"] = procedure_steps
+
+        # Expand top routes into full trees
+        for i, route in enumerate(routes[:_MAX_ROUTES_TO_EXPAND]):
+            reactants = route.get("reactants", "")
+            if not reactants:
+                continue
+            try:
+                t0 = _time.monotonic()
+                tree_result = expand_tree(smiles, reactants, max_depth=_TREE_MAX_DEPTH, timeout_sec=_TREE_TIMEOUT_SEC)
+                elapsed_tree = int((_time.monotonic() - t0) * 1000)
+                route["tree"] = tree_result.get("tree", {})
+                route["tree_stats"] = tree_result.get("stats", {})
+                stats = route["tree_stats"]
+                j.tool_call(
+                    "retrosynthesis", "tree_expansion",
+                    args={"route_idx": i},
+                    result_summary=f"{stats.get('total_nodes', 0)} узлов, {stats.get('buyable_count', 0)} покупаемых",
+                    duration_ms=elapsed_tree,
+                )
+                logger.info("[retro] tree #%d: %d nodes, %d buyable, %d unresolved, depth=%d",
+                    i + 1, stats.get("total_nodes", 0), stats.get("buyable_count", 0),
+                    stats.get("unresolved_count", 0), stats.get("max_depth_reached", 0))
+            except Exception as e:
+                logger.warning("[retro] tree expansion failed for route #%d: %s", i + 1, e)
+                route["tree"] = None
+                route["tree_stats"] = None
+
+        j.decision(
+            "retrosynthesis",
+            f"Найдено {len(routes)} маршрутов синтеза для {mol_name}",
+            {"routes_count": len(routes), "sources": sources, "total_found": total,
+             "best_score": routes[0].get("final_score") if routes else None},
+        )
 
     retro_text = _format_retro_text(mol_name, routes, sources, total)
 
-    # Build final_answer: keep molecule card, overwrite retro section
     existing_answer = state.get("final_answer", "")
     retro_marker = "=" * 60 + "\n  РЕТРОСИНТЕЗ:"
     if retro_marker in existing_answer:

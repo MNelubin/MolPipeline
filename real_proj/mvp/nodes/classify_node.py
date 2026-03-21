@@ -45,9 +45,13 @@ def classify_node(state: dict[str, Any]) -> dict[str, Any]:
     Reads:  state["query"]
     Writes: state["input_type"], state["current_phase"], state["cycle_counts"]
     """
+    from ..journal import AgentJournal
+    j = AgentJournal.for_session(state.get("session_id", "default"))
+
     query = state.get("query", "").strip()
 
     if not query:
+        j.warning("classify", "Пустой запрос")
         return {
             "input_type": "invalid",
             "current_phase": "identification",
@@ -55,17 +59,20 @@ def classify_node(state: dict[str, Any]) -> dict[str, Any]:
             "error": "Пустой запрос.",
         }
 
-    input_type = _classify(query)
-    logger.info("[classify] query=%r -> input_type=%s", query[:80], input_type)
+    with j.step("classify"):
+        input_type = _classify(query)
+        logger.info("[classify] query=%r -> input_type=%s", query[:80], input_type)
 
-    result: dict[str, Any] = {
-        "input_type": input_type,
-        "current_phase": "identification",
-        "cycle_counts": state.get("cycle_counts", {}),
-    }
+        j.decision("classify", f"Тип ввода определён: {input_type}", {"input_type": input_type, "query": query[:80]})
 
-    if input_type == "invalid":
-        result["error"] = "Не удалось распознать запрос."
+        result: dict[str, Any] = {
+            "input_type": input_type,
+            "current_phase": "identification",
+            "cycle_counts": state.get("cycle_counts", {}),
+        }
+
+        if input_type == "invalid":
+            result["error"] = "Не удалось распознать запрос."
 
     return result
 

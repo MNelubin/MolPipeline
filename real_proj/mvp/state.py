@@ -114,3 +114,6 @@ class MVPState(TypedDict, total=False):
     current_phase: Literal["identification", "synthesis", "experiment"]
     cycle_counts: dict[str, int]
     error: str
+
+    # ── Journal ──
+    session_id: str

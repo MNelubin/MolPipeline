@@ -43,8 +43,13 @@ def validate_and_guard_node(state: dict[str, Any]) -> dict[str, Any]:
     Writes: state["validation"], state["smiles"], state["pubchem_cid"],
             state["guard_result"], state["error"]
     """
+    import time as _time
+    from ..journal import AgentJournal
+    j = AgentJournal.for_session(state.get("session_id", "default"))
+
     query = state.get("query", "").strip()
     if not query:
+        j.warning("validate_and_guard", "Пустой запрос — нечего валидировать.")
         return {
             "validation": {
                 "is_valid": False,
@@ -54,46 +59,72 @@ def validate_and_guard_node(state: dict[str, Any]) -> dict[str, Any]:
             "error": "Пустой запрос — нечего валидировать.",
         }
 
-    # ── Step 1: Resolve molecule ──
-    resolve_result = _resolve_molecule(query)
-    validation = resolve_result.get("validation", {})
+    with j.step("validate_and_guard"):
+        # ── Step 1: Resolve molecule ──
+        t0 = _time.monotonic()
+        resolve_result = _resolve_molecule(query)
+        elapsed_resolve = int((_time.monotonic() - t0) * 1000)
+        validation = resolve_result.get("validation", {})
 
-    if not validation.get("is_valid", False):
-        resolve_status = "not_found"
-        validation["resolve_status"] = resolve_status
-        logger.info("[validate_and_guard] query=%r -> not_found", query[:60])
-        return resolve_result
-
-    # ── Step 2: Run safety checks ──
-    smiles = resolve_result.get("smiles", "")
-    cid = resolve_result.get("pubchem_cid")
-
-    guard_result = _run_safety_checks(
-        smiles=smiles,
-        cid=cid,
-        reaction_description=state.get("reaction_description", ""),
-    )
-
-    overall = guard_result.get("overall_status", "SAFE")
-
-    if overall == "CRITICAL_STOP":
-        resolve_status = "banned"
-        reason = (
-            guard_result.get("molecule_check", {}).get("reason", "")
-            or guard_result.get("reaction_check", {}).get("reason", "")
+        j.tool_call(
+            "validate_and_guard", "pubchem_resolve",
+            args={"query": query[:60]},
+            result_summary=f"is_valid={validation.get('is_valid')}, method={validation.get('resolve_method', '?')}",
+            duration_ms=elapsed_resolve,
         )
-        validation["resolve_status"] = resolve_status
-        return {
-            "validation": validation,
-            "smiles": smiles,
-            "pubchem_cid": cid,
-            "guard_result": guard_result,
-            "error": f"CRITICAL_STOP: {reason}",
-        }
 
-    resolve_status = "found"
-    validation["resolve_status"] = resolve_status
-    logger.info("[validate_and_guard] query=%r -> found, status=%s", query[:60], overall)
+        if not validation.get("is_valid", False):
+            resolve_status = "not_found"
+            validation["resolve_status"] = resolve_status
+            j.decision("validate_and_guard", f"Молекула не найдена: {query[:60]}", {"resolve_status": "not_found"})
+            logger.info("[validate_and_guard] query=%r -> not_found", query[:60])
+            return resolve_result
+
+        # ── Step 2: Run safety checks ──
+        smiles = resolve_result.get("smiles", "")
+        cid = resolve_result.get("pubchem_cid")
+
+        t0 = _time.monotonic()
+        guard_result = _run_safety_checks(
+            smiles=smiles,
+            cid=cid,
+            reaction_description=state.get("reaction_description", ""),
+        )
+        elapsed_guard = int((_time.monotonic() - t0) * 1000)
+
+        overall = guard_result.get("overall_status", "SAFE")
+        j.tool_call(
+            "validate_and_guard", "guard_check",
+            args={"smiles": smiles[:40]},
+            result_summary=f"overall_status={overall}",
+            duration_ms=elapsed_guard,
+        )
+
+        if overall == "CRITICAL_STOP":
+            resolve_status = "banned"
+            reason = (
+                guard_result.get("molecule_check", {}).get("reason", "")
+                or guard_result.get("reaction_check", {}).get("reason", "")
+            )
+            validation["resolve_status"] = resolve_status
+            j.warning("validate_and_guard", f"CRITICAL_STOP: {reason}",
+                      {"smiles": smiles[:40], "reason": reason})
+            return {
+                "validation": validation,
+                "smiles": smiles,
+                "pubchem_cid": cid,
+                "guard_result": guard_result,
+                "error": f"CRITICAL_STOP: {reason}",
+            }
+
+        resolve_status = "found"
+        validation["resolve_status"] = resolve_status
+        j.decision(
+            "validate_and_guard",
+            f"Молекула идентифицирована: CID={cid}, статус={overall}",
+            {"resolve_status": "found", "pubchem_cid": cid, "smiles": smiles[:40], "guard_status": overall},
+        )
+        logger.info("[validate_and_guard] query=%r -> found, status=%s", query[:60], overall)
 
     return {
         "validation": validation,
