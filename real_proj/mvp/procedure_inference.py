@@ -380,14 +380,17 @@ def _translate_procedure_via_llm(text: str) -> list[dict[str, str]] | None:
     try:
         from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
     except ImportError:
+        logger.debug("LLM procedure: config import failed")
         return None
 
     if not OPENROUTER_API_KEY:
+        logger.debug("LLM procedure: no API key")
         return None
 
     try:
         import json as _json
         from langchain_openai import ChatOpenAI
+        from langchain_core.messages import SystemMessage, HumanMessage
 
         llm = ChatOpenAI(
             model=LLM_MODEL,
@@ -401,8 +404,8 @@ def _translate_procedure_via_llm(text: str) -> list[dict[str, str]] | None:
         proc_text = text[:3000] if len(text) > 3000 else text
 
         resp = llm.invoke([
-            {"role": "system", "content": _PROCEDURE_SYSTEM_PROMPT},
-            {"role": "user", "content": proc_text},
+            SystemMessage(content=_PROCEDURE_SYSTEM_PROMPT),
+            HumanMessage(content=proc_text),
         ])
 
         raw = resp.content.strip()
@@ -416,11 +419,13 @@ def _translate_procedure_via_llm(text: str) -> list[dict[str, str]] | None:
             # Validate format
             for s in steps:
                 if not isinstance(s, dict) or "description" not in s:
+                    logger.warning("LLM procedure: invalid step format: %s", s)
                     return None
                 s.setdefault("step", "?")
                 s.setdefault("reason", "ORD процедура")
             logger.info("LLM procedure translation: %d steps", len(steps))
             return steps
+        logger.warning("LLM procedure: empty or invalid response: %s", raw[:200])
     except Exception as e:
         logger.warning("LLM procedure translation failed: %s", e)
 
