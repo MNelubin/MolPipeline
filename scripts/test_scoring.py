@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import httpx
 
-ORD_URL = "https://client.open-reaction-database.org/api/query"
+ORD_URL = "https://open-reaction-database.org/api/query"
 
 # Test molecules
 TEST_MOLECULES = {
@@ -201,17 +201,41 @@ EXAMPLE_RETRO_DATA = {
 
 
 def query_ord(smiles: str, limit: int = 10) -> list[dict]:
-    """Query Open Reaction Database for reactions producing the target."""
-    client = httpx.Client(timeout=15.0)
-    payload = {
-        "useStereochemistry": False,
-        "similarity": 0.6,
-        "component": [{"smiles": smiles, "source": "output", "mode": "substructure"}],
-        "limit": limit,
-    }
-
+    """Query Open Reaction Database — local SQLite first, then remote API."""
+    # Try local SQLite index
     try:
-        resp = client.post(ORD_URL, json=payload)
+        from src.tools.ord_api import _local_search_by_product
+        local_results = _local_search_by_product(smiles, limit)
+        if local_results:
+            print(f"    (local SQLite: {len(local_results)} hits)")
+            parsed = []
+            for r in local_results:
+                rxn_smi = r.get("reaction_smiles", "")
+                if not rxn_smi or ">>" not in rxn_smi:
+                    continue
+                reactant_str = rxn_smi.split(">>")[0]
+                yield_pct = r.get("yield")
+
+                parsed.append({
+                    "reactants": reactant_str,
+                    "reaction_smiles": rxn_smi,
+                    "score": 0.85,  # published = good confidence
+                    "source": "ord",
+                    "expected_yield": yield_pct / 100.0 if yield_pct else None,
+                    "plausibility": 0.90,
+                    "description": f"ORD: {r.get('reaction_id', '')[:30]}",
+                    "temperature": r.get("temperature"),
+                    "solvent": r.get("solvents", [None])[0] if r.get("solvents") else None,
+                    "catalyst": r.get("catalysts", [None])[0] if r.get("catalysts") else None,
+                })
+            return parsed
+    except Exception as e:
+        print(f"    (local search error: {e})")
+
+    # Fallback to remote API
+    client = httpx.Client(timeout=20.0)
+    try:
+        resp = client.get(ORD_URL, params={"component": smiles, "limit": limit})
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
@@ -240,11 +264,11 @@ def query_ord(smiles: str, limit: int = 10) -> list[dict]:
         parsed.append({
             "reactants": reactant_str,
             "reaction_smiles": rxn_smi,
-            "score": 0.8,
+            "score": 0.85,
             "source": "ord",
             "expected_yield": yield_val / 100.0 if yield_val else None,
-            "plausibility": 0.9,
-            "description": f"ORD published reaction",
+            "plausibility": 0.90,
+            "description": "ORD published reaction",
         })
 
     return parsed
