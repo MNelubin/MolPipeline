@@ -59,11 +59,245 @@ HETEROGENEOUS_CATALYSTS = {
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+def _classify_molecule(smiles: str) -> str:
+    """Classify molecule as 'organic' | 'inorganic' | 'elemental' | 'unknown'.
+
+    elemental — all atoms are the same element (I2, Cl2, S8, etc.)
+    inorganic  — no carbon atoms but mixed elements (NaCl, H2SO4, etc.)
+    organic    — contains carbon
+    """
+    if not smiles:
+        return "unknown"
+    if not HAS_RDKIT:
+        # Simple heuristic without RDKit
+        has_c = "C" in smiles or "c" in smiles
+        return "organic" if has_c else "inorganic"
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return "unknown"
+    atomic_nums = [a.GetAtomicNum() for a in mol.GetAtoms()]
+    if not atomic_nums:
+        return "unknown"
+    has_carbon = any(n == 6 for n in atomic_nums)
+    if has_carbon:
+        return "organic"
+    unique_elements = set(atomic_nums)
+    if len(unique_elements) == 1:
+        return "elemental"
+    return "inorganic"
+
+
+def _is_nonsensical_reaction(reaction_smiles: str) -> str | None:
+    """Check if a reaction SMILES is chemically nonsensical.
+
+    Returns a human-readable warning string, or None if the reaction seems valid.
+    """
+    if not reaction_smiles or ">>" not in reaction_smiles:
+        return None
+    parts = reaction_smiles.split(">>")
+    reactant_str = parts[0].strip()
+    product_str = parts[-1].strip()
+
+    if not reactant_str or not product_str:
+        return None
+
+    if not HAS_RDKIT:
+        return None
+
+    rmol = Chem.MolFromSmiles(reactant_str)
+    pmol = Chem.MolFromSmiles(product_str)
+    if rmol is None or pmol is None:
+        return f"Невалидный SMILES в уравнении реакции: {reaction_smiles[:80]}"
+
+    r_can = Chem.MolToSmiles(rmol)
+    p_can = Chem.MolToSmiles(pmol)
+
+    # Reactant == Product (trivial / identity)
+    if r_can == p_can:
+        return f"Уравнение реакции тривиально: реагент и продукт идентичны ({r_can})"
+
+    # Atom count check (without reagents after '>') — simple sanity
+    r_atoms_by_element: dict[int, int] = {}
+    for a in rmol.GetAtoms():
+        r_atoms_by_element[a.GetAtomicNum()] = r_atoms_by_element.get(a.GetAtomicNum(), 0) + 1
+    p_atoms_by_element: dict[int, int] = {}
+    for a in pmol.GetAtoms():
+        p_atoms_by_element[a.GetAtomicNum()] = p_atoms_by_element.get(a.GetAtomicNum(), 0) + 1
+
+    # For single-component reaction (no '.'), check conservation
+    if "." not in reactant_str:
+        for elem_num, count in p_atoms_by_element.items():
+            r_count = r_atoms_by_element.get(elem_num, 0)
+            if count > r_count * 2:  # allow some flexibility for stoichiometry errors
+                elem_sym = Chem.GetPeriodicTable().GetElementSymbol(elem_num)
+                return (
+                    f"Нарушение атомного баланса: реагент содержит {r_count} атомов {elem_sym}, "
+                    f"а продукт — {count}. Маршрут может быть некорректным."
+                )
+
+    return None
+
+
+def _infer_elemental_procedure(product_smiles: str) -> list[dict[str, str]]:
+    """Generate appropriate procedure for elemental substances (I2, S8, etc.)."""
+    if not HAS_RDKIT or not product_smiles:
+        return []
+    mol = Chem.MolFromSmiles(product_smiles)
+    if mol is None:
+        return []
+    # Get element symbol
+    atoms = list(mol.GetAtoms())
+    if not atoms:
+        return []
+    elem_num = atoms[0].GetAtomicNum()
+    elem_sym = Chem.GetPeriodicTable().GetElementSymbol(elem_num)
+    n_atoms = len(atoms)
+    elem_name = _ELEMENT_NAMES_RU.get(elem_sym, elem_sym)
+
+    # Halogens: Cl2, Br2, I2 — oxidation of halide salt
+    if elem_sym in ("I", "Br", "Cl", "F"):
+        if elem_sym == "I":
+            return [
+                {"step": "1", "description": f"{elem_name} ({elem_sym}₂) — коммерчески доступный реактив. Рекомендуется закупить у химического поставщика (квалификация ч.д.а. или х.ч.).", "reason": "Промышленный способ"},
+                {"step": "2", "description": "При необходимости лабораторного синтеза: растворить 2 г KI в 5 мл воды, медленно добавить раствор Cl₂ в воде (или HCl + H₂O₂). Выпавший осадок I₂ отфильтровать.", "reason": "Окисление KI хлором"},
+                {"step": "3", "description": "Промыть осадок холодной водой для удаления KCl. Высушить между листами фильтровальной бумаги.", "reason": "Промывка"},
+                {"step": "4", "description": "Для дополнительной очистки провести возгонку (сублимацию): нагреть I₂ в фарфоровой чашке, закрытой воронкой с холодной водой. I₂ возгоняется при 113°C и кристаллизуется на охлаждённой поверхности.", "reason": "Сублимация — стандартный метод очистки I₂"},
+                {"step": "5", "description": "Хранить в плотно закрытом тёмном флаконе. ВНИМАНИЕ: I₂ — раздражающее вещество, работать в вытяжном шкафу.", "reason": "Техника безопасности"},
+            ]
+        elif elem_sym == "Br":
+            return [
+                {"step": "1", "description": f"{elem_name} ({elem_sym}₂) — коммерчески доступная жидкость. Закупить у поставщика.", "reason": "Промышленный реактив"},
+                {"step": "2", "description": "ВНИМАНИЕ: Br₂ — сильнодействующий яд и сильный окислитель. Работать только в вытяжном шкафу, СИЗ: перчатки, защитные очки, лабораторный халат.", "reason": "Техника безопасности"},
+            ]
+        else:
+            return [
+                {"step": "1", "description": f"{elem_name} ({elem_sym}₂) — промышленный газ, поставляется в баллонах. Синтез в лаборатории нецелесообразен.", "reason": "Промышленный реактив"},
+            ]
+
+    # Sulfur
+    if elem_sym == "S":
+        return [
+            {"step": "1", "description": "Сера (S₈) — коммерчески доступный реактив, закупить у поставщика (ч.д.а.).", "reason": "Промышленный реактив"},
+            {"step": "2", "description": "При необходимости очистки: растворить в CS₂, отфильтровать нерастворимые примеси, упарить CS₂ — получится ромбическая сера.", "reason": "Очистка сублимацией или растворением в CS₂"},
+        ]
+
+    # Generic elemental
+    return [
+        {"step": "1", "description": f"Элементарный {elem_name} ({elem_sym}{n_atoms if n_atoms > 1 else ''}) — как правило, коммерчески доступен. Рекомендуется закупить у химического поставщика.", "reason": "Элементарное вещество"},
+        {"step": "2", "description": "Если требуется синтез: обратитесь к специализированной неорганической химической литературе — методика зависит от конкретного элемента.", "reason": "Специфика неорганического синтеза"},
+    ]
+
+
+def _infer_inorganic_procedure(route: dict[str, Any], product_smiles: str) -> list[dict[str, str]]:
+    """Generate a basic inorganic synthesis procedure.
+
+    Unlike organic synthesis, inorganic reactions:
+    - Often don't need organic solvents
+    - May use aqueous media
+    - Purification is via filtration/recrystallization/precipitation, not chromatography
+    """
+    temp = route.get("temperature")
+    solvent = route.get("solvent")
+    catalyst = route.get("catalyst")
+    temp_c = _parse_temp(temp)
+    solvent_info = _get_solvent_info(solvent)
+    solvent_name = solvent_info.get("name_ru", solvent) if solvent_info else (solvent or "вода")
+
+    steps: list[dict[str, str]] = []
+    step_num = 1
+
+    steps.append({
+        "step": str(step_num),
+        "description": f"Подготовить реагенты. Взвесить необходимые количества согласно таблице реагентов.",
+        "reason": "Неорганический синтез",
+    })
+    step_num += 1
+
+    if solvent_name:
+        steps.append({
+            "step": str(step_num),
+            "description": f"Растворить реагенты в {solvent_name} при перемешивании.",
+            "reason": f"Растворитель: {solvent_name}",
+        })
+        step_num += 1
+
+    if catalyst:
+        steps.append({
+            "step": str(step_num),
+            "description": f"Добавить катализатор/активатор: {catalyst}.",
+            "reason": f"Катализатор: {catalyst}",
+        })
+        step_num += 1
+
+    if temp_c is not None:
+        if temp_c < 0:
+            steps.append({
+                "step": str(step_num),
+                "description": f"Охладить до {temp_c}°C (ледяная баня).",
+                "reason": f"T реакции {temp_c}°C",
+            })
+        elif temp_c > 25:
+            steps.append({
+                "step": str(step_num),
+                "description": f"Нагреть реакционную смесь до {temp_c}°C при перемешивании.",
+                "reason": f"T реакции {temp_c}°C",
+            })
+        step_num += 1
+
+    steps.append({
+        "step": str(step_num),
+        "description": "Перемешивать 1-3 часа до завершения реакции (контроль по изменению цвета/осадку).",
+        "reason": "Время реакции (оценка)",
+    })
+    step_num += 1
+
+    # Product properties — solid or dissolved?
+    product_props = _get_mol_props(product_smiles) if product_smiles else {}
+    likely_solid = product_props.get("likely_solid", True)  # inorganics often solid
+
+    if likely_solid:
+        steps.append({
+            "step": str(step_num),
+            "description": "Отфильтровать выпавший осадок (вакуумная фильтрация через бумажный фильтр). Промыть дистиллированной водой.",
+            "reason": "Осаждение неорганического продукта",
+        })
+        step_num += 1
+        steps.append({
+            "step": str(step_num),
+            "description": "Высушить продукт в сушильном шкафу (60-120°C, 2-4 ч). При необходимости перекристаллизовать из воды.",
+            "reason": "Сушка и очистка",
+        })
+        step_num += 1
+    else:
+        steps.append({
+            "step": str(step_num),
+            "description": "Упарить раствор досуха (роторный испаритель или водяная баня). Перекристаллизовать из подходящего растворителя.",
+            "reason": "Выделение продукта из раствора",
+        })
+        step_num += 1
+
+    return steps
+
+
+_ELEMENT_NAMES_RU = {
+    "H": "водород", "He": "гелий", "Li": "литий", "Be": "бериллий",
+    "B": "бор", "C": "углерод", "N": "азот", "O": "кислород",
+    "F": "фтор", "Ne": "неон", "Na": "натрий", "Mg": "магний",
+    "Al": "алюминий", "Si": "кремний", "P": "фосфор", "S": "сера",
+    "Cl": "хлор", "Ar": "аргон", "K": "калий", "Ca": "кальций",
+    "Fe": "железо", "Cu": "медь", "Zn": "цинк", "Br": "бром",
+    "I": "йод", "Pt": "платина", "Au": "золото", "Hg": "ртуть",
+    "Pb": "свинец", "Ag": "серебро", "Cr": "хром", "Mn": "марганец",
+    "Ni": "никель", "Co": "кобальт", "Mo": "молибден", "W": "вольфрам",
+}
+
+
 def infer_procedure(route: dict[str, Any]) -> list[dict[str, str]]:
     """Infer synthesis procedure steps from reaction conditions.
 
     Uses heuristics based on temperature, solvent, catalyst, and
-    reactant/product properties.
+    reactant/product properties. Handles inorganic/elemental molecules
+    with appropriate non-organic procedures.
 
     Returns list of step dicts: {step, description, reason}
     """
@@ -72,7 +306,48 @@ def infer_procedure(route: dict[str, Any]) -> list[dict[str, str]]:
     solvent = route.get("solvent")
     catalyst = route.get("catalyst")
     reactants_str = route.get("reactants", "")
-    product_smiles = route.get("reaction_smiles", "").split(">>")[-1] if ">>" in route.get("reaction_smiles", "") else ""
+    reaction_smiles = route.get("reaction_smiles", "")
+    product_smiles = reaction_smiles.split(">>")[-1] if ">>" in reaction_smiles else ""
+
+    # ── Early exit: check for nonsensical reaction ──
+    nonsensical_warning = _is_nonsensical_reaction(reaction_smiles)
+
+    # ── Early exit: elemental molecules (I2, S8, Cl2, etc.) ──
+    mol_class = _classify_molecule(product_smiles) if product_smiles else "unknown"
+    if mol_class == "elemental":
+        elemental_steps = _infer_elemental_procedure(product_smiles)
+        if nonsensical_warning:
+            elemental_steps.insert(0, {
+                "step": "!",
+                "description": f"⚠ {nonsensical_warning}",
+                "reason": "Проверка уравнения реакции",
+            })
+        if elemental_steps:
+            # Re-number steps
+            for i, s in enumerate(elemental_steps, 1):
+                if s["step"] != "!":
+                    s["step"] = str(i)
+            return elemental_steps
+
+    # ── Early exit: inorganic compounds (no carbon) ──
+    if mol_class == "inorganic":
+        inorganic_steps = _infer_inorganic_procedure(route, product_smiles)
+        if nonsensical_warning:
+            inorganic_steps.insert(0, {
+                "step": "!",
+                "description": f"⚠ {nonsensical_warning}",
+                "reason": "Проверка уравнения реакции",
+            })
+        return inorganic_steps
+
+    # ── Non-fatal warning for organic reactions with odd stoichiometry ──
+    warning_step = None
+    if nonsensical_warning:
+        warning_step = {
+            "step": "!",
+            "description": f"⚠ {nonsensical_warning}",
+            "reason": "Проверка уравнения реакции",
+        }
 
     # Parse temperature
     temp_c = _parse_temp(temp)
@@ -86,6 +361,9 @@ def infer_procedure(route: dict[str, Any]) -> list[dict[str, str]]:
     product_props = _get_mol_props(product_smiles) if product_smiles else {}
 
     step_num = 1
+
+    if warning_step:
+        steps.append(warning_step)
 
     # ── Step 1: Atmosphere / sensitivity ──
     if _is_sensitive_reaction(catalyst, reactants_str):
