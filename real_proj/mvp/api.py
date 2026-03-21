@@ -1,10 +1,11 @@
 """FastAPI gateway for the Chemist Agent pipeline.
 
-POST /analyze  — run full pipeline, return complete state + formatted output
-GET  /health   — liveness check
+POST /analyze      — run full pipeline, return complete state + formatted output
+POST /ord/search   — search ORD by molecule name or SMILES, return ranked reactions
+GET  /health       — liveness check
 
 Run:
-    uvicorn real_proj.mvp.api:app --host 0.0.0.0 --port 8000
+    uvicorn real_proj.mvp.api:app --host 0.0.0.0 --port 8765
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Config must be imported first (sets LangSmith env vars)
 from . import config as _cfg  # noqa: F401
 from .graph import build_graph
+from .retro_tools import ord_search_by_product, score_route, _deduplicate_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +74,36 @@ class AnalyzeResponse(BaseModel):
 
     # Full pipeline state (all nodes)
     state: dict[str, Any]
+
+
+class OrdSearchRequest(BaseModel):
+    query: str = Field(..., description="Molecule name (any language) or SMILES string")
+    limit: int = Field(default=15, ge=1, le=100, description="Max reactions to fetch from ORD before dedup/ranking")
+    top_n: int = Field(default=15, ge=1, le=100, description="Max results to return after ranking")
+    scored: bool = Field(default=True, description="Apply multi-factor scoring and ranking")
+
+
+class OrdReaction(BaseModel):
+    reaction_id: str | None = None
+    reaction_smiles: str | None = None
+    reactants: str | None = None
+    expected_yield: float | None = None
+    temperature: str | None = None
+    solvent: str | None = None
+    catalyst: str | None = None
+    procedure_details: str | None = None
+    source: str = "ord"
+    final_score: float | None = None
+    scoring: dict[str, Any] | None = None
+
+
+class OrdSearchResponse(BaseModel):
+    query: str                          # original input
+    smiles: str                         # resolved canonical SMILES
+    resolution: str                     # "smiles_direct" | "pubchem_name" | "pubchem_llm"
+    total_found: int                    # reactions in ORD before dedup
+    returned: int                       # reactions in this response
+    reactions: list[dict[str, Any]]     # full reaction dicts
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -139,6 +171,80 @@ def _run_pipeline(query: str) -> dict[str, Any]:
     return _graph.invoke({"query": query})
 
 
+def _resolve_to_smiles(query: str) -> tuple[str, str]:
+    """Resolve a molecule name or SMILES to canonical SMILES.
+
+    Returns (canonical_smiles, resolution_method).
+    Raises ValueError if resolution fails.
+
+    Resolution methods:
+      "smiles_direct"  — input was already valid SMILES
+      "pubchem_name"   — resolved via PubChem name lookup
+      "pubchem_llm"    — Cyrillic name translated by LLM, then PubChem
+    """
+    from rdkit import Chem
+    from .nodes.validate_node import _detect_input_type, _translate_name_via_llm
+    from .tools import get_cid_by_name, get_smiles_by_cid
+    import re
+
+    _CYRILLIC_RE = re.compile(r"[а-яА-ЯёЁ]")
+    query = query.strip()
+
+    input_type = _detect_input_type(query)
+
+    if input_type == "smiles":
+        mol = Chem.MolFromSmiles(query)
+        if mol is None:
+            raise ValueError(f"Invalid SMILES: {query}")
+        return Chem.MolToSmiles(mol, isomericSmiles=True), "smiles_direct"
+
+    # Name → CID → SMILES
+    cid = get_cid_by_name(query)
+    resolution = "pubchem_name"
+
+    if cid is None and _CYRILLIC_RE.search(query):
+        en_name = _translate_name_via_llm(query)
+        if en_name:
+            cid = get_cid_by_name(en_name)
+            resolution = "pubchem_llm"
+
+    if cid is None:
+        raise ValueError(f"Molecule '{query}' not found in PubChem")
+
+    smiles = get_smiles_by_cid(cid)
+    if not smiles:
+        raise ValueError(f"PubChem CID {cid} has no SMILES")
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        raise ValueError(f"PubChem returned invalid SMILES for CID {cid}")
+
+    return Chem.MolToSmiles(mol, isomericSmiles=True), resolution
+
+
+def _run_ord_search(query: str, limit: int, top_n: int, scored: bool) -> dict[str, Any]:
+    """Resolve query → SMILES, search ORD, optionally score. Called in thread pool."""
+    smiles, resolution = _resolve_to_smiles(query)
+
+    reactions = ord_search_by_product(smiles, limit=limit)
+    total_found = len(reactions)
+
+    if scored and reactions:
+        for r in reactions:
+            score_route(r)
+        reactions = _deduplicate_routes(reactions)
+        reactions.sort(key=lambda r: r.get("final_score", 0), reverse=True)
+
+    reactions = reactions[:top_n]
+
+    return {
+        "smiles": smiles,
+        "resolution": resolution,
+        "total_found": total_found,
+        "reactions": reactions,
+    }
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -173,4 +279,46 @@ async def analyze(req: AnalyzeRequest):
         query=query,
         output=output,
         state=clean_state,
+    )
+
+
+@app.post("/ord/search", response_model=OrdSearchResponse)
+async def ord_search(req: OrdSearchRequest):
+    """Search Open Reaction Database for synthesis routes to the target molecule.
+
+    Accepts a molecule name (English or Russian) or SMILES string.
+    Returns all matching reactions from the local ORD SQLite index (2.38M reactions),
+    optionally scored and ranked by multi-factor scoring.
+    """
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query must not be empty")
+
+    logger.info("[ord/search] query=%r limit=%d top_n=%d scored=%s",
+                query, req.limit, req.top_n, req.scored)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: _run_ord_search(query, req.limit, req.top_n, req.scored),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[ord/search] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    clean_reactions = _sanitize(result["reactions"])
+    logger.info("[ord/search] %r → smiles=%s total=%d returning=%d",
+                query, result["smiles"][:30], result["total_found"], len(clean_reactions))
+
+    return OrdSearchResponse(
+        query=query,
+        smiles=result["smiles"],
+        resolution=result["resolution"],
+        total_found=result["total_found"],
+        returned=len(clean_reactions),
+        reactions=clean_reactions,
     )
