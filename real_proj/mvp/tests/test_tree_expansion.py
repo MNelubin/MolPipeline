@@ -311,7 +311,7 @@ class TestStats:
         }
         counts = {"total": 0, "buyable": 0, "banned": 0, "unresolved": 0, "max_depth": 0}
         _walk(tree, counts)
-        assert counts["total"] == 5
+        assert counts["total"] == 6  # root + 3 at depth 1 + 2 at depth 2
         assert counts["buyable"] == 2
         assert counts["banned"] == 1
         assert counts["unresolved"] == 1
