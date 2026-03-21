@@ -190,7 +190,8 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
     final_weight = _safe_float(rdkit_weight if rdkit_weight else parsed_weight)
 
     parsed_cid = parsed.get("pubchem_cid")
-    final_cid = _safe_int(parsed_cid if parsed_cid not in ("", None) else cid)
+    # Prefer the known CID (from state or pubchem lookup) — never let LLM override it
+    final_cid = _safe_int(cid or parsed_cid or 0)
 
     # Experimental values take priority over LLM guesses
     melting_point = exp_props.get("melting_point") or props.get("melting_point", "Н/Д")
@@ -200,8 +201,13 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
     flash_point = exp_props.get("flash_point") or props.get("flash_point")
     vapor_pressure = exp_props.get("vapor_pressure") or props.get("vapor_pressure")
 
+    # Name: prefer known PubChem IUPAC name over LLM output (LLM can hallucinate)
+    known_iupac = pubchem_result.get("iupac") or ""
+    llm_name = parsed.get("name", "")
+    final_name = known_iupac if known_iupac else (llm_name or "Неизвестно")
+
     molecule_info = {
-        "name": parsed.get("name", pubchem_result.get("iupac", "Неизвестно")),
+        "name": final_name,
         "synonyms": parsed.get("synonyms", pubchem_result.get("synonyms", [])),
         "smiles": parsed.get("smiles") or smiles or "",
         "molecular_formula": parsed.get("molecular_formula", pubchem_result.get("formula", "")),
