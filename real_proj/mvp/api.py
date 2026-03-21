@@ -76,6 +76,18 @@ class AnalyzeResponse(BaseModel):
     state: dict[str, Any]
 
 
+class TreeExpandRequest(BaseModel):
+    smiles: str = Field(..., description="Target molecule SMILES")
+    reactants: str = Field(..., description="Dot-separated reactant SMILES from the selected route")
+    max_depth: int = Field(default=6, ge=1, le=12, description="Maximum recursion depth")
+    timeout_sec: float = Field(default=120.0, ge=5, le=600, description="Maximum elapsed time in seconds")
+
+
+class TreeExpandResponse(BaseModel):
+    tree: dict[str, Any]
+    stats: dict[str, Any]
+
+
 class OrdSearchRequest(BaseModel):
     query: str = Field(..., description="Molecule name (any language) or SMILES string")
     limit: int = Field(default=15, ge=1, le=100, description="Max reactions to fetch from ORD before dedup/ranking")
@@ -322,3 +334,42 @@ async def ord_search(req: OrdSearchRequest):
         returned=len(clean_reactions),
         reactions=clean_reactions,
     )
+
+
+@app.post("/tree/expand", response_model=TreeExpandResponse)
+async def tree_expand(req: TreeExpandRequest):
+    """Recursively expand a selected synthesis route into a full tree.
+
+    Takes the target molecule SMILES and the reactants string from a selected
+    route, then recursively decomposes non-buyable reactants until all leaves
+    are buyable, banned, or unresolvable.
+    """
+    smiles = req.smiles.strip()
+    reactants = req.reactants.strip()
+    if not smiles or not reactants:
+        raise HTTPException(status_code=422, detail="smiles and reactants must not be empty")
+
+    logger.info("[tree/expand] smiles=%s reactants=%s max_depth=%d timeout=%.0fs",
+                smiles[:30], reactants[:40], req.max_depth, req.timeout_sec)
+
+    import asyncio
+    from .tree_expansion import expand_tree
+
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: expand_tree(smiles, reactants, req.max_depth, req.timeout_sec),
+        )
+    except Exception as exc:
+        logger.exception("[tree/expand] crashed for smiles %r", smiles[:30])
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    clean_result = _sanitize(result)
+    stats = clean_result.get("stats", {})
+    logger.info("[tree/expand] %s → %d nodes, %d buyable, %d banned, %.1fs",
+                smiles[:30], stats.get("total_nodes", 0),
+                stats.get("buyable_count", 0), stats.get("banned_count", 0),
+                stats.get("elapsed_sec", 0))
+
+    return TreeExpandResponse(tree=clean_result["tree"], stats=clean_result["stats"])
