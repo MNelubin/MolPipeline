@@ -122,9 +122,12 @@ def search_pubmed(query: str, max_results: int = 10) -> list[WebSource]:
 def search_web(query: str, max_results: int = 10) -> list[WebSource]:
     """General web search via duckduckgo-search library."""
     try:
-        from duckduckgo_search import DDGS
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS
     except ImportError:
-        logger.warning("duckduckgo-search not installed; skipping web search")
+        logger.warning("ddgs/duckduckgo-search not installed; skipping web search")
         return []
 
     sources: list[WebSource] = []
