@@ -187,7 +187,7 @@ def build_graph(checkpointer=None):
         checkpointer: LangGraph checkpointer instance. If None, creates
             a MemorySaver (in-memory, suitable for dev/CLI).
     """
-    if checkpointer is None:
+    if not checkpointer or isinstance(checkpointer, dict):
         checkpointer = MemorySaver()
 
     graph = StateGraph(MVPState)
