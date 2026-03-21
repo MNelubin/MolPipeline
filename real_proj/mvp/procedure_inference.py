@@ -353,54 +353,78 @@ def _infer_workup(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Procedure formatting (ORD English → structured Russian)
+# Procedure formatting (ORD English → structured Russian via LLM)
 # ═════════════════════════════════════════════════════════════════════════════
 
-# Key English→Russian term translations for procedures
-_TERM_MAP = {
-    "was added": "добавлен",
-    "were added": "добавлены",
-    "was dissolved": "растворён",
-    "were dissolved": "растворены",
-    "was stirred": "перемешивали",
-    "was heated": "нагревали",
-    "was cooled": "охлаждали",
-    "was filtered": "отфильтровали",
-    "was washed": "промыли",
-    "was dried": "высушили",
-    "was concentrated": "упарили",
-    "was purified": "очистили",
-    "was extracted": "экстрагировали",
-    "the mixture": "смесь",
-    "the solution": "раствор",
-    "the reaction": "реакцию",
-    "the product": "продукт",
-    "the residue": "остаток",
-    "room temperature": "комнатной температуре",
-    "ice bath": "ледяной бане",
-    "under nitrogen": "в атмосфере азота",
-    "under argon": "в атмосфере аргона",
-    "under vacuum": "под вакуумом",
-    "overnight": "в течение ночи (12-16 ч)",
-    "dropwise": "по каплям",
-    "column chromatography": "колоночной хроматографией",
-    "silica gel": "силикагеле",
-    "flash chromatography": "флэш-хроматографией",
-    "recrystallization": "перекристаллизацией",
-    "recrystallized": "перекристаллизовали",
-    "evaporated": "упарили",
-    "concentrated in vacuo": "упарили при пониженном давлении",
-    "rotary evaporator": "роторном испарителе",
-    "anhydrous": "безводном",
-    "saturated": "насыщенным",
-    "aqueous": "водным",
-    "organic layer": "органическую фазу",
-    "aqueous layer": "водную фазу",
-    "white solid": "белое твёрдое вещество",
-    "yellow oil": "жёлтое масло",
-    "colorless oil": "бесцветное масло",
-    "yield": "выход",
-}
+_PROCEDURE_SYSTEM_PROMPT = """\
+Ты — ассистент-химик. Тебе дан текст процедуры синтеза на английском языке из базы Open Reaction Database.
+
+Задача: перевести процедуру на русский язык и разбить на пронумерованные шаги.
+
+Правила:
+1. Каждый шаг — отдельное действие (добавление реагента, нагрев, перемешивание, фильтрация и т.д.)
+2. Сохраняй все количества, температуры, времена, названия реагентов
+3. Используй профессиональную химическую терминологию на русском
+4. Названия реагентов оставляй на английском в скобках, если нет устоявшегося русского названия
+5. Отвечай ТОЛЬКО в формате JSON — массив объектов
+
+Формат ответа (ТОЛЬКО JSON, без markdown):
+[
+  {"step": "1", "description": "Описание шага на русском", "reason": "ORD процедура"},
+  {"step": "2", "description": "Описание шага на русском", "reason": "ORD процедура"}
+]"""
+
+
+def _translate_procedure_via_llm(text: str) -> list[dict[str, str]] | None:
+    """Translate English procedure to structured Russian steps via LLM."""
+    try:
+        from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
+    except ImportError:
+        return None
+
+    if not OPENROUTER_API_KEY:
+        return None
+
+    try:
+        import json as _json
+        from langchain_openai import ChatOpenAI
+
+        llm = ChatOpenAI(
+            model=LLM_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=0.05,
+            max_tokens=2000,
+        )
+
+        # Truncate very long procedures
+        proc_text = text[:3000] if len(text) > 3000 else text
+
+        resp = llm.invoke([
+            {"role": "system", "content": _PROCEDURE_SYSTEM_PROMPT},
+            {"role": "user", "content": proc_text},
+        ])
+
+        raw = resp.content.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+
+        steps = _json.loads(raw)
+        if isinstance(steps, list) and steps:
+            # Validate format
+            for s in steps:
+                if not isinstance(s, dict) or "description" not in s:
+                    return None
+                s.setdefault("step", "?")
+                s.setdefault("reason", "ORD процедура")
+            logger.info("LLM procedure translation: %d steps", len(steps))
+            return steps
+    except Exception as e:
+        logger.warning("LLM procedure translation failed: %s", e)
+
+    return None
 
 
 def format_procedure_russian(
@@ -409,7 +433,7 @@ def format_procedure_russian(
 ) -> list[dict[str, str]]:
     """Format a route's procedure as structured Russian steps.
 
-    If ORD procedure_details exists, parses and translates it.
+    If ORD procedure_details exists, translates via LLM.
     Otherwise, infers from conditions using rules.
 
     Returns list of step dicts: {step, description, reason}
@@ -417,8 +441,13 @@ def format_procedure_russian(
     procedure = route.get("procedure_details", "")
 
     if procedure and len(procedure) > 50:
-        # Parse ORD procedure into steps
-        return _parse_english_procedure(procedure)
+        # Try LLM translation first
+        llm_result = _translate_procedure_via_llm(procedure)
+        if llm_result:
+            return llm_result
+        # Fallback: simple split (no translation)
+        logger.warning("LLM fallback: returning raw procedure split")
+        return _split_procedure_raw(procedure)
 
     if use_inference:
         return infer_procedure(route)
@@ -430,12 +459,8 @@ def format_procedure_russian(
     }]
 
 
-def _parse_english_procedure(text: str) -> list[dict[str, str]]:
-    """Parse English procedure text into numbered Russian steps.
-
-    Splits by sentences, groups into logical steps, applies term translation.
-    """
-    # Split into sentences
+def _split_procedure_raw(text: str) -> list[dict[str, str]]:
+    """Fallback: split procedure into sentences without translation."""
     sentences = re.split(r'(?<=[.!])\s+', text.strip())
     sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
 
@@ -443,52 +468,10 @@ def _parse_english_procedure(text: str) -> list[dict[str, str]]:
         return [{"step": "1", "description": text[:500], "reason": "ORD (оригинал)"}]
 
     steps: list[dict[str, str]] = []
-    current_group: list[str] = []
-    step_num = 1
-
-    # Group sentences into logical steps by action keywords
-    action_markers = [
-        "was added", "were added", "was dissolved", "was stirred",
-        "was heated", "was cooled", "was filtered", "was washed",
-        "was extracted", "was purified", "was concentrated",
-        "the mixture was", "the reaction was", "the product was",
-        "added to", "poured into",
-    ]
-
-    for sent in sentences:
-        sent_lower = sent.lower()
-        is_new_action = any(m in sent_lower for m in action_markers)
-
-        if is_new_action and current_group:
-            # Save current group as a step
-            combined = " ".join(current_group)
-            translated = _light_translate(combined)
-            steps.append({
-                "step": str(step_num),
-                "description": translated,
-                "reason": "ORD процедура",
-            })
-            step_num += 1
-            current_group = [sent]
-        else:
-            current_group.append(sent)
-
-    # Last group
-    if current_group:
-        combined = " ".join(current_group)
-        translated = _light_translate(combined)
+    for i, sent in enumerate(sentences, 1):
         steps.append({
-            "step": str(step_num),
-            "description": translated,
-            "reason": "ORD процедура",
+            "step": str(i),
+            "description": sent,
+            "reason": "ORD (оригинал, без перевода)",
         })
-
     return steps
-
-
-def _light_translate(text: str) -> str:
-    """Apply dictionary-based translation of common chemistry terms."""
-    result = text
-    for eng, rus in _TERM_MAP.items():
-        result = re.sub(re.escape(eng), rus, result, flags=re.IGNORECASE)
-    return result

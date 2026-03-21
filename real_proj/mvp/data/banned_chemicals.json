@@ -1,10 +1,10 @@
 {
   "_meta": {
-    "total": 143,
+    "total": 150,
     "stats": {
-      "critical": 32,
-      "high": 77,
-      "medium": 34
+      "critical": 36,
+      "high": 78,
+      "medium": 36
     },
     "sources": [
       "Costanzi Research CWC Schedules (costanziresearch.com)",
@@ -25,7 +25,7 @@
   "chemicals": [
     {
       "smiles": "[Br-].[Br-].CC[N+](C)(CC(=O)CCCCCCC(=O)C[N+](C)(CC)Cc1ncccc1OC(=O)N(C)C)Cc2ncccc2OC(=O)N(C)C",
-      "canonical_smiles": "CC[N+](C)(CC(=O)CCCCCCC(=O)C[N+](C)(CC)Cc1ncccc1OC(=O)N(C)C)Cc1ncccc1OC(=O)N(C)C.[Br-].[Br-]",
+      "canonical_smiles": "[Br-].[Br-].CC[N+](C)(CC(=O)CCCCCCC(=O)C[N+](C)(CC)Cc1ncccc1OC(=O)N(C)C)Cc2ncccc2OC(=O)N(C)C",
       "name": "1,10-Bis[N-(3-dimethylcarbamoxy-α-picolyl)-N-ethyl-N-methylammonio]decane-2,9- dione dibromide",
       "cas": "77104-00-8",
       "category": "cwc_schedule_1_example",
@@ -73,7 +73,7 @@
     },
     {
       "smiles": "[Br-].[Br-].CN(C)C(=O)Oc1cccnc1C[N+](C)(C)CCCCCCCCCC[N+](C)(C)CCO",
-      "canonical_smiles": "CN(C)C(=O)Oc1cccnc1C[N+](C)(C)CCCCCCCCCC[N+](C)(C)CCO.[Br-].[Br-]",
+      "canonical_smiles": "[Br-].[Br-].CN(C)C(=O)Oc1cccnc1C[N+](C)(C)CCCCCCCCCC[N+](C)(C)CCO",
       "name": "1-[N,N-dimethyl-N-(2-hydroxy)ethylammonio]-10-[N-(3-dimethylcarbamoxy-\nα-picolinyl)-N,N-dimethylammonio]decane dibromide",
       "cas": "77104-62-2",
       "category": "cwc_schedule_1_example",
@@ -85,7 +85,7 @@
     },
     {
       "smiles": "C(CCl)SCCl",
-      "canonical_smiles": "ClCCSCCl",
+      "canonical_smiles": "C(CCl)SCCl",
       "name": "2-Chloroethylchloromethylsulfide",
       "cas": "2625-76-5",
       "category": "cwc_schedule_1",
@@ -121,7 +121,7 @@
     },
     {
       "smiles": "CC(C)O[P](C)(Cl)=O",
-      "canonical_smiles": "CC(C)OP(C)(=O)Cl",
+      "canonical_smiles": "CC(C)O[P](C)(Cl)=O",
       "name": "Chlorosarin: O-Isopropyl methylphosphonochloridate",
       "cas": "1445-76-7",
       "category": "cwc_schedule_1_precursor",
@@ -133,7 +133,7 @@
     },
     {
       "smiles": "CC(O[P](C)(Cl)=O)C(C)(C)C",
-      "canonical_smiles": "CC(OP(C)(=O)Cl)C(C)(C)C",
+      "canonical_smiles": "CC(O[P](C)(Cl)=O)C(C)(C)C",
       "name": "Chlorosoman: O-Pinacolyl methylphosphonochloridate",
       "cas": "7040-57-5",
       "category": "cwc_schedule_1_precursor",
@@ -145,7 +145,7 @@
     },
     {
       "smiles": "C[P](F)(F)=O",
-      "canonical_smiles": "CP(=O)(F)F",
+      "canonical_smiles": "C[P](F)(F)=O",
       "name": "DF: Methylphosphonyldifluoride",
       "cas": "676-99-3",
       "category": "cwc_schedule_1_precursor",
@@ -157,7 +157,7 @@
     },
     {
       "smiles": "O=P(F)(N=C(N(CC)CC)C)OCC",
-      "canonical_smiles": "CCOP(=O)(F)N=C(C)N(CC)CC",
+      "canonical_smiles": "O=P(F)(N=C(N(CC)CC)C)OCC",
       "name": "Ethyl-(1-(diethylamino)ethylidene)phosphoramidofluoridate",
       "cas": "2387496-06-0",
       "category": "cwc_schedule_1_example",
@@ -193,7 +193,7 @@
     },
     {
       "smiles": "C(CCl)N(CCCl)CCCl",
-      "canonical_smiles": "ClCCN(CCCl)CCCl",
+      "canonical_smiles": "C(CCl)N(CCCl)CCCl",
       "name": "HN3: Tris(2-chloroethyl)amine",
       "cas": "555-77-1",
       "category": "cwc_schedule_1",
@@ -205,7 +205,7 @@
     },
     {
       "smiles": "C(=C[As](Cl)Cl)Cl",
-      "canonical_smiles": "ClC=C[As](Cl)Cl",
+      "canonical_smiles": "C(=C[As](Cl)Cl)Cl",
       "name": "Lewisite 1: 2-Chlorovinyldichloroarsine",
       "cas": "541-25-3",
       "category": "cwc_schedule_1",
@@ -241,7 +241,7 @@
     },
     {
       "smiles": "O=P(F)(N=C(N(CC)CC)C)C",
-      "canonical_smiles": "CCN(CC)C(C)=NP(C)(=O)F",
+      "canonical_smiles": "O=P(F)(N=C(N(CC)CC)C)C",
       "name": "Methyl-(1-(diethylamino)ethylidene)phosphonamidofluoridate",
       "cas": "2387496-12-8",
       "category": "cwc_schedule_1_example",
@@ -253,7 +253,7 @@
     },
     {
       "smiles": "O=P(F)(N=C(N(CC)CC)C)OC",
-      "canonical_smiles": "CCN(CC)C(C)=NP(=O)(F)OC",
+      "canonical_smiles": "O=P(F)(N=C(N(CC)CC)C)OC",
       "name": "Methyl-(1-(diethylamino)ethylidene)phosphoramidofluoridate",
       "cas": "2387496-04-8",
       "category": "cwc_schedule_1_example",
@@ -265,7 +265,7 @@
     },
     {
       "smiles": "CCN(CC)C(=N[P](C)(F)=O)N(CC)CC",
-      "canonical_smiles": "CCN(CC)C(=NP(C)(=O)F)N(CC)CC",
+      "canonical_smiles": "CCN(CC)C(=N[P](C)(F)=O)N(CC)CC",
       "name": "Methyl-(bis(diethylamino)methylene)phosphonamidofluoridate",
       "cas": "2387496-14-0",
       "category": "cwc_schedule_1",
@@ -289,7 +289,7 @@
     },
     {
       "smiles": "O=P(F)(N=C(N(CCCCCCCCCC)CCCCCCCCCC)CCCCCCCCC)CCCCCCCCCC",
-      "canonical_smiles": "CCCCCCCCCCN(CCCCCCCCCC)C(CCCCCCCCC)=NP(=O)(F)CCCCCCCCCC",
+      "canonical_smiles": "O=P(F)(N=C(N(CCCCCCCCCC)CCCCCCCCCC)CCCCCCCCC)CCCCCCCCCC",
       "name": "N-(1-(di-n-decylamino)-n-decylidene)-P-decylphosphonamidic fluoride",
       "cas": "2387495-99-8",
       "category": "cwc_schedule_1_example",
@@ -313,7 +313,7 @@
     },
     {
       "smiles": "O=P(F)(N=C(N(CCCCCCCCCC)CCCCCCCCCC)CCCCCCCCC)OCCCCCCCCCC",
-      "canonical_smiles": "CCCCCCCCCCOP(=O)(F)N=C(CCCCCCCCC)N(CCCCCCCCCC)CCCCCCCCCC",
+      "canonical_smiles": "O=P(F)(N=C(N(CCCCCCCCCC)CCCCCCCCCC)CCCCCCCCC)OCCCCCCCCCC",
       "name": "O-n-Decyl N-(1-(di-n-decylamino)-n-decylidene)phosphoramidofluoridate",
       "cas": "2387496-00-4",
       "category": "cwc_schedule_1_example",
@@ -337,7 +337,7 @@
     },
     {
       "smiles": "CC(C)O[P](C)(F)=O",
-      "canonical_smiles": "CC(C)OP(C)(=O)F",
+      "canonical_smiles": "CC(C)O[P](C)(F)=O",
       "name": "Sarin: O-Isopropyl methylphosphonofluoridate",
       "cas": "107-44-8",
       "category": "cwc_schedule_1_example",
@@ -349,7 +349,7 @@
     },
     {
       "smiles": "NC(=O)OC[C@@H]1NC(=N)N2CCC(O)(O)[C@@]22N=C(N)N[C@@H]12",
-      "canonical_smiles": "N=C1N[C@@H](COC(N)=O)[C@@H]2NC(N)=N[C@]23N1CCC3(O)O",
+      "canonical_smiles": "NC(=O)OC[C@@H]1NC(=N)N2CCC(O)(O)[C@@]22N=C(N)N[C@@H]12",
       "name": "Saxitoxin",
       "cas": "35523-89-8",
       "category": "cwc_schedule_1",
@@ -373,7 +373,7 @@
     },
     {
       "smiles": "CC(O[P](C)(F)=O)C(C)(C)C",
-      "canonical_smiles": "CC(OP(C)(=O)F)C(C)(C)C",
+      "canonical_smiles": "CC(O[P](C)(F)=O)C(C)(C)C",
       "name": "Soman: O-Pinacolyl methylphosphonofluoridate",
       "cas": "96-64-0",
       "category": "cwc_schedule_1_example",
@@ -385,7 +385,7 @@
     },
     {
       "smiles": "CCO[P](=O)(C#N)N(C)C",
-      "canonical_smiles": "CCOP(=O)(C#N)N(C)C",
+      "canonical_smiles": "CCO[P](=O)(C#N)N(C)C",
       "name": "Tabun:O-Ethyl N,N-dimethyl phosphoramidocyanidate",
       "cas": "77-81-6",
       "category": "cwc_schedule_1_example",
@@ -397,7 +397,7 @@
     },
     {
       "smiles": "CCO[P](C)(=O)SCCN(C(C)C)C(C)C",
-      "canonical_smiles": "CCOP(C)(=O)SCCN(C(C)C)C(C)C",
+      "canonical_smiles": "CCO[P](C)(=O)SCCN(C(C)C)C(C)C",
       "name": "VX: O-Ethyl S-2-diisopropylaminoethyl methyl phosphonothiolate",
       "cas": "50782-69-9",
       "category": "cwc_schedule_1_example",
@@ -421,7 +421,7 @@
     },
     {
       "smiles": "OC(=O)C(O)(c1ccccc1)c2ccccc2",
-      "canonical_smiles": "O=C(O)C(O)(c1ccccc1)c1ccccc1",
+      "canonical_smiles": "OC(=O)C(O)(c1ccccc1)c2ccccc2",
       "name": "2,2-Diphenyl-2-hydroxyacetic acid",
       "cas": "76-93-7",
       "category": "cwc_schedule_2_precursor",
@@ -457,7 +457,7 @@
     },
     {
       "smiles": "C1C2CC3CC(CC1C3)C2",
-      "canonical_smiles": "C1C2CC3CC1CC(C2)C3",
+      "canonical_smiles": "C1C2CC3CC(CC1C3)C2",
       "name": "Adamantane",
       "cas": "281-23-2",
       "category": "dea_list_1",
@@ -469,7 +469,7 @@
     },
     {
       "smiles": "CCO[P](=O)(OCC)SCCN(CC)CC",
-      "canonical_smiles": "CCOP(=O)(OCC)SCCN(CC)CC",
+      "canonical_smiles": "CCO[P](=O)(OCC)SCCN(CC)CC",
       "name": "Amiton: O,O-Diethyl S-[2-(diethylamino)ethyl] phosphorothiolate",
       "cas": "78-53-5",
       "category": "cwc_schedule_2",
@@ -481,7 +481,7 @@
     },
     {
       "smiles": "[NH4+].[O-][N+]([O-])=O",
-      "canonical_smiles": "O=[N+]([O-])[O-].[NH4+]",
+      "canonical_smiles": "[NH4+].[O-][N+]([O-])=O",
       "name": "Ammonium nitrate",
       "cas": "6484-52-2",
       "category": "eu_annex_i_explosive",
@@ -517,7 +517,7 @@
     },
     {
       "smiles": "OC(C(=O)OC1CN2CCC1CC2)(c3ccccc3)c4ccccc4",
-      "canonical_smiles": "O=C(OC1CN2CCC1CC2)C(O)(c1ccccc1)c1ccccc1",
+      "canonical_smiles": "OC(C(=O)OC1CN2CCC1CC2)(c3ccccc3)c4ccccc4",
       "name": "BZ: 3-Quinuclidinyl benzilate (*)",
       "cas": "6581-06-2",
       "category": "cwc_schedule_2",
@@ -529,7 +529,7 @@
     },
     {
       "smiles": "C(#N)c1ccccc1",
-      "canonical_smiles": "N#Cc1ccccc1",
+      "canonical_smiles": "C(#N)c1ccccc1",
       "name": "Benzonitrile (context)",
       "cas": "100-47-0",
       "category": "dea_list_1",
@@ -553,7 +553,7 @@
     },
     {
       "smiles": "C(=O)(F)F",
-      "canonical_smiles": "O=C(F)F",
+      "canonical_smiles": "C(=O)(F)F",
       "name": "Carbonyl difluoride",
       "cas": "353-50-4",
       "category": "highly_toxic",
@@ -577,7 +577,7 @@
     },
     {
       "smiles": "C(#N)Br",
-      "canonical_smiles": "N#CBr",
+      "canonical_smiles": "C(#N)Br",
       "name": "Cyanogen bromide",
       "cas": "506-68-3",
       "category": "highly_toxic",
@@ -589,16 +589,15 @@
     },
     {
       "smiles": "C(#N)Cl",
-      "canonical_smiles": "N#CCl",
+      "canonical_smiles": "C(#N)Cl",
       "name": "Cyanogen chloride",
       "cas": "506-77-4",
       "category": "highly_toxic",
       "danger_level": "high",
       "source": "curated",
-      "description": "Blood agent. CWC Schedule 3. | Also: CWC Blood agents — CWC 3A2 (Individual)",
+      "description": "Blood agent. CWC Schedule 3.",
       "schedule": "CWC Schedule 3",
-      "pubchem_cid": null,
-      "also_listed_in": "costanzi_cwc"
+      "pubchem_cid": null
     },
     {
       "smiles": "OCC1OC(O)C(O)C(O)C1O",
@@ -626,7 +625,7 @@
     },
     {
       "smiles": "CO[P](C)(=O)OC",
-      "canonical_smiles": "COP(C)(=O)OC",
+      "canonical_smiles": "CO[P](C)(=O)OC",
       "name": "Dimethyl methylphosphonate",
       "cas": "756-79-6",
       "category": "cwc_schedule_2_precursor",
@@ -650,7 +649,7 @@
     },
     {
       "smiles": "[O-][N+](=O)OO[N+](=O)[O-]",
-      "canonical_smiles": "O=[N+]([O-])OO[N+](=O)[O-]",
+      "canonical_smiles": "[O-][N+](=O)OO[N+](=O)[O-]",
       "name": "Dinitrogen tetroxide",
       "cas": "10544-72-6",
       "category": "highly_toxic",
@@ -662,7 +661,7 @@
     },
     {
       "smiles": "CCO[P](F)(Cl)=O",
-      "canonical_smiles": "CCOP(=O)(F)Cl",
+      "canonical_smiles": "CCO[P](F)(Cl)=O",
       "name": "Ethyl chlorofluorophosphate",
       "cas": "762-77-6",
       "category": "australia_group",
@@ -674,7 +673,7 @@
     },
     {
       "smiles": "CCO[P](Cl)(Cl)=O",
-      "canonical_smiles": "CCOP(=O)(Cl)Cl",
+      "canonical_smiles": "CCO[P](Cl)(Cl)=O",
       "name": "Ethyl dichlorophosphate",
       "cas": "1498-51-7",
       "category": "australia_group",
@@ -686,7 +685,7 @@
     },
     {
       "smiles": "CCO[P](F)(F)=O",
-      "canonical_smiles": "CCOP(=O)(F)F",
+      "canonical_smiles": "CCO[P](F)(F)=O",
       "name": "Ethyl difluorophosphate",
       "cas": "460-52-6",
       "category": "australia_group",
@@ -698,7 +697,7 @@
     },
     {
       "smiles": "COc1cc(CC=O)ccc1OC",
-      "canonical_smiles": "COc1ccc(CC=O)cc1OC",
+      "canonical_smiles": "COc1cc(CC=O)ccc1OC",
       "name": "Homoveratraldehyde",
       "cas": "120-14-9",
       "category": "dea_list_1",
@@ -746,7 +745,7 @@
     },
     {
       "smiles": "CO[P](F)(Cl)=O",
-      "canonical_smiles": "COP(=O)(F)Cl",
+      "canonical_smiles": "CO[P](F)(Cl)=O",
       "name": "Methyl chlorofluorophosphate",
       "cas": "754-01-8",
       "category": "australia_group",
@@ -758,7 +757,7 @@
     },
     {
       "smiles": "CO[P](Cl)(Cl)=O",
-      "canonical_smiles": "COP(=O)(Cl)Cl",
+      "canonical_smiles": "CO[P](Cl)(Cl)=O",
       "name": "Methyl dichlorophosphate",
       "cas": "677-24-7",
       "category": "australia_group",
@@ -770,7 +769,7 @@
     },
     {
       "smiles": "CO[P](F)(F)=O",
-      "canonical_smiles": "COP(=O)(F)F",
+      "canonical_smiles": "CO[P](F)(F)=O",
       "name": "Methyl difluorophosphate",
       "cas": "22382-13-4",
       "category": "australia_group",
@@ -794,7 +793,7 @@
     },
     {
       "smiles": "C[P](Cl)(Cl)=O",
-      "canonical_smiles": "CP(=O)(Cl)Cl",
+      "canonical_smiles": "C[P](Cl)(Cl)=O",
       "name": "Methylphosphonyl dichloride",
       "cas": "676-97-1",
       "category": "cwc_schedule_2_precursor",
@@ -842,7 +841,7 @@
     },
     {
       "smiles": "CCN(CC)C=N",
-      "canonical_smiles": "CCN(C=N)CC",
+      "canonical_smiles": "CCN(CC)C=N",
       "name": "N,N-Diethylformamidine",
       "cas": "90324-67-7",
       "category": "australia_group",
@@ -866,7 +865,7 @@
     },
     {
       "smiles": "CCN(CC)C(=N)CC",
-      "canonical_smiles": "CCC(=N)N(CC)CC",
+      "canonical_smiles": "CCN(CC)C(=N)CC",
       "name": "N,N-Diethylpropanamidine",
       "cas": "84764-73-8",
       "category": "australia_group",
@@ -902,7 +901,7 @@
     },
     {
       "smiles": "CN(C)C(C)=N",
-      "canonical_smiles": "CC(=N)N(C)C",
+      "canonical_smiles": "CN(C)C(C)=N",
       "name": "N,N-Dimethylacetamidine",
       "cas": "2909-14-0",
       "category": "australia_group",
@@ -986,7 +985,7 @@
     },
     {
       "smiles": "CCCN(CCC)C(=N)CCC",
-      "canonical_smiles": "CCCC(=N)N(CCC)CCC",
+      "canonical_smiles": "CCCN(CCC)C(=N)CCC",
       "name": "N,N-Dipropylbutanamidine",
       "cas": "1342422-35-8",
       "category": "australia_group",
@@ -998,7 +997,7 @@
     },
     {
       "smiles": "CCCN(CCC)C=N",
-      "canonical_smiles": "CCCN(C=N)CCC",
+      "canonical_smiles": "CCCN(CCC)C=N",
       "name": "N,N-Dipropylformamidine",
       "cas": "48044-20-8",
       "category": "australia_group",
@@ -1034,7 +1033,7 @@
     },
     {
       "smiles": "O=CC1=CC2=CC=CC=C2N1C",
-      "canonical_smiles": "Cn1c(C=O)cc2ccccc21",
+      "canonical_smiles": "O=CC1=CC2=CC=CC=C2N1C",
       "name": "N-Methylisatoic anhydride",
       "cas": "10328-92-4",
       "category": "dea_list_1",
@@ -1070,7 +1069,7 @@
     },
     {
       "smiles": "CCO[P](=S)(CC)Sc1ccccc1",
-      "canonical_smiles": "CCOP(=S)(CC)Sc1ccccc1",
+      "canonical_smiles": "CCO[P](=S)(CC)Sc1ccccc1",
       "name": "O-Ethyl S-phenyl ethylphosphonothiolothionate",
       "cas": "944-22-9",
       "category": "cwc_schedule_2",
@@ -1094,7 +1093,7 @@
     },
     {
       "smiles": "OC(=O)Cc1ccccc1",
-      "canonical_smiles": "O=C(O)Cc1ccccc1",
+      "canonical_smiles": "OC(=O)Cc1ccccc1",
       "name": "Phenylacetic acid",
       "cas": "103-82-2",
       "category": "dea_list_1",
@@ -1130,7 +1129,7 @@
     },
     {
       "smiles": "OC(c1ccccc1)C(N)C",
-      "canonical_smiles": "CC(N)C(O)c1ccccc1",
+      "canonical_smiles": "OC(c1ccccc1)C(N)C",
       "name": "Phenylpropanolamine (norpseudoephedrine)",
       "cas": "14838-15-4",
       "category": "dea_list_1",
@@ -1148,10 +1147,9 @@
       "category": "highly_toxic",
       "danger_level": "high",
       "source": "curated",
-      "description": "Chemical weapon. Lethal choking agent. CWC Schedule 3. | Also: CWC Choking agents — CWC 3A1 (Individual)",
+      "description": "Chemical weapon. Lethal choking agent. CWC Schedule 3.",
       "schedule": "CWC Schedule 3",
-      "pubchem_cid": null,
-      "also_listed_in": "costanzi_cwc"
+      "pubchem_cid": null
     },
     {
       "smiles": "CC(O)C(C)(C)C",
@@ -1179,7 +1177,7 @@
     },
     {
       "smiles": "OC(=O)c1ccc2c(c1)OCO2",
-      "canonical_smiles": "O=C(O)c1ccc2c(c1)OCO2",
+      "canonical_smiles": "OC(=O)c1ccc2c(c1)OCO2",
       "name": "Piperonylic acid",
       "cas": "94-53-1",
       "category": "dea_list_1",
@@ -1191,7 +1189,7 @@
     },
     {
       "smiles": "[K+].[O-]Cl(=O)=O",
-      "canonical_smiles": "[K+].[O-][Cl+2]([O-])[O-]",
+      "canonical_smiles": "[K+].[O-]Cl(=O)=O",
       "name": "Potassium chlorate",
       "cas": "3811-04-9",
       "category": "eu_annex_i_explosive",
@@ -1203,7 +1201,7 @@
     },
     {
       "smiles": "[K+].[O-]Cl(=O)(=O)=O",
-      "canonical_smiles": "[K+].[O-][Cl+3]([O-])([O-])[O-]",
+      "canonical_smiles": "[K+].[O-]Cl(=O)(=O)=O",
       "name": "Potassium perchlorate",
       "cas": "7778-74-7",
       "category": "eu_annex_i_explosive",
@@ -1215,7 +1213,7 @@
     },
     {
       "smiles": "OC(c1ccccc1)C(NC)C",
-      "canonical_smiles": "CNC(C)C(O)c1ccccc1",
+      "canonical_smiles": "OC(c1ccccc1)C(NC)C",
       "name": "Pseudoephedrine",
       "cas": "90-82-4",
       "category": "dea_list_1",
@@ -1251,7 +1249,7 @@
     },
     {
       "smiles": "[Na+].[O-]Cl(=O)=O",
-      "canonical_smiles": "[Na+].[O-][Cl+2]([O-])[O-]",
+      "canonical_smiles": "[Na+].[O-]Cl(=O)=O",
       "name": "Sodium chlorate",
       "cas": "7775-09-9",
       "category": "eu_annex_i_explosive",
@@ -1263,7 +1261,7 @@
     },
     {
       "smiles": "[Na+].[O-]Cl(=O)(=O)=O",
-      "canonical_smiles": "[Na+].[O-][Cl+3]([O-])([O-])[O-]",
+      "canonical_smiles": "[Na+].[O-]Cl(=O)(=O)=O",
       "name": "Sodium perchlorate",
       "cas": "7601-89-0",
       "category": "eu_annex_i_explosive",
@@ -1287,7 +1285,7 @@
     },
     {
       "smiles": "[Tl]O",
-      "canonical_smiles": "[OH][Tl]",
+      "canonical_smiles": "[Tl]O",
       "name": "Thallium(I) oxide",
       "cas": "1314-32-5",
       "category": "highly_toxic",
@@ -1323,7 +1321,7 @@
     },
     {
       "smiles": "OC(=O)/C=C/c1ccccc1",
-      "canonical_smiles": "O=C(O)/C=C/c1ccccc1",
+      "canonical_smiles": "OC(=O)/C=C/c1ccccc1",
       "name": "trans-Cinnamic acid",
       "cas": "140-10-3",
       "category": "dea_list_1",
@@ -1348,7 +1346,7 @@
     },
     {
       "smiles": "[Ca+2].[O-][N+]([O-])=O.[O-][N+]([O-])=O",
-      "canonical_smiles": "O=[N+]([O-])[O-].O=[N+]([O-])[O-].[Ca+2]",
+      "canonical_smiles": "[Ca+2].[O-][N+]([O-])=O.[O-][N+]([O-])=O",
       "name": "Calcium nitrate",
       "cas": "10124-37-5",
       "category": "eu_annex_ii_reportable",
@@ -1372,7 +1370,7 @@
     },
     {
       "smiles": "[O-][N+](=O)C(Cl)(Cl)Cl",
-      "canonical_smiles": "O=[N+]([O-])C(Cl)(Cl)Cl",
+      "canonical_smiles": "[O-][N+](=O)C(Cl)(Cl)Cl",
       "name": "Chloropicrin: Trichloronitromethane",
       "cas": "76-06-2",
       "category": "cwc_schedule_3",
@@ -1383,8 +1381,20 @@
       "pubchem_cid": 6423
     },
     {
+      "smiles": "ClC#N",
+      "canonical_smiles": "ClC#N",
+      "name": "Cyanogen chloride",
+      "cas": "506-77-4",
+      "category": "cwc_schedule_3",
+      "danger_level": "medium",
+      "source": "costanzi_cwc",
+      "description": "CWC Blood agents — CWC 3A2 (Individual)",
+      "schedule": "CWC 3A2",
+      "pubchem_cid": 10477
+    },
+    {
       "smiles": "ClC(=C(c1ccc(Cl)cc1)c1ccc(Cl)cc1)Cl",
-      "canonical_smiles": "ClC(Cl)=C(c1ccc(Cl)cc1)c1ccc(Cl)cc1",
+      "canonical_smiles": "ClC(=C(c1ccc(Cl)cc1)c1ccc(Cl)cc1)Cl",
       "name": "DDT",
       "cas": "50-29-3",
       "category": "stockholm_convention",
@@ -1420,7 +1430,7 @@
     },
     {
       "smiles": "[H]P(=O)(OCC)OCC",
-      "canonical_smiles": "CCO[PH](=O)OCC",
+      "canonical_smiles": "[H]P(=O)(OCC)OCC",
       "name": "Diethyl phosphite",
       "cas": "762-04-9",
       "category": "cwc_schedule_3_precursor",
@@ -1432,7 +1442,7 @@
     },
     {
       "smiles": "[H]P(=O)(OC)OC",
-      "canonical_smiles": "CO[PH](=O)OC",
+      "canonical_smiles": "[H]P(=O)(OC)OC",
       "name": "Dimethyl phosphite",
       "cas": "868-85-9",
       "category": "cwc_schedule_3_precursor",
@@ -1444,7 +1454,7 @@
     },
     {
       "smiles": "CC(=O)OCC",
-      "canonical_smiles": "CCOC(C)=O",
+      "canonical_smiles": "CC(=O)OCC",
       "name": "Ethyl acetate",
       "cas": "141-78-6",
       "category": "dea_list_2",
@@ -1492,7 +1502,7 @@
     },
     {
       "smiles": "C1CN2CN3CN(C1)C2C3",
-      "canonical_smiles": "C1CN2CN3CC2N(C1)C3",
+      "canonical_smiles": "C1CN2CN3CN(C1)C2C3",
       "name": "Hexamethylenetetramine (hexamine)",
       "cas": "100-97-0",
       "category": "eu_annex_ii_reportable",
@@ -1528,7 +1538,7 @@
     },
     {
       "smiles": "CC(O)C",
-      "canonical_smiles": "CC(C)O",
+      "canonical_smiles": "CC(O)C",
       "name": "Isopropanol",
       "cas": "67-63-0",
       "category": "dea_list_2",
@@ -1540,7 +1550,7 @@
     },
     {
       "smiles": "[Mg+2].[O-][N+]([O-])=O.[O-][N+]([O-])=O",
-      "canonical_smiles": "O=[N+]([O-])[O-].O=[N+]([O-])[O-].[Mg+2]",
+      "canonical_smiles": "[Mg+2].[O-][N+]([O-])=O.[O-][N+]([O-])=O",
       "name": "Magnesium nitrate hexahydrate",
       "cas": "13446-18-9",
       "category": "eu_annex_ii_reportable",
@@ -1575,8 +1585,20 @@
       "pubchem_cid": 7767
     },
     {
+      "smiles": "ClC(Cl)=O",
+      "canonical_smiles": "ClC(Cl)=O",
+      "name": "Phosgene: Carbonyl dichloride",
+      "cas": "75-44-5",
+      "category": "cwc_schedule_3",
+      "danger_level": "medium",
+      "source": "costanzi_cwc",
+      "description": "CWC Choking agents — CWC 3A1 (Individual)",
+      "schedule": "CWC 3A1",
+      "pubchem_cid": 6371
+    },
+    {
       "smiles": "Cl[P](Cl)(Cl)=O",
-      "canonical_smiles": "O=P(Cl)(Cl)Cl",
+      "canonical_smiles": "Cl[P](Cl)(Cl)=O",
       "name": "Phosphorus oxychloride",
       "cas": "10025-87-3",
       "category": "cwc_schedule_3_precursor",
@@ -1588,7 +1610,7 @@
     },
     {
       "smiles": "Cl[P](Cl)(Cl)(Cl)Cl",
-      "canonical_smiles": "ClP(Cl)(Cl)(Cl)Cl",
+      "canonical_smiles": "Cl[P](Cl)(Cl)(Cl)Cl",
       "name": "Phosphorus pentachloride",
       "cas": "10026-13-8",
       "category": "cwc_schedule_3_precursor",
@@ -1612,7 +1634,7 @@
     },
     {
       "smiles": "[K+].[O-][N+]([O-])=O",
-      "canonical_smiles": "O=[N+]([O-])[O-].[K+]",
+      "canonical_smiles": "[K+].[O-][N+]([O-])=O",
       "name": "Potassium nitrate",
       "cas": "7757-79-1",
       "category": "eu_annex_ii_reportable",
@@ -1624,7 +1646,7 @@
     },
     {
       "smiles": "[Na+].[O-][N+]([O-])=O",
-      "canonical_smiles": "O=[N+]([O-])[O-].[Na+]",
+      "canonical_smiles": "[Na+].[O-][N+]([O-])=O",
       "name": "Sodium nitrate",
       "cas": "7631-99-4",
       "category": "eu_annex_ii_reportable",
@@ -1660,7 +1682,7 @@
     },
     {
       "smiles": "OS(O)(=O)=O",
-      "canonical_smiles": "O=S(=O)(O)O",
+      "canonical_smiles": "OS(O)(=O)=O",
       "name": "Sulfuric acid",
       "cas": "7664-93-9",
       "category": "eu_annex_ii_reportable",
@@ -1673,7 +1695,7 @@
     },
     {
       "smiles": "Cl[S](Cl)=O",
-      "canonical_smiles": "O=S(Cl)Cl",
+      "canonical_smiles": "Cl[S](Cl)=O",
       "name": "Thionyl chloride",
       "cas": "7719-09-7",
       "category": "cwc_schedule_3_precursor",
@@ -1742,6 +1764,66 @@
       "description": "Extraction solvent in cocaine processing.",
       "schedule": "DEA List 2",
       "pubchem_cid": null
+    },
+    {
+      "smiles": "CCC(=O)N(c1ccccc1)C1CCN(CCc2ccccc2)CC1",
+      "canonical_smiles": "CCC(=O)N(c1ccccc1)C1CCN(CCc2ccccc2)CC1",
+      "name": "Fentanyl",
+      "cas": "437-38-7",
+      "category": "dea_schedule_2",
+      "danger_level": "critical",
+      "source": "dea_schedule_2",
+      "description": "Schedule II controlled synthetic opioid. Extremely potent analgesic, high abuse potential.",
+      "schedule": "DEA Schedule II",
+      "pubchem_cid": 3345
+    },
+    {
+      "smiles": "CCC(=O)N(c1ccccc1)C1CCN(CC1)CCc1cccs1",
+      "canonical_smiles": "CCC(=O)N(c1ccccc1)C1CCN(CCc2cccs2)CC1",
+      "name": "Sufentanil",
+      "cas": "56030-54-7",
+      "category": "dea_schedule_2",
+      "danger_level": "critical",
+      "source": "dea_schedule_2",
+      "description": "Schedule II synthetic opioid, 5-10x more potent than fentanyl.",
+      "schedule": "DEA Schedule II",
+      "pubchem_cid": 41693
+    },
+    {
+      "smiles": "CCC(=O)N(c1ccccc1)C1CCN(CCOc2ccc(F)cc2)CC1",
+      "canonical_smiles": "CCC(=O)N(c1ccccc1)C1CCN(CCOc2ccc(F)cc2)CC1",
+      "name": "para-Fluorofentanyl",
+      "cas": "90736-23-5",
+      "category": "dea_schedule_1",
+      "danger_level": "critical",
+      "source": "dea_schedule_1",
+      "description": "Schedule I fentanyl analog. No accepted medical use, high abuse potential.",
+      "schedule": "DEA Schedule I",
+      "pubchem_cid": 62281
+    },
+    {
+      "smiles": "COc1ccc2c3c1O[C@@H]1[C@@H](O)C=C[C@H]4[C@@H](C2)N(C)CC[C@]314",
+      "canonical_smiles": "COc1ccc2c3c1O[C@@H]1[C@@H](O)C=C[C@H]4[C@@H](C2)N(C)CC[C@]314",
+      "name": "Morphine",
+      "cas": "57-27-2",
+      "category": "dea_schedule_2",
+      "danger_level": "high",
+      "source": "dea_schedule_2",
+      "description": "Schedule II opioid analgesic. Natural opiate alkaloid, high abuse potential.",
+      "schedule": "DEA Schedule II",
+      "pubchem_cid": 5288826
+    },
+    {
+      "smiles": "COc1ccc2c3c1OC1C(OC(C)=O)C=CC4C(C2)N(C)CCC314",
+      "canonical_smiles": "CC(=O)O[C@@H]1C=C[C@@H]2[C@H]3Cc4ccc(OC)c5c4[C@@]2(CCN3C)[C@H]1O5",
+      "name": "Heroin (Diacetylmorphine)",
+      "cas": "561-27-3",
+      "category": "dea_schedule_1",
+      "danger_level": "critical",
+      "source": "dea_schedule_1",
+      "description": "Schedule I opioid. No accepted medical use in the US, extremely high abuse potential.",
+      "schedule": "DEA Schedule I",
+      "pubchem_cid": 5462328
     }
   ]
 }

@@ -1,4 +1,8 @@
-"""Validation node: detect input type (SMILES vs name), validate, resolve via PubChem."""
+"""Validation node: detect input type (SMILES vs name), validate, resolve via PubChem.
+
+If a name contains Cyrillic characters and PubChem lookup fails,
+uses LLM to translate it to English before retrying.
+"""
 
 from __future__ import annotations
 
@@ -9,9 +13,12 @@ from typing import Any
 from rdkit import Chem
 from rdkit.Chem import Descriptors, rdMolDescriptors
 
+from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
 from ..tools import get_cid_by_name, get_cid_by_smiles, get_smiles_by_cid, get_compound_properties
 
 logger = logging.getLogger(__name__)
+
+_CYRILLIC_RE = re.compile(r"[а-яА-ЯёЁ]")
 
 _SMILES_PATTERN = re.compile(
     r"^[A-Za-z0-9@+\-\[\]\(\)\\/=#$%.:~]+$"
@@ -108,9 +115,46 @@ def _validate_smiles(smiles: str) -> dict[str, Any]:
     }
 
 
+def _translate_name_via_llm(name_ru: str) -> str | None:
+    """Translate a Russian chemical name to English using LLM."""
+    if not OPENROUTER_API_KEY:
+        return None
+    try:
+        from langchain_openai import ChatOpenAI
+
+        llm = ChatOpenAI(
+            model=LLM_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=0,
+            max_tokens=100,
+        )
+        resp = llm.invoke(
+            f"Переведи название химического вещества на английский. "
+            f"Ответь ТОЛЬКО английским названием, без пояснений.\n\n"
+            f"Вещество: {name_ru}"
+        )
+        result = resp.content.strip().strip('"').strip("'").strip(".")
+        if result and not _CYRILLIC_RE.search(result):
+            logger.info("[validate] LLM translated %r → %r", name_ru, result)
+            return result
+    except Exception as e:
+        logger.warning("[validate] LLM translation failed: %s", e)
+    return None
+
+
 def _validate_name(name: str) -> dict[str, Any]:
     # Шаг 1: name → CID через PubChem
     cid = get_cid_by_name(name)
+
+    # Шаг 1.5: если не нашли и имя содержит кириллицу — переводим через LLM
+    if cid is None and _CYRILLIC_RE.search(name):
+        english_name = _translate_name_via_llm(name)
+        if english_name:
+            cid = get_cid_by_name(english_name)
+            if cid:
+                logger.info("[validate] Resolved via LLM: %r → %r → CID=%d", name, english_name, cid)
+
     if cid is None:
         return {
             "validation": {

@@ -306,23 +306,23 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
     all_routes: list[dict[str, Any]] = []
     sources_used: list[str] = []
 
-    # 1. ORD search (primary)
+    # 1. ORD search (primary, deterministic, authoritative)
     ord_results = ord_search_by_product(smiles, limit=15)
     if ord_results:
         all_routes.extend(ord_results)
         sources_used.append("ord")
-        logger.info("ORD: %d routes found", len(ord_results))
-
-    # 2. Local retro model (standalone, extracted from ASKCOS)
-    try:
-        from .retro_predictor import predict_retro
-        model_results = predict_retro(smiles, top_n=10)
-        if model_results:
-            all_routes.extend(model_results)
-            sources_used.append("retro_model")
-            logger.info("Retro model: %d routes found", len(model_results))
-    except Exception as e:
-        logger.warning("Retro model failed: %s", e)
+        logger.info("ORD: %d routes found — skipping model (ORD is authoritative)", len(ord_results))
+    else:
+        # 2. Fallback: local retro model only when ORD has no data
+        try:
+            from .retro_predictor import predict_retro
+            model_results = predict_retro(smiles, top_n=10)
+            if model_results:
+                all_routes.extend(model_results)
+                sources_used.append("retro_model")
+                logger.info("Retro model: %d routes found", len(model_results))
+        except Exception as e:
+            logger.warning("Retro model failed: %s", e)
 
     total_found = len(all_routes)
 

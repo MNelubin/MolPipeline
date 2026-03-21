@@ -142,7 +142,7 @@ def _format_retro_text(
         procedure_steps = route.get("procedure_steps_ru", [])
         if procedure_steps:
             lines.append("")
-            lines.append("  📋 ПРОЦЕДУРА СИНТЕЗА:")
+            lines.append("  ПРОЦЕДУРА СИНТЕЗА:")
             for step in procedure_steps:
                 step_num = step.get("step", "?")
                 desc = step.get("description", "")
