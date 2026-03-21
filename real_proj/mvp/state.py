@@ -51,6 +51,7 @@ class MVPState(TypedDict, total=False):
     # After validation
     validation: ValidationResult
     smiles: str  # canonical SMILES (set by validate_node)
+    pubchem_cid: int  # CID from PubChem (set by validate_node)
 
     # After guard
     guard_result: GuardResult

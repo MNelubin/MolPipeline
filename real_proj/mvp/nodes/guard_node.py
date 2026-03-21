@@ -43,8 +43,9 @@ def guard_node(state: dict[str, Any]) -> dict[str, Any]:
         }
 
     reaction_description: str = state.get("reaction_description", "")
+    cid: int | None = state.get("pubchem_cid") or None
 
-    logger.info("[guard] checking smiles=%r", smiles)
+    logger.info("[guard] checking smiles=%r cid=%s", smiles, cid)
 
     # 1. Molecule banlist
     mol_check = banlist_check(smiles)
@@ -54,8 +55,8 @@ def guard_node(state: dict[str, Any]) -> dict[str, Any]:
     rxn_check = reaction_banlist_check(reaction_description)
     logger.info("[guard] reaction_banlist → %s", rxn_check.get("status"))
 
-    # 3. GHS / PubChem safety
-    safety = safety_lookup(smiles)
+    # 3. GHS / PubChem safety (pass CID to avoid re-resolving)
+    safety = safety_lookup(smiles, cid=cid)
     logger.info(
         "[guard] safety → %d H-phrases, %d pictograms",
         len(safety.get("h_phrases", [])),

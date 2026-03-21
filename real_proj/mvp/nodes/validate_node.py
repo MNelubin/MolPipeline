@@ -90,6 +90,8 @@ def _validate_smiles(smiles: str) -> dict[str, Any]:
         props = get_compound_properties(canon)
         iupac = props.get("IUPACName")
 
+    logger.info("[validate] SMILES valid → canon=%s  CID=%s", canon, cid)
+
     return {
         "validation": {
             "is_valid": True,
@@ -102,10 +104,12 @@ def _validate_smiles(smiles: str) -> dict[str, Any]:
             "error": None,
         },
         "smiles": canon,
+        "pubchem_cid": cid or 0,
     }
 
 
 def _validate_name(name: str) -> dict[str, Any]:
+    # Шаг 1: name → CID через PubChem
     cid = get_cid_by_name(name)
     if cid is None:
         return {
@@ -113,11 +117,12 @@ def _validate_name(name: str) -> dict[str, Any]:
                 "is_valid": False,
                 "input_type": "name",
                 "canonical_smiles": None,
-                "error": f"Compound '{name}' not found in PubChem.",
+                "error": f"Вещество '{name}' не найдено в PubChem.",
             },
-            "error": f"Compound '{name}' not found in PubChem.",
+            "error": f"Вещество '{name}' не найдено в PubChem.",
         }
 
+    # Шаг 2: CID → SMILES
     smiles = get_smiles_by_cid(cid)
     if not smiles:
         return {
@@ -125,11 +130,12 @@ def _validate_name(name: str) -> dict[str, Any]:
                 "is_valid": False,
                 "input_type": "name",
                 "canonical_smiles": None,
-                "error": f"PubChem CID {cid} found but SMILES unavailable.",
+                "error": f"PubChem CID {cid} найден, но SMILES недоступен.",
             },
-            "error": f"PubChem CID {cid} — no SMILES available.",
+            "error": f"PubChem CID {cid} — SMILES недоступен.",
         }
 
+    # Шаг 3: валидация SMILES через RDKit
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return {
@@ -137,17 +143,20 @@ def _validate_name(name: str) -> dict[str, Any]:
                 "is_valid": False,
                 "input_type": "name",
                 "canonical_smiles": None,
-                "error": f"PubChem returned unparseable SMILES: {smiles}",
+                "error": f"PubChem вернул невалидный SMILES: {smiles}",
             },
-            "error": f"Unparseable SMILES from PubChem: {smiles}",
+            "error": f"Невалидный SMILES из PubChem: {smiles}",
         }
 
+    # Шаг 4: канонизация + обогащение
     canon = Chem.MolToSmiles(mol, isomericSmiles=True)
     formula = rdMolDescriptors.CalcMolFormula(mol)
     mw = round(Descriptors.MolWt(mol), 4)
 
     props = get_compound_properties(canon)
     iupac = props.get("IUPACName")
+
+    logger.info("[validate] name=%r → CID=%d → SMILES=%s", name, cid, canon)
 
     return {
         "validation": {
@@ -161,4 +170,5 @@ def _validate_name(name: str) -> dict[str, Any]:
             "error": None,
         },
         "smiles": canon,
+        "pubchem_cid": cid,
     }

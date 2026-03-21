@@ -98,8 +98,9 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
     query = state.get("query", "")
     smiles = state.get("smiles", "")
     guard_result = state.get("guard_result", {})
+    cid: int | None = state.get("pubchem_cid") or None
 
-    logger.info("[molecule_info] query=%r smiles=%r", query, smiles)
+    logger.info("[molecule_info] query=%r smiles=%r cid=%s", query, smiles, cid)
 
     # 1. Get data from PubChem and RDKit
     pubchem_result = {}
@@ -115,15 +116,17 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
             if "error" not in pubchem_data:
                 pubchem_result = pubchem_data
 
-    cid = pubchem_result.get("cid")
+    # Use CID from state (resolved in validate), fallback to pubchem_result
+    if not cid:
+        cid = pubchem_result.get("cid")
 
-    # 2. Physical description from PubChem
-    phys_desc_list = get_physical_description(smiles) if smiles else []
+    # 2. Physical description from PubChem (pass CID directly)
+    phys_desc_list = get_physical_description(smiles, cid=cid) if smiles else []
     phys_desc_str = " | ".join(phys_desc_list[:5]) if phys_desc_list else ""
     logger.info("[molecule_info] physical_description entries: %d", len(phys_desc_list))
 
-    # 3. 2D/3D image URLs
-    images = get_molecule_images(smiles, cid)
+    # 3. 2D/3D image URLs (pass CID directly)
+    images = get_molecule_images(smiles, cid=cid)
     logger.info("[molecule_info] images: 2d=%s 3d=%s", bool(images["image_2d"]), bool(images["image_3d"]))
 
     # 4. Safety data

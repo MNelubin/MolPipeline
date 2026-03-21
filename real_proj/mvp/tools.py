@@ -186,8 +186,12 @@ def _parse_h_p_phrases(text: str) -> tuple[list[str], list[str]]:
     )
 
 
-def safety_lookup(smiles: str) -> dict:
-    """Fetch GHS safety data from PubChem for a SMILES string.
+def safety_lookup(smiles: str, cid: int | None = None) -> dict:
+    """Fetch GHS safety data from PubChem.
+
+    Args:
+        smiles: SMILES string (used as fallback if cid is None).
+        cid: PubChem CID (preferred, avoids re-resolving).
 
     Returns dict with: ghs_pictograms, h_phrases, p_phrases, ld50, flash_point.
     """
@@ -199,16 +203,16 @@ def safety_lookup(smiles: str) -> dict:
         "flash_point": None,
     }
 
-    encoded = quote(smiles, safe="")
-    cid_url = f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/cids/JSON"
-    cid_data = _get_json(cid_url)
-    if not cid_data:
-        return result
-
-    try:
-        cid = cid_data["IdentifierList"]["CID"][0]
-    except (KeyError, IndexError, TypeError):
-        return result
+    if cid is None:
+        encoded = quote(smiles, safe="")
+        cid_url = f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/cids/JSON"
+        cid_data = _get_json(cid_url)
+        if not cid_data:
+            return result
+        try:
+            cid = cid_data["IdentifierList"]["CID"][0]
+        except (KeyError, IndexError, TypeError):
+            return result
 
     # GHS Classification
     ghs_url = f"{PUBCHEM_VIEW_URL}/data/compound/{cid}/JSON?heading=GHS+Classification"
@@ -275,55 +279,55 @@ def safety_lookup(smiles: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _PPE_MAP: dict[str, list[str]] = {
-    "H200": ["Explosion-proof equipment nearby"],
-    "H201": ["Explosion-proof equipment nearby"],
-    "H202": ["Explosion-proof equipment nearby"],
-    "H220": ["Flame-resistant lab coat", "Explosion-proof equipment nearby"],
-    "H221": ["Flame-resistant lab coat"],
-    "H224": ["Flame-resistant lab coat", "Explosion-proof equipment nearby"],
-    "H225": ["Flame-resistant lab coat"],
-    "H226": ["Flame-resistant lab coat"],
-    "H290": ["Chemical-resistant gloves"],
-    "H300": ["Nitrile gloves", "Full face shield", "Fume hood required"],
-    "H301": ["Nitrile gloves", "Fume hood required"],
-    "H302": ["Nitrile gloves"],
-    "H310": ["Chemical-resistant suit", "Nitrile gloves", "Full face shield"],
-    "H311": ["Nitrile gloves", "Chemical-resistant apron"],
-    "H312": ["Nitrile gloves"],
-    "H314": ["Chemical splash goggles", "Face shield", "Chemical-resistant gloves"],
-    "H315": ["Nitrile gloves"],
-    "H317": ["Nitrile gloves"],
-    "H318": ["Chemical splash goggles"],
-    "H319": ["Safety goggles"],
-    "H330": ["Self-contained breathing apparatus (SCBA)", "Fume hood required"],
-    "H331": ["Fume hood required", "Respiratory protection"],
-    "H332": ["Fume hood required"],
-    "H334": ["Respiratory protection", "Fume hood required"],
-    "H335": ["Fume hood required"],
-    "H336": ["Fume hood required"],
-    "H340": ["Fume hood required", "Nitrile gloves", "Minimize exposure"],
-    "H341": ["Fume hood required", "Nitrile gloves"],
-    "H350": ["Fume hood required", "Nitrile gloves", "Minimize exposure"],
-    "H351": ["Fume hood required", "Nitrile gloves"],
-    "H360": ["Full protective equipment", "Minimize exposure"],
-    "H370": ["Full protective equipment", "Fume hood required"],
-    "H372": ["Full protective equipment", "Fume hood required"],
-    "H400": ["Contain spills", "Chemical-resistant gloves"],
-    "H410": ["Contain spills", "Chemical-resistant gloves"],
+    "H200": ["Взрывозащищённое оборудование"],
+    "H201": ["Взрывозащищённое оборудование"],
+    "H202": ["Взрывозащищённое оборудование"],
+    "H220": ["Огнестойкий халат", "Взрывозащищённое оборудование"],
+    "H221": ["Огнестойкий халат"],
+    "H224": ["Огнестойкий халат", "Взрывозащищённое оборудование"],
+    "H225": ["Огнестойкий халат"],
+    "H226": ["Огнестойкий халат"],
+    "H290": ["Химически стойкие перчатки"],
+    "H300": ["Нитриловые перчатки", "Полный лицевой щиток", "Вытяжной шкаф"],
+    "H301": ["Нитриловые перчатки", "Вытяжной шкаф"],
+    "H302": ["Нитриловые перчатки"],
+    "H310": ["Химзащитный костюм", "Нитриловые перчатки", "Полный лицевой щиток"],
+    "H311": ["Нитриловые перчатки", "Химзащитный фартук"],
+    "H312": ["Нитриловые перчатки"],
+    "H314": ["Защитные очки от брызг", "Лицевой щиток", "Химически стойкие перчатки"],
+    "H315": ["Нитриловые перчатки"],
+    "H317": ["Нитриловые перчатки"],
+    "H318": ["Защитные очки от брызг"],
+    "H319": ["Защитные очки"],
+    "H330": ["Автономный дыхательный аппарат (SCBA)", "Вытяжной шкаф"],
+    "H331": ["Вытяжной шкаф", "Респиратор"],
+    "H332": ["Вытяжной шкаф"],
+    "H334": ["Респиратор", "Вытяжной шкаф"],
+    "H335": ["Вытяжной шкаф"],
+    "H336": ["Вытяжной шкаф"],
+    "H340": ["Вытяжной шкаф", "Нитриловые перчатки", "Минимизировать воздействие"],
+    "H341": ["Вытяжной шкаф", "Нитриловые перчатки"],
+    "H350": ["Вытяжной шкаф", "Нитриловые перчатки", "Минимизировать воздействие"],
+    "H351": ["Вытяжной шкаф", "Нитриловые перчатки"],
+    "H360": ["Полный комплект СИЗ", "Минимизировать воздействие"],
+    "H370": ["Полный комплект СИЗ", "Вытяжной шкаф"],
+    "H372": ["Полный комплект СИЗ", "Вытяжной шкаф"],
+    "H400": ["Средства локализации разливов", "Химически стойкие перчатки"],
+    "H410": ["Средства локализации разливов", "Химически стойкие перчатки"],
 }
 
 
 def ppe_recommender(substances: str, h_phrases: str) -> list[str]:
-    """Recommend PPE based on H-phrases.
+    """Рекомендации СИЗ на основе H-фраз.
 
     Args:
-        substances: SMILES string (for logging only).
-        h_phrases: comma-separated H-phrases (e.g. "H225,H319").
+        substances: SMILES (только для логирования).
+        h_phrases: H-фразы через запятую (напр. "H225,H319").
 
     Returns:
-        Sorted deduplicated list of PPE recommendations.
+        Отсортированный список рекомендаций СИЗ на русском.
     """
-    ppe_set: set[str] = {"Lab coat", "Nitrile gloves", "Safety goggles"}
+    ppe_set: set[str] = {"Лабораторный халат", "Нитриловые перчатки", "Защитные очки"}
 
     codes = re.findall(r"H\d{3}[A-Za-z]?", h_phrases)
     for code in codes:
@@ -424,27 +428,32 @@ def rdkit_properties(smiles: str) -> dict:
 # Physical description from PubChem PUG View
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def get_physical_description(smiles: str) -> list[str]:
+def get_physical_description(smiles: str, cid: int | None = None) -> list[str]:
     """Fetch physical description texts from PubChem (color, form, odor, etc.).
 
-    Returns a list of description strings. Empty list on failure.
+    Args:
+        smiles: SMILES (fallback for CID resolution).
+        cid: PubChem CID (preferred).
+
+    Returns a list of unique, meaningful description strings.
     """
-    encoded = quote(smiles, safe="")
-    cid_url = f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/cids/JSON"
-    cid_data = _get_json(cid_url)
-    if not cid_data:
-        return []
-    try:
-        cid = cid_data["IdentifierList"]["CID"][0]
-    except (KeyError, IndexError, TypeError):
-        return []
+    if cid is None:
+        encoded = quote(smiles, safe="")
+        cid_url = f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/cids/JSON"
+        cid_data = _get_json(cid_url)
+        if not cid_data:
+            return []
+        try:
+            cid = cid_data["IdentifierList"]["CID"][0]
+        except (KeyError, IndexError, TypeError):
+            return []
 
     url = f"{PUBCHEM_VIEW_URL}/data/compound/{cid}/JSON?heading=Physical+Description"
     data = _get_json(url)
     if not data:
         return []
 
-    descriptions: list[str] = []
+    raw_descriptions: list[str] = []
     try:
         sections = data["Record"]["Section"]
     except (KeyError, TypeError):
@@ -456,14 +465,30 @@ def get_physical_description(smiles: str) -> list[str]:
                 val = info.get("Value", {})
                 for swm in val.get("StringWithMarkup", []):
                     text = swm.get("String", "").strip()
-                    if text and text not in descriptions:
-                        descriptions.append(text)
+                    if text:
+                        raw_descriptions.append(text)
             children = sec.get("Section", [])
             if children:
                 _walk_phys(children)
 
     _walk_phys(sections)
-    return descriptions
+
+    # Filter: skip too short (<10 chars like "Solid"), deduplicate by content
+    seen_lower: set[str] = set()
+    filtered: list[str] = []
+    for desc in raw_descriptions:
+        lower = desc.lower().strip(" .")
+        if len(desc) < 10:
+            continue
+        if lower in seen_lower:
+            continue
+        # Skip if already covered by a longer description
+        if any(lower in existing for existing in seen_lower):
+            continue
+        seen_lower.add(lower)
+        filtered.append(desc)
+
+    return filtered
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
