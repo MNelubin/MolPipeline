@@ -34,3 +34,21 @@ PUBCHEM_VIEW_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view"
 
 # ASKCOS (self-hosted retrosynthesis)
 ASKCOS_BASE_URL = os.getenv("ASKCOS_BASE_URL", "http://localhost:9100")
+
+
+# Accessor functions expected by tools/research.py and services/research_llm.py
+def get_openai_api_key() -> str:
+    return OPENROUTER_API_KEY
+
+
+def get_openai_base_url() -> str:
+    return OPENROUTER_BASE_URL
+
+
+def get_llm_model() -> str:
+    return LLM_MODEL
+
+
+# Alias used by services/research_llm.py
+def get_openai_model() -> str:
+    return LLM_MODEL
