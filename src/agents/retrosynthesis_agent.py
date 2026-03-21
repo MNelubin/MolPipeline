@@ -18,6 +18,8 @@ from src.llm import get_llm
 from src.models.molecule import MoleculeInfo
 from src.models.reaction import ReactionConditions, ReactionStep, SynthesisPathway
 from src.models.state import AgentState
+from src.tools.banned_filter import filter_retro_results, check_smiles_banned, check_reaction_banned
+from src.tools.retro_scorer import rank_precursors, score_pathway, rank_pathways
 
 logger = logging.getLogger(__name__)
 
@@ -84,13 +86,50 @@ async def run_retrosynthesis(
     if all_pathways:
         all_pathways = await _enrich_pathways_with_llm(all_pathways)
 
-    # --- Phase 4: Score and sort ---
+    # --- Phase 4: Filter banned chemicals/reactions ---
+    all_pathways = _filter_banned_pathways(all_pathways)
+
+    # --- Phase 5: Score and rank with retro_scorer ---
     for p in all_pathways:
         p.compute_scores()
-    all_pathways.sort(
-        key=lambda p: (p.confidence_score or 0, p.overall_yield or 0),
-        reverse=True,
-    )
+
+    pathway_dicts = []
+    for p in all_pathways:
+        steps_data = []
+        for s in p.steps:
+            steps_data.append({
+                "reaction_smiles": s.reaction_smiles,
+                "score": s.confidence,
+                "source": s.source,
+                "expected_yield": s.expected_yield,
+                "plausibility": s.confidence,
+            })
+        pathway_dicts.append({
+            "pathway_id": p.pathway_id,
+            "steps": steps_data,
+        })
+
+    if pathway_dicts:
+        ranked = rank_pathways(pathway_dicts, smiles)
+        # Apply scores back to SynthesisPathway objects
+        score_map = {r["pathway_id"]: r for r in ranked}
+        for p in all_pathways:
+            r = score_map.get(p.pathway_id)
+            if r:
+                scoring = r.get("pathway_scoring", {})
+                p.safety_score = scoring.get("breakdown", {}).get("safety")
+                p.cost_score = scoring.get("breakdown", {}).get("buyability")
+                p._retro_score = scoring.get("total_score", 0.0)
+
+        all_pathways.sort(
+            key=lambda p: getattr(p, "_retro_score", 0.0),
+            reverse=True,
+        )
+    else:
+        all_pathways.sort(
+            key=lambda p: (p.confidence_score or 0, p.overall_yield or 0),
+            reverse=True,
+        )
 
     return all_pathways[:5]  # top 5
 
@@ -153,6 +192,61 @@ def _call_ord(smiles: str) -> dict:
     """Call ORD product search (synchronous)."""
     from src.tools.ord_api import ord_search_by_product
     return ord_search_by_product.invoke({"smiles": smiles})
+
+
+def _filter_banned_pathways(
+    pathways: list[SynthesisPathway],
+) -> list[SynthesisPathway]:
+    """Remove pathways that contain banned chemicals or reaction patterns."""
+    filtered = []
+    for p in pathways:
+        is_banned = False
+        for step in p.steps:
+            rxn = step.reaction_smiles
+            if not rxn or ">>" not in rxn:
+                continue
+
+            # Check reaction pattern
+            ban = check_reaction_banned(rxn)
+            if ban:
+                logger.warning(
+                    f"Blocked pathway {p.pathway_id}: banned reaction "
+                    f"'{ban.get('name')}' ({ban.get('danger_level', 'unknown')})"
+                )
+                is_banned = True
+                break
+
+            # Check each reactant
+            reactant_str = rxn.split(">>")[0]
+            for smi in reactant_str.split("."):
+                smi = smi.strip()
+                if not smi:
+                    continue
+                ban = check_smiles_banned(smi)
+                if ban:
+                    danger = ban.get("danger_level", "unknown")
+                    if danger in ("critical", "high"):
+                        logger.warning(
+                            f"Blocked pathway {p.pathway_id}: banned chemical "
+                            f"'{ban.get('name')}' ({danger})"
+                        )
+                        is_banned = True
+                        break
+                    else:
+                        logger.info(
+                            f"Warning for pathway {p.pathway_id}: flagged chemical "
+                            f"'{ban.get('name')}' ({danger})"
+                        )
+            if is_banned:
+                break
+
+        if not is_banned:
+            filtered.append(p)
+
+    removed = len(pathways) - len(filtered)
+    if removed:
+        logger.info(f"Banned filter removed {removed}/{len(pathways)} pathways")
+    return filtered
 
 
 def _convert_to_pathways(

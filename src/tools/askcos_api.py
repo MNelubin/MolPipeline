@@ -9,27 +9,19 @@ _client = httpx.Client(timeout=300.0)  # retro can be slow
 
 
 @tool
-def askcos_retrosynthesis(smiles: str, max_depth: int = 5, max_branching: int = 25) -> dict:
-    """Run tree-search retrosynthesis via ASKCOS.
+def askcos_retrosynthesis(smiles: str) -> dict:
+    """Run tree-search retrosynthesis via ASKCOS v2.
 
-    Performs iterative one-step retrosynthesis expanding a full tree
+    Performs MCTS-based retrosynthesis expanding a full tree
     of possible synthesis routes from commercially available starting materials.
 
     Args:
         smiles: Target molecule SMILES
-        max_depth: Maximum tree depth (default 5)
-        max_branching: Maximum branching factor per node (default 25)
     """
     url = f"{ASKCOS_BASE_URL}/api/tree-search/mcts/call-sync-without-token"
 
     payload = {
-        "target": smiles,
-        "max_depth": max_depth,
-        "max_branching": max_branching,
-        "expansion_time": 60,
-        "max_trees": 5,
-        "buyable_logic": "and",
-        "return_first": False,
+        "smiles": smiles,
     }
 
     try:
@@ -52,19 +44,19 @@ def askcos_retrosynthesis(smiles: str, max_depth: int = 5, max_branching: int = 
 
 @tool
 def askcos_one_step(smiles: str, top_n: int = 10) -> dict:
-    """Run one-step retrosynthesis via ASKCOS.
+    """Run one-step retrosynthesis via ASKCOS v2.
 
-    Returns possible one-step disconnections for the target molecule.
+    Returns possible one-step disconnections for the target molecule
+    using template-relevance model.
 
     Args:
         smiles: Target molecule SMILES
         top_n: Number of top results to return (default 10)
     """
-    url = f"{ASKCOS_BASE_URL}/api/retro/call-sync-without-token"
+    url = f"{ASKCOS_BASE_URL}/api/retro/template-relevance/call-sync"
 
     payload = {
-        "target": smiles,
-        "num_results": top_n,
+        "smiles": [smiles],
     }
 
     try:
@@ -78,14 +70,22 @@ def askcos_one_step(smiles: str, top_n: int = 10) -> dict:
         return {"error": f"ASKCOS request failed: {e}"}
 
     data = resp.json()
-    results = data.get("result", [])
+
+    # v2 returns list of results per input SMILES
+    all_results = data if isinstance(data, list) else [data]
+    results = all_results[0] if all_results else []
+    if isinstance(results, dict):
+        results = results.get("result", results.get("outcomes", []))
 
     parsed = []
-    for r in results[:top_n]:
+    for r in (results if isinstance(results, list) else [])[:top_n]:
+        reactants = r.get("smiles", r.get("precursors", ""))
+        if isinstance(reactants, list):
+            reactants = ".".join(reactants)
         parsed.append({
-            "reactants": r.get("smiles", ""),
-            "template": r.get("template", ""),
-            "score": r.get("score", 0.0),
+            "reactants": reactants,
+            "template": r.get("template", r.get("tforms", "")),
+            "score": r.get("score", r.get("prob", 0.0)),
             "num_examples": r.get("num_examples", 0),
             "source": "askcos",
         })

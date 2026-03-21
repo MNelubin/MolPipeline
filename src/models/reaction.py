@@ -49,17 +49,44 @@ class SynthesisPathway(BaseModel):
     confidence_score: float | None = None  # fraction of DB-confirmed steps
 
     def compute_scores(self) -> None:
-        """Recompute derived scores from steps."""
+        """Recompute derived scores from steps using retro_scorer."""
         self.total_steps = len(self.steps)
-        if self.steps:
-            yields = [
-                s.expected_yield for s in self.steps if s.expected_yield is not None
-            ]
-            if yields:
-                result = 1.0
-                for y in yields:
-                    result *= y
-                self.overall_yield = result
+        if not self.steps:
+            return
 
-            confirmed = sum(1 for s in self.steps if s.source != "predicted")
-            self.confidence_score = confirmed / len(self.steps)
+        # Overall yield = product of step yields
+        yields = [
+            s.expected_yield for s in self.steps if s.expected_yield is not None
+        ]
+        if yields:
+            result = 1.0
+            for y in yields:
+                result *= y
+            self.overall_yield = result
+
+        # Confidence = fraction of DB-confirmed steps
+        confirmed = sum(1 for s in self.steps if s.source != "predicted")
+        self.confidence_score = confirmed / len(self.steps)
+
+        # Use retro_scorer for richer pathway scoring
+        try:
+            from src.tools.retro_scorer import score_pathway
+
+            steps_data = []
+            for s in self.steps:
+                steps_data.append({
+                    "reaction_smiles": s.reaction_smiles,
+                    "score": s.confidence,
+                    "source": s.source,
+                    "expected_yield": s.expected_yield,
+                    "plausibility": s.confidence,
+                })
+            scoring = score_pathway(steps_data, self.target_smiles, self.safety_score)
+            breakdown = scoring.get("breakdown", {})
+
+            if self.safety_score is None:
+                self.safety_score = breakdown.get("safety")
+            if self.cost_score is None:
+                self.cost_score = breakdown.get("buyability")
+        except Exception:
+            pass
