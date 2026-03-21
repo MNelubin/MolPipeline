@@ -2,23 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import ChatMessage from './components/ChatMessage'
 import ModelSelector from './components/ModelSelector'
 import CalculatorCard from './components/CalculatorCard'
-import { useSSEPipeline } from './hooks/useSSEPipeline'
+import MoleculeCard from './components/MoleculeCard'
+import PathwaySelector from './components/PathwaySelector'
+import ExperimentProtocol from './components/ExperimentProtocol'
+import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
-
-function createBotMessage(id) {
-  return {
-    id,
-    role: 'bot',
-    nodes: { validate: 'idle', guard: 'idle', molecule_info: 'idle', retrosynthesis: 'idle' },
-    streamText: '',
-    moleculeInfo: null,
-    guardResult: null,
-    retroResult: null,
-    error: null,
-    done: false,
-  }
-}
 
 // ── Sidebar nav items ─────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -47,81 +36,44 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [page, setPage] = useState('chat')        // 'chat' | 'calculator'
-  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [model, setModel] = useState('openai/gpt-4o')
   const [history, setHistory] = useState([])
 
-  const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
-  const { run, cancel, isStreaming } = useSSEPipeline()
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  const {
+    status,
+    phase,
+    pipelineState,
+    error,
+    startAnalysis,
+    confirmSynthesis,
+    selectPathway,
+    reset,
+  } = useInteractivePipeline()
 
-  const updateBotMessage = useCallback((id, updater) => {
-    setMessages(prev =>
-      prev.map(m => m.id === id
-        ? (typeof updater === 'function' ? updater(m) : { ...m, ...updater })
-        : m)
-    )
-  }, [])
+  const isRunning = status === 'running'
 
   const handleSubmit = useCallback(async () => {
     const query = input.trim()
-    if (!query || isStreaming) return
+    if (!query || isRunning) return
 
     setInput('')
     textareaRef.current?.focus()
-
-    const userMsg = { id: `u-${Date.now()}`, role: 'user', query }
-    const botId   = `b-${Date.now()}`
-    setMessages(prev => [...prev, userMsg, createBotMessage(botId)])
     setHistory(prev => [query, ...prev.filter(h => h !== query)].slice(0, 20))
 
-    await run(query, model, ({ type, data }) => {
-      switch (type) {
-        case 'node_start':
-          updateBotMessage(botId, m => ({ ...m, nodes: { ...m.nodes, [data.node]: 'running' } }))
-          break
-        case 'node_complete':
-          updateBotMessage(botId, m => {
-            const nodes = { ...m.nodes, [data.node]: 'done' }
-            const update = { nodes }
-            if (data.node === 'validate') {
-              const val = data.output?.validation || {}
-              if (!val.is_valid && val.error) update.error = val.error
-            }
-            if (data.node === 'guard')          update.guardResult = data.output?.guard_result   || null
-            if (data.node === 'molecule_info')  update.moleculeInfo = data.output?.molecule_info  || null
-            if (data.node === 'retrosynthesis') update.retroResult  = data.output?.retro_result   || null
-            return { ...m, ...update }
-          })
-          break
-        case 'token':
-          updateBotMessage(botId, m => ({ ...m, streamText: m.streamText + data.text }))
-          break
-        case 'pipeline_done':
-          updateBotMessage(botId, m => ({
-            ...m, done: true,
-            nodes: Object.fromEntries(Object.entries(m.nodes).map(([k, v]) => [k, v === 'running' ? 'done' : v])),
-          }))
-          break
-        case 'error':
-          updateBotMessage(botId, m => ({
-            ...m, done: true, error: data.message,
-            nodes: Object.fromEntries(Object.entries(m.nodes).map(([k, v]) => [k, v === 'running' ? 'error' : v])),
-          }))
-          break
-        default: break
-      }
-    })
-  }, [input, isStreaming, model, run, updateBotMessage])
+    await startAnalysis(query, model)
+  }, [input, isRunning, model, startAnalysis])
 
   const handleKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
   }
+
+  const moleculeInfo = pipelineState?.molecule_info || null
+  const guardResult = pipelineState?.guard_result || null
+  const synthesisPaths = pipelineState?.synthesis_pathways || []
+  const experimentProtocol = pipelineState?.experiment_protocol || null
 
   return (
     <div className="app">
@@ -166,9 +118,9 @@ export default function App() {
 
         <div className="sidebar-footer">
           <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
-            validate → guard<br />
-            → molecule_info<br />
-            → retrosynthesis
+            classify → validate<br />
+            → molecule_info → retro<br />
+            → stoichiometry → plan
           </div>
         </div>
       </aside>
@@ -181,18 +133,20 @@ export default function App() {
           <>
             <div className="topbar">
               <span className="topbar-title">
-                {isStreaming ? (
+                {isRunning ? (
                   <span style={{ color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className="spinner" style={{ width: 12, height: 12 }} />
                     Обработка...
                   </span>
                 ) : 'Введите название или SMILES молекулы'}
               </span>
-              <ModelSelector value={model} onChange={setModel} disabled={isStreaming} />
+              <ModelSelector value={model} onChange={setModel} disabled={isRunning} />
             </div>
 
             <div className="messages">
-              {messages.length === 0 ? (
+
+              {/* ── Empty state ── */}
+              {status === 'idle' && (
                 <div className="empty-state">
                   <div className="empty-icon">⬡</div>
                   <div className="empty-title">MolPipeline</div>
@@ -203,10 +157,100 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-              ) : (
-                messages.map(msg => <ChatMessage key={msg.id} message={msg} />)
               )}
-              <div ref={messagesEndRef} />
+
+              {/* ── Running spinner ── */}
+              {isRunning && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '24px 0', color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                  <div className="spinner" style={{ width: 18, height: 18 }} />
+                  Выполняется анализ...
+                </div>
+              )}
+
+              {/* ── Error state ── */}
+              {status === 'error' && error && (
+                <div style={{
+                  margin: '16px 0',
+                  padding: '12px 16px',
+                  background: 'var(--red)12',
+                  border: '1px solid var(--red)40',
+                  borderRadius: 'var(--r-md)',
+                  color: 'var(--red)',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  Ошибка: {error}
+                  <button
+                    style={{ marginLeft: 16, fontSize: 11, cursor: 'pointer', color: 'var(--text-3)', background: 'none', border: 'none' }}
+                    onClick={reset}
+                  >
+                    Сбросить
+                  </button>
+                </div>
+              )}
+
+              {/* ── Phase: card_ready — show molecule card + confirm button ── */}
+              {!isRunning && (phase === 'card_ready' || phase === 'select_pathway' || phase === 'completed') && moleculeInfo && (
+                <div style={{ marginBottom: 16 }}>
+                  <MoleculeCard
+                    moleculeInfo={moleculeInfo}
+                    guardResult={guardResult}
+                    retroResult={pipelineState?.retro_result || null}
+                  />
+
+                  {phase === 'card_ready' && (
+                    <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
+                      <button
+                        className="send-btn"
+                        style={{ padding: '10px 24px', fontSize: 13, width: 'auto', borderRadius: 'var(--r-md)' }}
+                        onClick={confirmSynthesis}
+                        disabled={isRunning}
+                      >
+                        Продолжить синтез
+                      </button>
+                      <button
+                        style={{
+                          padding: '10px 24px', fontSize: 13, borderRadius: 'var(--r-md)',
+                          background: 'none', border: '1px solid var(--border)',
+                          color: 'var(--text-2)', cursor: 'pointer',
+                        }}
+                        onClick={reset}
+                      >
+                        Сбросить
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Phase: select_pathway — show pathway selector ── */}
+              {!isRunning && phase === 'select_pathway' && synthesisPaths.length > 0 && (
+                <PathwaySelector
+                  pathways={synthesisPaths}
+                  onSelect={selectPathway}
+                />
+              )}
+
+              {/* ── Phase: completed — show experiment protocol ── */}
+              {!isRunning && phase === 'completed' && experimentProtocol && (
+                <ExperimentProtocol protocol={experimentProtocol} />
+              )}
+
+              {/* ── Completed but no protocol (error/banned) ── */}
+              {!isRunning && phase === 'completed' && !experimentProtocol && pipelineState?.error && (
+                <div style={{
+                  padding: '12px 16px',
+                  background: 'var(--red)12',
+                  border: '1px solid var(--red)40',
+                  borderRadius: 'var(--r-md)',
+                  color: 'var(--red)',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  {pipelineState.error}
+                </div>
+              )}
+
             </div>
 
             <div className="input-area">
@@ -219,7 +263,7 @@ export default function App() {
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  disabled={isStreaming}
+                  disabled={isRunning}
                   style={{ height: 44 }}
                   onInput={e => {
                     e.target.style.height = '44px'
@@ -228,19 +272,13 @@ export default function App() {
                 />
                 <button
                   className="send-btn"
-                  onClick={isStreaming ? cancel : handleSubmit}
-                  disabled={!input.trim() && !isStreaming}
+                  onClick={handleSubmit}
+                  disabled={!input.trim() || isRunning}
                 >
-                  {isStreaming ? (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <rect x="3" y="3" width="10" height="10" rx="2" />
-                    </svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="8" y1="13" x2="8" y2="3" />
-                      <polyline points="4 7 8 3 12 7" />
-                    </svg>
-                  )}
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="13" x2="8" y2="3" />
+                    <polyline points="4 7 8 3 12 7" />
+                  </svg>
                 </button>
               </div>
               <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>

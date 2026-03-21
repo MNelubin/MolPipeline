@@ -1,4 +1,10 @@
-"""Unified state for the 4-node MVP graph."""
+"""State definitions for the multi-phase agent graph.
+
+Three phases with interrupt points:
+  Phase 1: classify -> validate_and_guard -> molecule_info -> INTERRUPT
+  Phase 2: retrosynthesis -> [guard_safety, reagent_check] -> aggregate -> INTERRUPT
+  Phase 3: stoichiometry -> experiment_planner -> END
+"""
 
 from __future__ import annotations
 
@@ -23,7 +29,7 @@ class MoleculeInfo(TypedDict, total=False):
 
 
 class GuardResult(TypedDict, total=False):
-    """Safety check result from the guard node."""
+    """Safety check result from the guard / validate_and_guard node."""
     overall_status: Literal["SAFE", "WARNING", "CRITICAL_STOP"]
     molecule_check: dict
     reaction_check: dict
@@ -43,25 +49,68 @@ class ValidationResult(TypedDict, total=False):
     error: str | None
 
 
+class ReagentReport(TypedDict, total=False):
+    """Reagent availability report for synthesis pathways."""
+    pathway_reports: list[dict[str, Any]]
+    all_available: bool
+    unavailable_reagents: list[str]
+
+
+class SafetyReport(TypedDict, total=False):
+    """Safety report for synthesis pathways (separate from initial guard check)."""
+    pathway_reports: list[dict[str, Any]]
+    has_critical: bool
+    warnings: list[str]
+
+
+class TargetAmount(TypedDict, total=False):
+    """User-specified target amount for stoichiometry calculations."""
+    amount_type: Literal["product_mass", "reagent_mass", "reagent_moles"]
+    value: float
+    unit: str
+
+
 class MVPState(TypedDict, total=False):
     """Top-level state flowing through the graph."""
-    # Input
+
+    # ── Input ──
     query: str
 
-    # After validation
-    validation: ValidationResult
-    smiles: str  # canonical SMILES (set by validate_node)
-    pubchem_cid: int  # CID from PubChem (set by validate_node)
+    # ── Phase 1: Classification ──
+    input_type: Literal["molecule", "research", "invalid"]
 
-    # After guard
+    # ── Phase 1: Research (if input_type == "research" or validate fallback) ──
+    research_result: dict[str, Any]
+
+    # ── Phase 1: Validation + Guard ──
+    validation: ValidationResult
+    smiles: str
+    pubchem_cid: int
     guard_result: GuardResult
 
-    # After molecule_info
+    # ── Phase 1: Molecule info ──
     molecule_info: MoleculeInfo
     final_answer: str
 
-    # After retrosynthesis
+    # ── Phase 2: Retrosynthesis ──
     retro_result: dict[str, Any]
+    synthesis_pathways: list[dict[str, Any]]
 
-    # Error / early exit
+    # ── Phase 2: Reagent check + Guard safety (parallel) ──
+    reagent_report: ReagentReport
+    safety_report: SafetyReport
+
+    # ── Phase 2 -> 3: User selections ──
+    selected_pathway: int | None
+
+    # ── Phase 3: Stoichiometry ──
+    target_amount: TargetAmount | None
+    calculations: dict[str, Any] | None
+
+    # ── Phase 3: Experiment protocol ──
+    experiment_protocol: dict[str, Any] | None
+
+    # ── Control ──
+    current_phase: Literal["identification", "synthesis", "experiment"]
+    cycle_counts: dict[str, int]
     error: str

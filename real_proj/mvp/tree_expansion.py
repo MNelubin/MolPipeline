@@ -16,9 +16,9 @@ from typing import Any
 
 from rdkit import Chem
 
-from .retro_tools import (
+from .tools.retro_tools import (
     _is_buyable,
-    ord_search_by_product,
+    _ord_search_via_api,
     score_route,
 )
 from .tools import banlist_check, get_compound_properties
@@ -59,7 +59,7 @@ def _find_top_routes(smiles: str, top_n: int = 5) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
 
     # 1. ORD search — fetch extra to have room after dedup/sort
-    ord_results = ord_search_by_product(smiles, limit=top_n * 3)
+    ord_results = _ord_search_via_api(smiles, limit=top_n * 3)
     if ord_results:
         for r in ord_results:
             score_route(r)

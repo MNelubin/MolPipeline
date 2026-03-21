@@ -1,27 +1,30 @@
 """FastAPI gateway for the Chemist Agent pipeline.
 
-POST /analyze      — run full pipeline, return complete state + formatted output
+POST /analyze      — run pipeline (mode=auto end-to-end, or mode=interactive with pauses)
+POST /resume       — resume an interactive session at the next interrupt point
 POST /ord/search   — search ORD by molecule name or SMILES, return ranked reactions
+POST /tree/expand  — recursively expand a synthesis route into a full tree
 GET  /health       — liveness check
 
 Run:
-    uvicorn real_proj.mvp.api:app --host 0.0.0.0 --port 8765
+    uvicorn mvp.api:app --host 0.0.0.0 --port 8765
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-# Config must be imported first (sets LangSmith env vars)
 from . import config as _cfg  # noqa: F401
 from .graph import build_graph
-from .retro_tools import ord_search_by_product, score_route, _deduplicate_routes
+from .tools.retro_tools import _ord_search_via_api, score_route, _deduplicate_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,8 +34,14 @@ logger = logging.getLogger("mvp.api")
 
 app = FastAPI(
     title="Chemist Agent API",
-    description="Molecule analysis: validation → safety → info → retrosynthesis",
-    version="1.0.0",
+    description=(
+        "Multi-phase chemist agent with human-in-the-loop:\n"
+        "  Phase 1: classify -> validate -> molecule_info -> INTERRUPT\n"
+        "  Phase 2: retrosynthesis -> safety+reagent -> INTERRUPT\n"
+        "  Phase 3: stoichiometry -> experiment_planner -> END\n\n"
+        "Supports mode='auto' (end-to-end) and mode='interactive' (pause at interrupts)."
+    ),
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -42,44 +51,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Build graph once at startup (loads model weights, ~192 MB)
 _graph = None
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 @app.on_event("startup")
 async def _startup():
     global _graph
-    logger.info("Building graph (loading model weights)…")
+    logger.info("Building graph (loading model weights)...")
     _graph = build_graph()
     logger.info("Graph ready.")
-
-
-# Thread pool for synchronous graph.invoke()
-_executor = ThreadPoolExecutor(max_workers=4)
 
 
 # ── Request / Response models ─────────────────────────────────────────────────
 
 class AnalyzeRequest(BaseModel):
-    query: str  # SMILES or molecule name (any language)
+    query: str = Field(..., description="SMILES or molecule name (any language)")
+    mode: Literal["auto", "interactive"] = Field(
+        default="auto",
+        description="'auto' runs end-to-end with defaults; 'interactive' pauses at interrupts",
+    )
 
 
 class AnalyzeResponse(BaseModel):
-    # Pipeline status
-    status: str                     # "ok" | "invalid" | "banned" | "error"
+    status: str
     query: str
-
-    # Formatted text output (same as CLI prints)
     output: str
-
-    # Full pipeline state (all nodes)
     state: dict[str, Any]
+    thread_id: str | None = Field(
+        default=None,
+        description="Session ID for resuming interactive sessions (only in interactive mode)",
+    )
+    phase: str | None = Field(
+        default=None,
+        description="Current interrupt phase: 'card_ready', 'select_pathway', or 'completed'",
+    )
+
+
+class ResumeRequest(BaseModel):
+    thread_id: str = Field(..., description="Session ID from a previous /analyze or /resume call")
+    resume_data: Any = Field(
+        default=True,
+        description=(
+            "Data to resume with. For card_ready: True (or any truthy value). "
+            "For select_pathway: {selected_pathway: int, target_amount: {value: float, unit: str}}"
+        ),
+    )
+
+
+class ResumeResponse(BaseModel):
+    status: str
+    output: str
+    state: dict[str, Any]
+    thread_id: str
+    phase: str | None = None
 
 
 class TreeExpandRequest(BaseModel):
     smiles: str = Field(..., description="Target molecule SMILES")
     reactants: str = Field(..., description="Dot-separated reactant SMILES from the selected route")
-    max_depth: int = Field(default=20, ge=1, le=25, description="Maximum recursion depth")
+    max_depth: int = Field(default=6, ge=1, le=12, description="Maximum recursion depth")
     timeout_sec: float = Field(default=120.0, ge=5, le=600, description="Maximum elapsed time in seconds")
 
 
@@ -90,45 +121,46 @@ class TreeExpandResponse(BaseModel):
 
 class OrdSearchRequest(BaseModel):
     query: str = Field(..., description="Molecule name (any language) or SMILES string")
-    limit: int = Field(default=15, ge=1, le=100, description="Max reactions to fetch from ORD before dedup/ranking")
-    top_n: int = Field(default=15, ge=1, le=100, description="Max results to return after ranking")
-    scored: bool = Field(default=True, description="Apply multi-factor scoring and ranking")
-
-
-class OrdReaction(BaseModel):
-    reaction_id: str | None = None
-    reaction_smiles: str | None = None
-    reactants: str | None = None
-    expected_yield: float | None = None
-    temperature: str | None = None
-    solvent: str | None = None
-    catalyst: str | None = None
-    procedure_details: str | None = None
-    source: str = "ord"
-    final_score: float | None = None
-    scoring: dict[str, Any] | None = None
+    limit: int = Field(default=15, ge=1, le=100)
+    top_n: int = Field(default=15, ge=1, le=100)
+    scored: bool = Field(default=True)
 
 
 class OrdSearchResponse(BaseModel):
-    query: str                          # original input
-    smiles: str                         # resolved canonical SMILES
-    resolution: str                     # "smiles_direct" | "pubchem_name" | "pubchem_llm"
-    total_found: int                    # reactions in ORD before dedup
-    returned: int                       # reactions in this response
-    reactions: list[dict[str, Any]]     # full reaction dicts
+    query: str
+    smiles: str
+    resolution: str
+    total_found: int
+    returned: int
+    reactions: list[dict[str, Any]]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _get_state(config: dict) -> dict[str, Any]:
+    """Get the current graph state for a given thread."""
+    snapshot = _graph.get_state(config)
+    return dict(snapshot.values) if snapshot and snapshot.values else {}
+
+
+def _detect_phase(state: dict[str, Any]) -> str:
+    """Detect which interrupt phase the graph is paused at, or 'completed'."""
+    phase = state.get("current_phase", "")
+    if state.get("experiment_protocol"):
+        return "completed"
+    if state.get("synthesis_pathways") and not state.get("selected_pathway") and state.get("selected_pathway") != 0:
+        return "select_pathway"
+    if state.get("molecule_info") and not state.get("retro_result"):
+        return "card_ready"
+    if phase == "experiment":
+        return "completed"
+    return phase or "unknown"
+
+
 def _make_output(state: dict[str, Any]) -> str:
-    """Reproduce the text output from run.py for the given final state."""
-    lines: list[str] = []
-
+    """Build text output from state."""
     if state.get("error"):
-        lines.append("!" * 60)
-        lines.append(f"  ОШИБКА: {state['error']}")
-        lines.append("!" * 60)
-
+        lines = ["!" * 60, f"  ОШИБКА: {state['error']}", "!" * 60]
         guard = state.get("guard_result", {})
         if guard:
             mol_check = guard.get("molecule_check", {})
@@ -140,17 +172,12 @@ def _make_output(state: dict[str, Any]) -> str:
                 lines.append(f"  Причина:    {mol_check.get('reason')}")
             if rxn_check.get("status") in ("prohibited", "restricted"):
                 lines.append(f"\n  Реакция:    {rxn_check.get('reason')}")
-
         validation = state.get("validation", {})
         if validation and not validation.get("is_valid"):
             lines.append(f"\n  Ошибка валидации: {validation.get('error')}")
+        return "\n".join(lines)
 
-    elif state.get("final_answer"):
-        lines.append(state["final_answer"])
-    else:
-        lines.append("  Результат не получен.")
-
-    return "\n".join(lines)
+    return state.get("final_answer", "  Результат не получен.")
 
 
 def _derive_status(state: dict[str, Any]) -> str:
@@ -164,7 +191,7 @@ def _derive_status(state: dict[str, Any]) -> str:
         return "error"
     if state.get("final_answer"):
         return "ok"
-    return "error"
+    return "pending"
 
 
 def _sanitize(obj: Any) -> Any:
@@ -178,24 +205,66 @@ def _sanitize(obj: Any) -> Any:
     return str(obj)
 
 
-def _run_pipeline(query: str) -> dict[str, Any]:
-    """Run graph synchronously (called in thread pool)."""
-    return _graph.invoke({"query": query})
+def _run_auto(query: str) -> dict[str, Any]:
+    """Run graph end-to-end in auto mode: auto-resume all interrupts."""
+    thread_id = f"auto-{uuid.uuid4().hex[:12]}"
+    config = {"configurable": {"thread_id": thread_id}}
+
+    _graph.invoke({"query": query}, config=config)
+    state = _get_state(config)
+
+    if state.get("error") or not state.get("molecule_info"):
+        return state
+
+    # Resume past card interrupt
+    _graph.invoke(Command(resume=True), config=config)
+    state = _get_state(config)
+
+    pathways = state.get("synthesis_pathways", [])
+    if not pathways:
+        return state
+
+    # Auto-pick best viable path: viable first, fewest unresolved, highest score
+    best_idx = 0
+    if len(pathways) > 1:
+        ranked = sorted(
+            range(len(pathways)),
+            key=lambda i: (
+                not pathways[i].get("viable", False),
+                pathways[i].get("unresolved_leaves", 999),
+                -pathways[i].get("final_score", 0),
+            ),
+        )
+        best_idx = ranked[0]
+
+    _graph.invoke(
+        Command(resume={
+            "selected_pathway": best_idx,
+            "target_amount": {"value": 1.0, "unit": "g", "amount_type": "product_mass"},
+        }),
+        config=config,
+    )
+    return _get_state(config)
+
+
+def _run_interactive_start(query: str, thread_id: str) -> dict[str, Any]:
+    """Start an interactive session — runs until first interrupt."""
+    config = {"configurable": {"thread_id": thread_id}}
+    _graph.invoke({"query": query}, config=config)
+    return _get_state(config)
+
+
+def _run_resume(thread_id: str, resume_data: Any) -> dict[str, Any]:
+    """Resume an interactive session with user-provided data."""
+    config = {"configurable": {"thread_id": thread_id}}
+    _graph.invoke(Command(resume=resume_data), config=config)
+    return _get_state(config)
 
 
 def _resolve_to_smiles(query: str) -> tuple[str, str]:
-    """Resolve a molecule name or SMILES to canonical SMILES.
-
-    Returns (canonical_smiles, resolution_method).
-    Raises ValueError if resolution fails.
-
-    Resolution methods:
-      "smiles_direct"  — input was already valid SMILES
-      "pubchem_name"   — resolved via PubChem name lookup
-      "pubchem_llm"    — Cyrillic name translated by LLM, then PubChem
-    """
+    """Resolve a molecule name or SMILES to canonical SMILES."""
     from rdkit import Chem
-    from .nodes.validate_node import _detect_input_type, _translate_name_via_llm
+    from .nodes.validate_and_guard_node import _detect_input_type, _translate_name_via_llm
     from .tools import get_cid_by_name, get_smiles_by_cid
     import re
 
@@ -210,7 +279,6 @@ def _resolve_to_smiles(query: str) -> tuple[str, str]:
             raise ValueError(f"Invalid SMILES: {query}")
         return Chem.MolToSmiles(mol, isomericSmiles=True), "smiles_direct"
 
-    # Name → CID → SMILES
     cid = get_cid_by_name(query)
     resolution = "pubchem_name"
 
@@ -235,10 +303,10 @@ def _resolve_to_smiles(query: str) -> tuple[str, str]:
 
 
 def _run_ord_search(query: str, limit: int, top_n: int, scored: bool) -> dict[str, Any]:
-    """Resolve query → SMILES, search ORD, optionally score. Called in thread pool."""
+    """Resolve query -> SMILES, search ORD, optionally score."""
     smiles, resolution = _resolve_to_smiles(query)
 
-    reactions = ord_search_by_product(smiles, limit=limit)
+    reactions = _ord_search_via_api(smiles, limit=limit)
     total_found = len(reactions)
 
     if scored and reactions:
@@ -266,42 +334,91 @@ async def health():
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(req: AnalyzeRequest):
+    """Start pipeline analysis.
+
+    mode='auto': runs end-to-end, auto-selects best pathway, returns full protocol.
+    mode='interactive': runs Phase 1 only, pauses at first interrupt, returns thread_id.
+    """
     query = req.query.strip()
     if not query:
         raise HTTPException(status_code=422, detail="query must not be empty")
 
-    logger.info("Received query: %r", query)
+    logger.info("[analyze] query=%r mode=%s", query, req.mode)
 
     import asyncio
     loop = asyncio.get_event_loop()
+
     try:
-        state = await loop.run_in_executor(_executor, _run_pipeline, query)
+        if req.mode == "auto":
+            state = await loop.run_in_executor(_executor, _run_auto, query)
+            output = _make_output(state)
+            status = _derive_status(state)
+            return AnalyzeResponse(
+                status=status,
+                query=query,
+                output=output,
+                state=_sanitize(state),
+                thread_id=None,
+                phase="completed" if status == "ok" else None,
+            )
+        else:
+            thread_id = f"session-{uuid.uuid4().hex[:12]}"
+            state = await loop.run_in_executor(
+                _executor, _run_interactive_start, query, thread_id,
+            )
+            output = _make_output(state)
+            status = _derive_status(state)
+            phase = _detect_phase(state)
+
+            return AnalyzeResponse(
+                status=status,
+                query=query,
+                output=output,
+                state=_sanitize(state),
+                thread_id=thread_id,
+                phase=phase,
+            )
     except Exception as exc:
-        logger.exception("Pipeline crashed for query %r", query)
+        logger.exception("[analyze] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/resume", response_model=ResumeResponse)
+async def resume(req: ResumeRequest):
+    """Resume an interactive session at the next interrupt point.
+
+    For 'card_ready' interrupt: send resume_data=true to continue to retrosynthesis.
+    For 'select_pathway' interrupt: send resume_data={selected_pathway: 0, target_amount: {value: 1.0, unit: "g"}}.
+    """
+    logger.info("[resume] thread_id=%s resume_data=%s", req.thread_id, req.resume_data)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+
+    try:
+        state = await loop.run_in_executor(
+            _executor, _run_resume, req.thread_id, req.resume_data,
+        )
+    except Exception as exc:
+        logger.exception("[resume] crashed for thread_id=%s", req.thread_id)
         raise HTTPException(status_code=500, detail=str(exc))
 
     output = _make_output(state)
     status = _derive_status(state)
-    clean_state = _sanitize(state)
+    phase = _detect_phase(state)
 
-    logger.info("Query %r → status=%s", query, status)
-
-    return AnalyzeResponse(
+    return ResumeResponse(
         status=status,
-        query=query,
         output=output,
-        state=clean_state,
+        state=_sanitize(state),
+        thread_id=req.thread_id,
+        phase=phase,
     )
 
 
 @app.post("/ord/search", response_model=OrdSearchResponse)
 async def ord_search(req: OrdSearchRequest):
-    """Search Open Reaction Database for synthesis routes to the target molecule.
-
-    Accepts a molecule name (English or Russian) or SMILES string.
-    Returns all matching reactions from the local ORD SQLite index (2.38M reactions),
-    optionally scored and ranked by multi-factor scoring.
-    """
+    """Search Open Reaction Database for synthesis routes."""
     query = req.query.strip()
     if not query:
         raise HTTPException(status_code=422, detail="query must not be empty")
@@ -323,7 +440,7 @@ async def ord_search(req: OrdSearchRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
     clean_reactions = _sanitize(result["reactions"])
-    logger.info("[ord/search] %r → smiles=%s total=%d returning=%d",
+    logger.info("[ord/search] %r -> smiles=%s total=%d returning=%d",
                 query, result["smiles"][:30], result["total_found"], len(clean_reactions))
 
     return OrdSearchResponse(
@@ -338,12 +455,7 @@ async def ord_search(req: OrdSearchRequest):
 
 @app.post("/tree/expand", response_model=TreeExpandResponse)
 async def tree_expand(req: TreeExpandRequest):
-    """Recursively expand a selected synthesis route into a full tree.
-
-    Takes the target molecule SMILES and the reactants string from a selected
-    route, then recursively decomposes non-buyable reactants until all leaves
-    are buyable, banned, or unresolvable.
-    """
+    """Recursively expand a selected synthesis route into a full tree."""
     smiles = req.smiles.strip()
     reactants = req.reactants.strip()
     if not smiles or not reactants:
@@ -367,7 +479,7 @@ async def tree_expand(req: TreeExpandRequest):
 
     clean_result = _sanitize(result)
     stats = clean_result.get("stats", {})
-    logger.info("[tree/expand] %s → %d nodes, %d buyable, %d banned, %.1fs",
+    logger.info("[tree/expand] %s -> %d nodes, %d buyable, %d banned, %.1fs",
                 smiles[:30], stats.get("total_nodes", 0),
                 stats.get("buyable_count", 0), stats.get("banned_count", 0),
                 stats.get("elapsed_sec", 0))
