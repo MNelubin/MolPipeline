@@ -235,7 +235,7 @@ export default function App() {
 
               {/* ── Phase: completed — show experiment protocol ── */}
               {!isRunning && phase === 'completed' && experimentProtocol && (
-                <ExperimentProtocol protocol={experimentProtocol} />
+                <ExperimentProtocol protocol={experimentProtocol} moleculeInfo={moleculeInfo} />
               )}
 
               {/* ── Completed but no protocol (error/banned) ── */}
