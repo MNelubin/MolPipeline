@@ -253,7 +253,7 @@ async def calculate(request: dict):
     import asyncio
 
     try:
-        from mvp.calculator_combined import calculator_agent
+        from .calculator_combined import calculator_agent
     except ImportError as e:
         raise HTTPException(500, f"Calculator not available: {e}")
 
