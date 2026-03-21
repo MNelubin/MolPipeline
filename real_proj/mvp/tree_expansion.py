@@ -298,7 +298,7 @@ def _build_node(
 def expand_tree(
     target_smiles: str,
     reactants: str,
-    max_depth: int = 10,
+    max_depth: int = 20,
     timeout_sec: float = 120.0,
 ) -> dict[str, Any]:
     """Expand a selected synthesis route into a full tree.

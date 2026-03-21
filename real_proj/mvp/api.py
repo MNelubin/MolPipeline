@@ -79,7 +79,7 @@ class AnalyzeResponse(BaseModel):
 class TreeExpandRequest(BaseModel):
     smiles: str = Field(..., description="Target molecule SMILES")
     reactants: str = Field(..., description="Dot-separated reactant SMILES from the selected route")
-    max_depth: int = Field(default=10, ge=1, le=15, description="Maximum recursion depth")
+    max_depth: int = Field(default=20, ge=1, le=25, description="Maximum recursion depth")
     timeout_sec: float = Field(default=120.0, ge=5, le=600, description="Maximum elapsed time in seconds")
 
 
