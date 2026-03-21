@@ -145,7 +145,7 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
     molecule_info = {
         "name": parsed.get("name", pubchem_result.get("iupac", "Unknown")),
         "synonyms": parsed.get("synonyms", pubchem_result.get("synonyms", [])),
-        "smiles": parsed.get("smiles", smiles or ""),
+        "smiles": parsed.get("smiles") or smiles or "",
         "molecular_formula": parsed.get("molecular_formula", pubchem_result.get("formula", "")),
         "molecular_weight": final_weight,
         "properties": {
