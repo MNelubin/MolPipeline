@@ -21,6 +21,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # ── Add project root to path so we can import mvp ───────────────────────────
@@ -266,3 +267,22 @@ async def calculate(request: dict):
     except Exception as e:
         logger.exception("Calculator error")
         raise HTTPException(500, str(e))
+
+
+# ── Frontend SPA static files ───────────────────────────────────────────────
+
+FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.is_dir():
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve frontend SPA — try file first, fallback to index.html."""
+        file_path = FRONTEND_DIST / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        index = FRONTEND_DIST / "index.html"
+        if index.is_file():
+            return FileResponse(index)
+        raise HTTPException(404, "Not found")
