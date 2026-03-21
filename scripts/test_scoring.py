@@ -121,8 +121,8 @@ EXAMPLE_RETRO_DATA = {
             "description": "One-pot: 4-nitrophenol reduction + acetylation",
         },
         {
-            "reactants": "c1ccc(cc1)NC(=O)C.Br2.O",
-            "reaction_smiles": "c1ccc(cc1)NC(=O)C.Br2.O>>CC(=O)Nc1ccc(O)cc1",
+            "reactants": "c1ccc(cc1)NC(=O)C.BrBr.O",
+            "reaction_smiles": "c1ccc(cc1)NC(=O)C.BrBr.O>>CC(=O)Nc1ccc(O)cc1",
             "score": 0.25,
             "source": "predicted",
             "plausibility": 0.30,
@@ -132,7 +132,7 @@ EXAMPLE_RETRO_DATA = {
     ],
     "ibuprofen": [
         {
-            "reactants": "CC(C)Cc1ccc(cc1)C(C)=O.CO2",
+            "reactants": "CC(C)Cc1ccc(cc1)C(C)=O.O=C=O",
             "reaction_smiles": "CC(C)Cc1ccc(cc1)C(C)=O>>CC(C)Cc1ccc(cc1)C(C)C(O)=O",
             "score": 0.85,
             "source": "literature",
@@ -150,8 +150,8 @@ EXAMPLE_RETRO_DATA = {
             "description": "Via nitrile hydrolysis (longer route)",
         },
         {
-            "reactants": "CC(C)Cc1ccc(cc1)CBr.Mg.CO2",
-            "reaction_smiles": "CC(C)Cc1ccc(cc1)CBr.Mg.CO2>>CC(C)Cc1ccc(cc1)C(C)C(O)=O",
+            "reactants": "CC(C)Cc1ccc(cc1)CBr.[Mg].O=C=O",
+            "reaction_smiles": "CC(C)Cc1ccc(cc1)CBr.[Mg].O=C=O>>CC(C)Cc1ccc(cc1)C(C)C(O)=O",
             "score": 0.65,
             "source": "literature",
             "plausibility": 0.72,
@@ -159,8 +159,8 @@ EXAMPLE_RETRO_DATA = {
             "description": "Grignard route: ArCH2Br + Mg → ArCH2MgBr + CO2",
         },
         {
-            "reactants": "CC(Cl)c1ccc(CC(C)C)cc1.AgCN.O",
-            "reaction_smiles": "CC(Cl)c1ccc(CC(C)C)cc1.AgCN.O>>CC(C)Cc1ccc(cc1)C(C)C(O)=O",
+            "reactants": "CC(Cl)c1ccc(CC(C)C)cc1.[Ag]C#N.O",
+            "reaction_smiles": "CC(Cl)c1ccc(CC(C)C)cc1.[Ag]C#N.O>>CC(C)Cc1ccc(cc1)C(C)C(O)=O",
             "score": 0.35,
             "source": "predicted",
             "plausibility": 0.40,
