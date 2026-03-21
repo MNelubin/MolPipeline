@@ -31,3 +31,6 @@ if LANGSMITH_API_KEY:
 # PubChem
 PUBCHEM_BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
 PUBCHEM_VIEW_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view"
+
+# ASKCOS (self-hosted retrosynthesis)
+ASKCOS_BASE_URL = os.getenv("ASKCOS_BASE_URL", "http://localhost:9100")

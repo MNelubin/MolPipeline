@@ -275,6 +275,107 @@ def safety_lookup(smiles: str, cid: int | None = None) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# GHS pictogram info (image URLs + descriptions)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+GHS_PICTOGRAMS: dict[str, dict[str, str]] = {
+    "GHS01": {
+        "name_ru": "Взрывающаяся бомба",
+        "name_en": "Exploding Bomb",
+        "description": "Взрывчатые вещества, самореактивные вещества, органические пероксиды",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS01.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS01.gif",
+    },
+    "GHS02": {
+        "name_ru": "Пламя",
+        "name_en": "Flame",
+        "description": "Воспламеняющиеся газы, аэрозоли, жидкости, твёрдые вещества; пирофорные; самонагревающиеся",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS02.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS02.gif",
+    },
+    "GHS03": {
+        "name_ru": "Пламя над кругом",
+        "name_en": "Flame Over Circle",
+        "description": "Окисляющие газы, жидкости, твёрдые вещества",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS03.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS03.gif",
+    },
+    "GHS04": {
+        "name_ru": "Газовый баллон",
+        "name_en": "Gas Cylinder",
+        "description": "Сжатые, сжиженные, охлаждённые или растворённые газы под давлением",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS04.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS04.gif",
+    },
+    "GHS05": {
+        "name_ru": "Коррозия",
+        "name_en": "Corrosion",
+        "description": "Коррозийно для металлов; вызывает тяжёлые ожоги кожи и повреждение глаз",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS05.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS05.gif",
+    },
+    "GHS06": {
+        "name_ru": "Череп и кости",
+        "name_en": "Skull and Crossbones",
+        "description": "Острая токсичность (смертельно/токсично при проглатывании, контакте с кожей, вдыхании)",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS06.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS06.gif",
+    },
+    "GHS07": {
+        "name_ru": "Восклицательный знак",
+        "name_en": "Exclamation Mark",
+        "description": "Раздражение кожи/глаз; острая токсичность (вредно); наркотические эффекты",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS07.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS07.gif",
+    },
+    "GHS08": {
+        "name_ru": "Опасность для здоровья",
+        "name_en": "Health Hazard",
+        "description": "Канцерогенность, мутагенность, репродуктивная токсичность, поражение органов-мишеней",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS08.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS08.gif",
+    },
+    "GHS09": {
+        "name_ru": "Окружающая среда",
+        "name_en": "Environment",
+        "description": "Опасно для водной среды (острая и хроническая токсичность)",
+        "image_svg": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS09.svg",
+        "image_gif": "https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS09.gif",
+    },
+}
+
+
+def get_ghs_pictogram_info(code: str) -> dict[str, str] | None:
+    """Get pictogram info by GHS code (e.g. 'GHS02').
+
+    Returns dict with: name_ru, name_en, description, image_svg, image_gif.
+    """
+    return GHS_PICTOGRAMS.get(code)
+
+
+def enrich_ghs_pictograms(codes: list[str]) -> list[dict[str, str]]:
+    """Convert list of GHS codes to enriched pictogram data for frontend.
+
+    Returns list of dicts, each with: code, name_ru, description, image_svg, image_gif.
+    """
+    result = []
+    for code in codes:
+        info = GHS_PICTOGRAMS.get(code)
+        if info:
+            result.append({"code": code, **info})
+        else:
+            result.append({
+                "code": code,
+                "name_ru": code,
+                "name_en": code,
+                "description": "",
+                "image_svg": f"https://pubchem.ncbi.nlm.nih.gov/images/ghs/{code}.svg",
+                "image_gif": f"https://pubchem.ncbi.nlm.nih.gov/images/ghs/{code}.gif",
+            })
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ppe_recommender — PPE based on H-phrases
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -579,7 +680,7 @@ def get_compound_properties(smiles: str) -> dict[str, Any]:
     encoded = quote(smiles, safe="")
     url = (
         f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/property/"
-        "MolecularWeight,MolecularFormula,IUPACName,IsomericSMILES/JSON"
+        "MolecularWeight,MolecularFormula,IUPACName,IsomericSMILES,InChI,InChIKey/JSON"
     )
     data = _get_json(url)
     if not data:
@@ -588,3 +689,219 @@ def get_compound_properties(smiles: str) -> dict[str, Any]:
         return data["PropertyTable"]["Properties"][0]
     except (KeyError, IndexError, TypeError):
         return {}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Experimental properties from PubChem PUG View
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _extract_numeric(text: str) -> float | None:
+    """Pull the first number from text."""
+    m = re.search(r"(-?\d+\.?\d*)", text)
+    return float(m.group(1)) if m else None
+
+
+def _walk_pug_view(sections: list[dict], target_heading: str) -> list[str]:
+    """Recursively find a section by heading and extract all StringWithMarkup texts."""
+    results: list[str] = []
+
+    def _walk(secs: list[dict]) -> None:
+        for sec in secs:
+            heading = sec.get("TOCHeading", "")
+            if heading.lower() == target_heading.lower():
+                for info in sec.get("Information", []):
+                    val = info.get("Value", {})
+                    for swm in val.get("StringWithMarkup", []):
+                        text = swm.get("String", "").strip()
+                        if text:
+                            results.append(text)
+                    # Also check numeric values
+                    nums = val.get("Number")
+                    unit = val.get("Unit", "")
+                    if nums is not None:
+                        ns = nums if isinstance(nums, list) else [nums]
+                        results.append(f"{ns[0]} {unit}".strip())
+            children = sec.get("Section", [])
+            if children:
+                _walk(children)
+
+    _walk(sections)
+    return results
+
+
+def get_experimental_properties(cid: int) -> dict[str, Any]:
+    """Fetch experimental properties from PubChem PUG View.
+
+    Returns dict with: melting_point, boiling_point, density, solubility,
+    flash_point, vapor_pressure, logp, cas_number.
+    """
+    result: dict[str, Any] = {
+        "melting_point": None,
+        "boiling_point": None,
+        "density": None,
+        "solubility": None,
+        "flash_point": None,
+        "vapor_pressure": None,
+        "logp": None,
+    }
+
+    url = f"{PUBCHEM_VIEW_URL}/data/compound/{cid}/JSON?heading=Experimental+Properties"
+    data = _get_json(url)
+    if not data:
+        return result
+
+    try:
+        sections = data["Record"]["Section"]
+    except (KeyError, TypeError):
+        return result
+
+    # Melting Point
+    mp_texts = _walk_pug_view(sections, "Melting Point")
+    if mp_texts:
+        for t in mp_texts:
+            if "°C" in t or "deg" in t.lower() or "°" in t:
+                val = _extract_numeric(t)
+                if val is not None and -300 < val < 5000:
+                    result["melting_point"] = val
+                    break
+        if result["melting_point"] is None:
+            val = _extract_numeric(mp_texts[0])
+            if val is not None:
+                result["melting_point"] = val
+
+    # Boiling Point
+    bp_texts = _walk_pug_view(sections, "Boiling Point")
+    if bp_texts:
+        for t in bp_texts:
+            if "°C" in t or "deg" in t.lower() or "°" in t:
+                val = _extract_numeric(t)
+                if val is not None and -300 < val < 5000:
+                    result["boiling_point"] = val
+                    break
+        if result["boiling_point"] is None:
+            val = _extract_numeric(bp_texts[0])
+            if val is not None:
+                result["boiling_point"] = val
+
+    # Density
+    density_texts = _walk_pug_view(sections, "Density")
+    if density_texts:
+        val = _extract_numeric(density_texts[0])
+        if val is not None and 0 < val < 25:
+            result["density"] = val
+
+    # Solubility
+    sol_texts = _walk_pug_view(sections, "Solubility")
+    if sol_texts:
+        result["solubility"] = sol_texts[0]
+
+    # Flash Point
+    fp_texts = _walk_pug_view(sections, "Flash Point")
+    if fp_texts:
+        val = _extract_numeric(fp_texts[0])
+        if val is not None:
+            result["flash_point"] = val
+
+    # Vapor Pressure
+    vp_texts = _walk_pug_view(sections, "Vapor Pressure")
+    if vp_texts:
+        result["vapor_pressure"] = vp_texts[0]
+
+    # LogP
+    logp_texts = _walk_pug_view(sections, "LogP")
+    if logp_texts:
+        val = _extract_numeric(logp_texts[0])
+        if val is not None:
+            result["logp"] = val
+
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LD50 / Toxicity from PubChem
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_ld50(cid: int) -> dict[str, Any]:
+    """Fetch LD50 / acute toxicity data from PubChem.
+
+    Returns dict with: ld50_oral, ld50_dermal, ld50_inhalation (strings).
+    """
+    result: dict[str, Any] = {
+        "ld50_oral": None,
+        "ld50_dermal": None,
+        "ld50_inhalation": None,
+    }
+
+    url = f"{PUBCHEM_VIEW_URL}/data/compound/{cid}/JSON?heading=Acute+Effects"
+    data = _get_json(url)
+    if not data:
+        return result
+
+    try:
+        sections = data["Record"]["Section"]
+    except (KeyError, TypeError):
+        return result
+
+    all_texts: list[str] = []
+
+    def _walk_ld50(secs: list[dict]) -> None:
+        for sec in secs:
+            for info in sec.get("Information", []):
+                val = info.get("Value", {})
+                for swm in val.get("StringWithMarkup", []):
+                    text = swm.get("String", "").strip()
+                    if text and "LD50" in text.upper():
+                        all_texts.append(text)
+            children = sec.get("Section", [])
+            if children:
+                _walk_ld50(children)
+
+    _walk_ld50(sections)
+
+    for text in all_texts:
+        text_lower = text.lower()
+        if "oral" in text_lower and result["ld50_oral"] is None:
+            result["ld50_oral"] = text
+        elif "dermal" in text_lower and result["ld50_dermal"] is None:
+            result["ld50_dermal"] = text
+        elif "inhal" in text_lower and result["ld50_inhalation"] is None:
+            result["ld50_inhalation"] = text
+
+    # If no route-specific found, take first one
+    if all(v is None for v in result.values()) and all_texts:
+        result["ld50_oral"] = all_texts[0]
+
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CAS number from PubChem synonyms
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_CAS_PATTERN = re.compile(r"^\d{2,7}-\d{2}-\d$")
+
+
+def get_cas_number(cid: int) -> str | None:
+    """Extract CAS Registry Number from PubChem synonyms.
+
+    CAS numbers appear as synonyms in format: NNNNN-NN-N
+    """
+    url = f"{PUBCHEM_BASE_URL}/compound/cid/{cid}/synonyms/JSON"
+    data = _get_json(url)
+    if not data:
+        return None
+
+    try:
+        synonyms = (
+            data.get("InformationList", {})
+            .get("Information", [{}])[0]
+            .get("Synonym", [])
+        )
+    except (IndexError, TypeError):
+        return None
+
+    for syn in synonyms:
+        if _CAS_PATTERN.match(syn.strip()):
+            return syn.strip()
+
+    return None

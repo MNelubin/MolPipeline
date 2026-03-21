@@ -1,7 +1,7 @@
 """Molecule info node: gather data + LLM synthesis via OpenRouter.
 
 Outputs everything in Russian. Includes physical description,
-2D/3D images, and full safety report.
+2D/3D images, experimental properties, LD50, CAS, GHS pictograms.
 """
 
 from __future__ import annotations
@@ -20,6 +20,10 @@ from ..tools import (
     rdkit_properties,
     get_physical_description,
     get_molecule_images,
+    get_experimental_properties,
+    get_ld50,
+    get_cas_number,
+    enrich_ghs_pictograms,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,35 +38,36 @@ _MOLECULE_CARD_PROMPT = PromptTemplate.from_template("""
 3. Данные RDKit: {rdkit_data}
 4. Данные безопасности: {safety_data}
 5. Физическое описание (PubChem): {physical_description}
+6. Экспериментальные свойства (PubChem): {experimental_props}
+7. LD50 данные: {ld50_data}
 
 Верни JSON-объект со следующими полями. Если данных нет — используй свои знания.
 
 Поля JSON:
 - "name": название вещества (русское общеупотребительное + IUPAC в скобках)
-- "synonyms": список синонимов на русском (список строк)
+- "synonyms": список синонимов на русском (список строк, 3-5 штук)
 - "smiles": SMILES-строка
 - "molecular_formula": брутто-формула
 - "molecular_weight": молярная масса (число)
-- "physical_description": описание физических свойств НА РУССКОМ — внешний вид, цвет, запах, агрегатное состояние, кристаллическая структура. Опирайся на данные из PubChem Physical Description.
+- "physical_description": описание физических свойств НА РУССКОМ — внешний вид, цвет, запах, агрегатное состояние. Опирайся на PubChem Physical Description.
 - "properties": словарь с ключами:
-    - "melting_point": температура плавления (°C)
-    - "boiling_point": температура кипения (°C)
+    - "melting_point": температура плавления (°C, число или строка с единицами)
+    - "boiling_point": температура кипения (°C, число или строка с единицами)
     - "solubility": растворимость (описание на русском)
-    - "density": плотность (г/мл)
-    - "logP": коэффициент распределения
+    - "density": плотность (г/мл, число)
+    - "logP": коэффициент распределения (число)
     - "physical_state": агрегатное состояние на русском (твёрдое/жидкое/газ)
-    - "tpsa": площадь полярной поверхности
-    - "h_bond_donors": доноры водородных связей (число)
-    - "h_bond_acceptors": акцепторы водородных связей (число)
-    - "rotatable_bonds": вращаемые связи (число)
-    - "ring_count": количество колец (число)
+    - "flash_point": температура вспышки (°C, число или null)
+    - "vapor_pressure": давление паров (строка или null)
 - "ghs_classification": список классов опасности GHS на русском (список строк)
 - "spectral_notes": краткая заметка о спектральных данных (ИК, ЯМР) на русском
-- "description": подробное описание вещества на русском (применение, значение, история)
+- "description": подробное описание вещества на русском (применение, значение, история, 2-3 предложения)
 - "pubchem_cid": CID число (0 если неизвестно)
 
-ВАЖНО: Данные RDKit (масса, logP, TPSA и т.д.) приоритетнее вычисленных PubChem.
-Верни ТОЛЬКО валидный JSON, без markdown-блоков кода.
+ВАЖНО:
+- Данные RDKit (масса, logP, TPSA) приоритетнее вычисленных PubChem.
+- Экспериментальные свойства PubChem (Т. пл., Т. кип., плотность) приоритетнее LLM-знаний.
+- Верни ТОЛЬКО валидный JSON, без markdown-блоков кода.
 """)
 
 
@@ -90,11 +95,7 @@ def _safe_float(val: Any, default: float = 0.0) -> float:
 
 
 def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
-    """LangGraph node: gather molecule info and produce a structured card.
-
-    Reads: state["query"], state["smiles"], state["guard_result"]
-    Writes: state["molecule_info"], state["final_answer"]
-    """
+    """LangGraph node: gather molecule info and produce a structured card."""
     query = state.get("query", "")
     smiles = state.get("smiles", "")
     guard_result = state.get("guard_result", {})
@@ -102,7 +103,7 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
 
     logger.info("[molecule_info] query=%r smiles=%r cid=%s", query, smiles, cid)
 
-    # 1. Get data from PubChem and RDKit
+    # 1. RDKit + PubChem basic
     pubchem_result = {}
     rdkit_result = {}
 
@@ -116,23 +117,42 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
             if "error" not in pubchem_data:
                 pubchem_result = pubchem_data
 
-    # Use CID from state (resolved in validate), fallback to pubchem_result
     if not cid:
         cid = pubchem_result.get("cid")
 
-    # 2. Physical description from PubChem (pass CID directly)
+    # 2. Physical description
     phys_desc_list = get_physical_description(smiles, cid=cid) if smiles else []
     phys_desc_str = " | ".join(phys_desc_list[:5]) if phys_desc_list else ""
-    logger.info("[molecule_info] physical_description entries: %d", len(phys_desc_list))
 
-    # 3. 2D/3D image URLs (pass CID directly)
+    # 3. Images
     images = get_molecule_images(smiles, cid=cid)
-    logger.info("[molecule_info] images: 2d=%s 3d=%s", bool(images["image_2d"]), bool(images["image_3d"]))
 
-    # 4. Safety data
+    # 4. Experimental properties from PUG View
+    exp_props: dict[str, Any] = {}
+    if cid:
+        exp_props = get_experimental_properties(cid)
+        logger.info("[molecule_info] experimental: mp=%s bp=%s density=%s",
+                     exp_props.get("melting_point"), exp_props.get("boiling_point"),
+                     exp_props.get("density"))
+
+    # 5. LD50
+    ld50_data: dict[str, Any] = {}
+    if cid:
+        ld50_data = get_ld50(cid)
+        logger.info("[molecule_info] ld50: %s", {k: bool(v) for k, v in ld50_data.items()})
+
+    # 6. CAS number
+    cas_number: str | None = None
+    if cid:
+        cas_number = get_cas_number(cid)
+        logger.info("[molecule_info] cas=%s", cas_number)
+
+    # 7. GHS pictograms enriched
     safety_data = guard_result.get("safety_data", {})
+    ghs_codes = safety_data.get("ghs_pictograms", [])
+    ghs_enriched = enrich_ghs_pictograms(ghs_codes)
 
-    # 5. LLM synthesis (Russian)
+    # 8. LLM synthesis
     llm = _get_llm()
     prompt_value = _MOLECULE_CARD_PROMPT.format(
         query=query,
@@ -140,6 +160,8 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
         rdkit_data=json.dumps(rdkit_result, ensure_ascii=False),
         safety_data=json.dumps(safety_data, ensure_ascii=False),
         physical_description=phys_desc_str,
+        experimental_props=json.dumps(exp_props, ensure_ascii=False),
+        ld50_data=json.dumps(ld50_data, ensure_ascii=False),
     )
 
     try:
@@ -160,7 +182,7 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
         logger.warning("[molecule_info] JSON parse error: %s", e)
         parsed = {}
 
-    # 6. Build molecule_info
+    # 9. Build molecule_info — merge LLM + raw data
     props = parsed.get("properties", {})
 
     rdkit_weight = rdkit_result.get("molecular_weight")
@@ -170,36 +192,53 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
     parsed_cid = parsed.get("pubchem_cid")
     final_cid = _safe_int(parsed_cid if parsed_cid not in ("", None) else cid)
 
+    # Experimental values take priority over LLM guesses
+    melting_point = exp_props.get("melting_point") or props.get("melting_point", "Н/Д")
+    boiling_point = exp_props.get("boiling_point") or props.get("boiling_point", "Н/Д")
+    density = exp_props.get("density") or props.get("density", "Н/Д")
+    solubility = exp_props.get("solubility") or props.get("solubility", "Н/Д")
+    flash_point = exp_props.get("flash_point") or props.get("flash_point")
+    vapor_pressure = exp_props.get("vapor_pressure") or props.get("vapor_pressure")
+
     molecule_info = {
         "name": parsed.get("name", pubchem_result.get("iupac", "Неизвестно")),
         "synonyms": parsed.get("synonyms", pubchem_result.get("synonyms", [])),
         "smiles": parsed.get("smiles") or smiles or "",
         "molecular_formula": parsed.get("molecular_formula", pubchem_result.get("formula", "")),
         "molecular_weight": final_weight,
+        "cas_number": cas_number,
         "physical_description": parsed.get("physical_description", phys_desc_str or "Нет данных"),
         "properties": {
-            "melting_point": props.get("melting_point", "Н/Д"),
-            "boiling_point": props.get("boiling_point", "Н/Д"),
-            "solubility": props.get("solubility", "Н/Д"),
-            "density": props.get("density", "Н/Д"),
+            "melting_point": melting_point,
+            "boiling_point": boiling_point,
+            "solubility": solubility,
+            "density": density,
             "logP": props.get("logP", rdkit_result.get("logp")),
             "physical_state": props.get("physical_state", "Н/Д"),
-            "tpsa": props.get("tpsa", rdkit_result.get("tpsa")),
-            "h_bond_donors": props.get("h_bond_donors", rdkit_result.get("h_bond_donors")),
-            "h_bond_acceptors": props.get("h_bond_acceptors", rdkit_result.get("h_bond_acceptors")),
-            "rotatable_bonds": props.get("rotatable_bonds", rdkit_result.get("rotatable_bonds")),
-            "ring_count": props.get("ring_count", rdkit_result.get("ring_count")),
+            "tpsa": rdkit_result.get("tpsa") or props.get("tpsa"),
+            "h_bond_donors": rdkit_result.get("h_bond_donors") or props.get("h_bond_donors"),
+            "h_bond_acceptors": rdkit_result.get("h_bond_acceptors") or props.get("h_bond_acceptors"),
+            "rotatable_bonds": rdkit_result.get("rotatable_bonds") or props.get("rotatable_bonds"),
+            "ring_count": rdkit_result.get("ring_count") or props.get("ring_count"),
+            "flash_point": flash_point,
+            "vapor_pressure": vapor_pressure,
             "spectral_notes": parsed.get("spectral_notes", "Н/Д"),
+        },
+        "toxicity": {
+            "ld50_oral": ld50_data.get("ld50_oral"),
+            "ld50_dermal": ld50_data.get("ld50_dermal"),
+            "ld50_inhalation": ld50_data.get("ld50_inhalation"),
         },
         "description": parsed.get("description", ""),
         "ghs_classification": parsed.get("ghs_classification", []),
+        "ghs_pictograms": ghs_enriched,
         "pubchem_cid": final_cid,
         "image_2d": images["image_2d"],
         "image_3d": images["image_3d"],
         "pubchem_url": images["pubchem_url"],
     }
 
-    # 7. Build final text answer (Russian)
+    # 10. Build final text (Russian)
     guard_status = guard_result.get("overall_status", "НЕИЗВЕСТНО")
     status_ru = {
         "SAFE": "БЕЗОПАСНО",
@@ -209,8 +248,20 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
 
     ppe_list = guard_result.get("ppe_recommendations", [])
     h_phrases = safety_data.get("h_phrases", [])
-    ghs_pics = safety_data.get("ghs_pictograms", [])
     p = molecule_info["properties"]
+
+    # GHS pictogram display
+    ghs_display = ""
+    for pic in ghs_enriched:
+        ghs_display += f"    {pic['code']} — {pic['name_ru']}: {pic['description']}\n"
+        ghs_display += f"      Картинка: {pic['image_svg']}\n"
+
+    # LD50 display
+    ld50_display = ""
+    for route, label in [("ld50_oral", "Перорально"), ("ld50_dermal", "Дермально"), ("ld50_inhalation", "Ингаляционно")]:
+        val = ld50_data.get(route)
+        if val:
+            ld50_display += f"    {label}: {val}\n"
 
     final_text = (
         f"{'='*60}\n"
@@ -219,18 +270,20 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
         f"  SMILES:         {molecule_info['smiles']}\n"
         f"  Формула:        {molecule_info['molecular_formula']}\n"
         f"  Мол. масса:     {molecule_info['molecular_weight']:.2f} г/моль\n"
+        f"  CAS:            {molecule_info['cas_number'] or 'Н/Д'}\n"
         f"  PubChem CID:    {molecule_info['pubchem_cid']}\n"
         f"\n"
         f"  Физ. описание:  {molecule_info['physical_description']}\n"
         f"\n"
         f"  Свойства:\n"
-        f"    Т. плавления:   {p['melting_point']}\n"
-        f"    Т. кипения:     {p['boiling_point']}\n"
+        f"    Т. плавления:   {p['melting_point']} °C\n"
+        f"    Т. кипения:     {p['boiling_point']} °C\n"
         f"    Растворимость:  {p['solubility']}\n"
-        f"    Плотность:      {p['density']}\n"
+        f"    Плотность:      {p['density']} г/мл\n"
         f"    LogP:           {p['logP']}\n"
         f"    Состояние:      {p['physical_state']}\n"
         f"    TPSA:           {p['tpsa']}\n"
+        f"    Т. вспышки:     {p['flash_point'] or 'Н/Д'} °C\n"
         f"    H-доноры:       {p['h_bond_donors']}  H-акцепторы: {p['h_bond_acceptors']}\n"
         f"    Враш. связи:    {p['rotatable_bonds']}  Кольца: {p['ring_count']}\n"
         f"\n"
@@ -245,11 +298,18 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
         f"  ОТЧЁТ О БЕЗОПАСНОСТИ\n"
         f"{'='*60}\n"
         f"  Статус:         {status_ru}\n"
-        f"  GHS пиктограммы: {', '.join(ghs_pics) if ghs_pics else 'Нет'}\n"
+        f"\n"
+        f"  GHS пиктограммы:\n"
+        f"{ghs_display if ghs_display else '    Нет\n'}"
+        f"\n"
         f"  H-фразы:        {'; '.join(h_phrases[:5]) if h_phrases else 'Нет'}\n"
         f"  СИЗ:            {', '.join(ppe_list) if ppe_list else 'Стандартное лаб. оборудование'}\n"
-        f"{'='*60}\n"
     )
+
+    if ld50_display:
+        final_text += f"\n  Токсичность (LD50):\n{ld50_display}"
+
+    final_text += f"{'='*60}\n"
 
     return {
         "molecule_info": molecule_info,

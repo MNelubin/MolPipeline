@@ -1,4 +1,4 @@
-"""LangGraph StateGraph: validate → guard → (conditional) → molecule_info → END.
+"""LangGraph StateGraph: validate → guard → molecule_info → retrosynthesis → END.
 
 If guard returns CRITICAL_STOP, the graph skips molecule_info and goes to END.
 """
@@ -11,6 +11,7 @@ from .state import MVPState
 from .nodes.validate_node import validate_node
 from .nodes.guard_node import guard_node
 from .nodes.molecule_info_node import molecule_info_node
+from .nodes.retrosynthesis_node import retrosynthesis_node
 
 
 def _after_validate(state: MVPState) -> str:
@@ -30,13 +31,14 @@ def _after_guard(state: MVPState) -> str:
 
 
 def build_graph() -> StateGraph:
-    """Construct and compile the 3-node MVP graph."""
+    """Construct and compile the 4-node MVP graph."""
     graph = StateGraph(MVPState)
 
     # Nodes
     graph.add_node("validate", validate_node)
     graph.add_node("guard", guard_node)
     graph.add_node("molecule_info", molecule_info_node)
+    graph.add_node("retrosynthesis", retrosynthesis_node)
 
     # Edges
     graph.add_edge(START, "validate")
@@ -48,6 +50,7 @@ def build_graph() -> StateGraph:
         "molecule_info": "molecule_info",
         "end": END,
     })
-    graph.add_edge("molecule_info", END)
+    graph.add_edge("molecule_info", "retrosynthesis")
+    graph.add_edge("retrosynthesis", END)
 
     return graph.compile()

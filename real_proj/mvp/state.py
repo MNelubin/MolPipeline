@@ -1,4 +1,4 @@
-"""Unified state for the 3-node MVP graph."""
+"""Unified state for the 4-node MVP graph."""
 
 from __future__ import annotations
 
@@ -59,6 +59,9 @@ class MVPState(TypedDict, total=False):
     # After molecule_info
     molecule_info: MoleculeInfo
     final_answer: str
+
+    # After retrosynthesis
+    retro_result: dict[str, Any]
 
     # Error / early exit
     error: str
