@@ -26,12 +26,12 @@ import 'reactflow/dist/style.css'
 
 const SC = {
   buyable:      { color: '#22d3a0', label: 'Покупаемый',    icon: '✓' },
-  restricted:   { color: '#f4a522', label: 'Предупреждение', icon: '⚠' },
+  restricted:   { color: '#ffe033', label: 'Предупреждение', icon: '⚠' },
   banned:       { color: '#f05050', label: 'Запрещён',      icon: '✕' },
   intermediate: { color: '#06d6f0', label: 'Промежуточный', icon: '◆' },
-  unresolved:   { color: '#f4a522', label: 'Не найден',     icon: '?' },
-  depth_limit:  { color: '#f4a522', label: 'Лимит глубины', icon: '↓' },
-  timeout:      { color: '#f4a522', label: 'Таймаут',       icon: '⏱' },
+  unresolved:   { color: '#ffe033', label: 'Не найден',     icon: '?' },
+  depth_limit:  { color: '#ffe033', label: 'Лимит глубины', icon: '↓' },
+  timeout:      { color: '#ffe033', label: 'Таймаут',       icon: '⏱' },
   circular:     { color: '#f4a522', label: 'Цикл',          icon: '↻' },
   invalid_smiles:{ color: '#f05050', label: 'Невалидный',   icon: '!' },
 }
