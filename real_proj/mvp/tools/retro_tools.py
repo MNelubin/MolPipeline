@@ -58,20 +58,103 @@ def _deduplicate_routes(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# ORD search via external API
+# ORD search via local SQLite database
 # ═════════════════════════════════════════════════════════════════════════════
+
+import sqlite3
+from pathlib import Path
+
+# DB is at <project_root>/data/ord_reactions.db
+_ORD_DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "ord_reactions.db"
 
 
 def _ord_search_via_api(smiles: str, limit: int = 15) -> list[dict]:
-    """Search ORD for reactions producing the target molecule via external API."""
-    import httpx
-    resp = httpx.post(
-        "https://hack.humaneconomy.ru/ord/search",
-        json={"query": smiles, "limit": limit, "scored": False},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["reactions"]
+    """Search ORD local SQLite for reactions producing the target molecule."""
+    if not _ORD_DB_PATH.exists():
+        logger.warning("[ORD] SQLite DB not found at %s", _ORD_DB_PATH)
+        return []
+
+    try:
+        conn = sqlite3.connect(str(_ORD_DB_PATH))
+    except Exception as e:
+        logger.warning("[ORD] Cannot open SQLite DB: %s", e)
+        return []
+
+    results: list[dict] = []
+    try:
+        canonical = smiles
+        if HAS_RDKIT:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol:
+                canonical = Chem.MolToSmiles(mol, isomericSmiles=True)
+
+        # 1. Exact canonical match via product_index
+        cursor = conn.execute(
+            """
+            SELECT r.id, r.reaction_smiles, r.yield_pct,
+                   r.temperature, r.solvent, r.catalyst
+            FROM product_index pi
+            JOIN reactions r ON r.id = pi.reaction_id
+            WHERE pi.canonical_smiles = ?
+            LIMIT ?
+            """,
+            (canonical, limit),
+        )
+        results = _rows_to_retro_dicts(cursor)
+
+        # 2. Fallback: component role='product'
+        if not results:
+            cursor = conn.execute(
+                """
+                SELECT r.id, r.reaction_smiles, r.yield_pct,
+                       r.temperature, r.solvent, r.catalyst
+                FROM components c
+                JOIN reactions r ON r.id = c.reaction_id
+                WHERE c.role = 'product' AND c.smiles = ?
+                LIMIT ?
+                """,
+                (canonical, limit),
+            )
+            results = _rows_to_retro_dicts(cursor)
+
+    except Exception as e:
+        logger.warning("[ORD] Query error: %s", e)
+    finally:
+        conn.close()
+
+    logger.info("[ORD] SQLite: %d results for %s", len(results), smiles[:30])
+    return results[:limit]
+
+
+def _rows_to_retro_dicts(cursor) -> list[dict]:
+    """Convert SQLite rows to retro_tools-format route dicts."""
+    results = []
+    for row in cursor:
+        rxn_id, rxn_smi, yield_pct, temp, solvent, catalyst = row
+        if not rxn_smi or ">>" not in rxn_smi:
+            continue
+        reactant_str = rxn_smi.split(">>")[0]
+        # Join reactants as dot-separated string (expected by score_route)
+        reactants_clean = ".".join(
+            s.strip() for s in reactant_str.split(".") if s.strip()
+        )
+        route: dict[str, Any] = {
+            "reaction_id": rxn_id,
+            "reaction_smiles": rxn_smi,
+            "reactants": reactants_clean,
+            "source": "ord",
+            "num_examples": 1,
+        }
+        if yield_pct is not None:
+            route["expected_yield"] = float(yield_pct) / 100.0
+        if temp:
+            route["temperature"] = temp
+        if solvent:
+            route["solvent"] = solvent
+        if catalyst:
+            route["catalyst"] = catalyst
+        results.append(route)
+    return results
 
 
 # ═════════════════════════════════════════════════════════════════════════════

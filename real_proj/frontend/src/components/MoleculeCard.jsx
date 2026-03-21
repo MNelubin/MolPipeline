@@ -173,7 +173,7 @@ export default function MoleculeCard({ moleculeInfo, guardResult, retroResult })
             </div>
             {viewMode === '2d' && img2dUrl && (
               <div className="viewer-2d">
-                <img src={img2dUrl} alt="2D structure" style={{ width: '100%' }} />
+                <img src={img2dUrl} alt="2D structure" style={{ maxWidth: '100%', maxHeight: 200, display: 'block', margin: '0 auto' }} />
               </div>
             )}
             {viewMode === '3d' && (
