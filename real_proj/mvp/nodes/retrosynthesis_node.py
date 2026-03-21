@@ -1,8 +1,8 @@
-"""Retrosynthesis node: find synthesis routes via ORD + ASKCOS, score and rank.
+"""Retrosynthesis node: find synthesis routes via ORD + retro model, score and rank.
 
-Searches ORD SQLite for published reactions, falls back to ASKCOS
-template-relevance prediction, scores all candidates, and produces
-a ranked list with procedure details where available.
+Searches ORD SQLite for published reactions, uses standalone retro model
+for prediction, deduplicates, scores, ranks, and formats procedure
+details as step-by-step Russian instructions.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from ..retro_tools import search_and_rank
+from ..procedure_inference import format_procedure_russian
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,11 @@ def retrosynthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         total, len(routes), ", ".join(sources) or "none",
     )
 
+    # Generate procedure steps for each route
+    for route in routes:
+        procedure_steps = format_procedure_russian(route)
+        route["procedure_steps_ru"] = procedure_steps
+
     # Build retro text (Russian)
     retro_text = _format_retro_text(mol_name, routes, sources, total)
 
@@ -61,10 +67,10 @@ def _format_retro_text(
     sources: list[str],
     total: int,
 ) -> str:
-    """Format retrosynthesis results as Russian text."""
+    """Format retrosynthesis results as Russian text with step-by-step procedures."""
     source_labels = {
         "ord": "Open Reaction Database",
-        "askcos": "ASKCOS (предиктивная модель)",
+        "retro_model": "Ретросинтез-модель (template-relevance)",
     }
     source_str = ", ".join(source_labels.get(s, s) for s in sources)
 
@@ -86,17 +92,20 @@ def _format_retro_text(
     for i, route in enumerate(routes, 1):
         scoring = route.get("scoring", {})
         source = route.get("source", "?")
-        source_label = {"ord": "ORD", "askcos": "ASKCOS"}.get(source, source.upper())
+        source_label = {
+            "ord": "ORD",
+            "retro_model": "МОДЕЛЬ",
+        }.get(source, source.upper())
 
-        lines.append(f"  ── Путь #{i} [{source_label}] ──")
+        lines.append(f"  ── Путь #{i} [{source_label}] " + "─" * 40)
 
-        # Reactants
+        # Reactants (canonical)
         reactants = route.get("reactants", "")
         if len(reactants) > 80:
             reactants = reactants[:77] + "..."
         lines.append(f"  Реагенты:       {reactants}")
 
-        # Reaction SMILES (abbreviated)
+        # Reaction SMILES
         rxn_smi = route.get("reaction_smiles", "")
         if rxn_smi:
             if len(rxn_smi) > 80:
@@ -113,7 +122,7 @@ def _format_retro_text(
         if route.get("expected_yield") is not None:
             lines.append(f"  Выход:          {route['expected_yield']:.0%}")
 
-        # Score breakdown
+        # Score
         lines.append(f"  Оценка:         {route.get('final_score', 0):.3f}/1.00")
         lines.append(
             f"    Модель: {scoring.get('model_score', 0):.2f}  "
@@ -122,19 +131,25 @@ def _format_retro_text(
             f"Простота: {scoring.get('simplicity', 0):.2f}"
         )
 
-        # Procedure details (truncated)
-        procedure = route.get("procedure_details", "")
-        if procedure:
-            if len(procedure) > 300:
-                procedure = procedure[:297] + "..."
-            lines.append(f"  Процедура:      {procedure}")
-
-        # Template info (ASKCOS)
+        # Template info
         if route.get("num_examples"):
             lines.append(f"  Примеров в базе: {route['num_examples']}")
 
         if route.get("reaction_id"):
             lines.append(f"  ORD ID:         {route['reaction_id']}")
+
+        # ── Procedure steps (structured Russian) ──
+        procedure_steps = route.get("procedure_steps_ru", [])
+        if procedure_steps:
+            lines.append("")
+            lines.append("  📋 ПРОЦЕДУРА СИНТЕЗА:")
+            for step in procedure_steps:
+                step_num = step.get("step", "?")
+                desc = step.get("description", "")
+                reason = step.get("reason", "")
+                lines.append(f"    Шаг {step_num}. {desc}")
+                if reason and reason != "ORD процедура":
+                    lines.append(f"           ↳ {reason}")
 
         lines.append("")
 

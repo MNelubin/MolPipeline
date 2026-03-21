@@ -1,8 +1,8 @@
-"""Retrosynthesis tools for MVP: ORD SQLite search, ASKCOS fallback, scoring.
+"""Retrosynthesis tools for MVP: ORD SQLite search, local model, scoring.
 
 Searches local ORD index for known synthesis routes (with procedure_details),
-falls back to ASKCOS one-step template-relevance prediction,
-then scores and ranks all candidates.
+uses standalone retro model (extracted from ASKCOS) for prediction,
+deduplicates, scores and ranks all candidates.
 """
 
 from __future__ import annotations
@@ -13,19 +13,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from .config import ASKCOS_BASE_URL
-
 logger = logging.getLogger(__name__)
 
-# ── Paths & URLs ──────────────────────────────────────────────────────────────
+# ── Paths ─────────────────────────────────────────────────────────────────────
 
-# ORD database: project_root/data/ord_reactions.db
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 ORD_DB_PATH = _PROJECT_ROOT / "data" / "ord_reactions.db"
-
-ASKCOS_TIMEOUT = 120.0
 
 # RDKit
 try:
@@ -35,6 +28,45 @@ try:
     HAS_RDKIT = True
 except ImportError:
     HAS_RDKIT = False
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Canonical deduplication
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _canonical_reactant_key(reactants_str: str) -> str | None:
+    """Create a canonical dedup key from dot-separated reactant SMILES."""
+    if not HAS_RDKIT or not reactants_str:
+        return reactants_str
+    parts = []
+    for smi in reactants_str.split("."):
+        smi = smi.strip()
+        if not smi:
+            continue
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            return None
+        parts.append(Chem.MolToSmiles(mol, isomericSmiles=True))
+    parts.sort()
+    return ".".join(parts)
+
+
+def _deduplicate_routes(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove duplicate routes by canonical reactant set.
+
+    Keeps the route with the higher score when duplicates are found.
+    """
+    seen: dict[str, dict[str, Any]] = {}
+    for route in routes:
+        key = _canonical_reactant_key(route.get("reactants", ""))
+        if key is None:
+            continue
+        existing = seen.get(key)
+        if existing is None or route.get("final_score", 0) > existing.get("final_score", 0):
+            seen[key] = route
+    return list(seen.values())
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # ORD SQLite search
@@ -65,7 +97,6 @@ def ord_search_by_product(smiles: str, limit: int = 15) -> list[dict[str, Any]]:
 
     has_procedure = _has_column(conn, "reactions", "procedure_details")
 
-    # Build SELECT with optional procedure_details
     cols = "r.id, r.reaction_smiles, r.yield_pct, r.temperature, r.solvent, r.catalyst"
     if has_procedure:
         cols += ", r.procedure_details"
@@ -127,7 +158,7 @@ def _rows_to_dicts(cursor, has_procedure: bool) -> list[dict[str, Any]]:
             "reaction_smiles": rxn_smi,
             "reactants": reactant_str,
             "source": "ord",
-            "score": 0.85,  # published = good confidence
+            "score": 0.85,
             "plausibility": 0.90,
         }
         if yield_pct is not None:
@@ -146,85 +177,9 @@ def _rows_to_dicts(cursor, has_procedure: bool) -> list[dict[str, Any]]:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# ASKCOS one-step retrosynthesis (fallback)
-# ═════════════════════════════════════════════════════════════════════════════
-
-
-def askcos_one_step(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
-    """Call ASKCOS one-step retrosynthesis API.
-
-    Returns list of dicts with: reactants, score, template, num_examples, source.
-    """
-    url = f"{ASKCOS_BASE_URL}/api/retro/template-relevance/call-sync"
-    client = httpx.Client(timeout=ASKCOS_TIMEOUT)
-
-    try:
-        resp = client.post(url, json={"smiles": [smiles]})
-        resp.raise_for_status()
-    except httpx.ConnectError:
-        logger.warning("ASKCOS not reachable at %s", ASKCOS_BASE_URL)
-        return []
-    except httpx.HTTPStatusError as e:
-        logger.warning("ASKCOS API error: %s", e.response.status_code)
-        return []
-    except httpx.RequestError as e:
-        logger.warning("ASKCOS request failed: %s", e)
-        return []
-    finally:
-        client.close()
-
-    data = resp.json()
-
-    # ASKCOS v2 response: {status_code, message, result}
-    # result[0] = {templates: [...], reactants: [...], scores: [...]}
-    # reactants and scores are parallel arrays aligned with templates
-    result_wrapper = data if isinstance(data, dict) else {}
-    result_list = result_wrapper.get("result", [])
-    if not isinstance(result_list, list) or not result_list:
-        logger.warning("ASKCOS: unexpected response format")
-        return []
-
-    first_result = result_list[0] if result_list else {}
-    if not isinstance(first_result, dict):
-        return []
-
-    reactants_list = first_result.get("reactants", [])
-    scores_list = first_result.get("scores", [])
-    templates_list = first_result.get("templates", [])
-
-    parsed = []
-    n = min(top_n, len(reactants_list))
-    for i in range(n):
-        reactants = reactants_list[i] if i < len(reactants_list) else ""
-        if isinstance(reactants, list):
-            reactants = ".".join(reactants)
-        if not reactants:
-            continue
-
-        score = scores_list[i] if i < len(scores_list) else 0.0
-        template = templates_list[i] if i < len(templates_list) else {}
-        num_examples = template.get("num_examples", template.get("count", 0)) if isinstance(template, dict) else 0
-        reaction_smarts = template.get("reaction_smarts", "") if isinstance(template, dict) else ""
-
-        parsed.append({
-            "reactants": reactants,
-            "reaction_smiles": f"{reactants}>>{smiles}",
-            "score": score,
-            "plausibility": min(score * 1.5, 1.0),
-            "template": reaction_smarts,
-            "num_examples": num_examples,
-            "source": "askcos",
-        })
-
-    logger.info("ASKCOS one-step: %d results for %s", len(parsed), smiles[:30])
-    return parsed
-
-
-# ═════════════════════════════════════════════════════════════════════════════
 # Scoring (adapted from src/tools/retro_scorer.py)
 # ═════════════════════════════════════════════════════════════════════════════
 
-# Common cheap reagents
 _CHEAP_REAGENTS = {
     "O", "CO", "CCO", "CC(C)O", "CC(C)=O", "CC=O", "CC(O)=O",
     "CC(=O)OC(C)=O", "ClCCl", "ClC(Cl)Cl", "C(Cl)(Cl)(Cl)Cl",
@@ -265,11 +220,7 @@ def _is_buyable(smiles: str) -> bool:
 
 
 def score_route(route: dict[str, Any]) -> dict[str, Any]:
-    """Score a single retrosynthesis route.
-
-    Adds 'final_score' and 'scoring' to the route dict.
-    Returns the enriched route.
-    """
+    """Score a single retrosynthesis route."""
     reactants_str = route.get("reactants", "")
     model_score = route.get("score", 0.5)
     plausibility = route.get("plausibility", 0.8)
@@ -306,12 +257,10 @@ def score_route(route: dict[str, Any]) -> dict[str, Any]:
     simplicity *= 1.0 / (1.0 + 0.3 * total_chiral)
     efficiency = 1.0 / (1.0 + 0.25 * (n_reactants - 1))
 
-    # Bonus for having yield data
     yield_bonus = 0.0
     if route.get("expected_yield") is not None:
         yield_bonus = min(route["expected_yield"], 1.0) * 0.1
 
-    # Bonus for having procedure_details
     procedure_bonus = 0.05 if route.get("procedure_details") else 0.0
 
     composite = (
@@ -340,31 +289,42 @@ def score_route(route: dict[str, Any]) -> dict[str, Any]:
     return route
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# Main pipeline
+# ═════════════════════════════════════════════════════════════════════════════
+
+
 def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
-    """Full retrosynthesis pipeline: ORD search → ASKCOS fallback → score → rank.
+    """Full retrosynthesis pipeline: ORD → local retro model → deduplicate → score → rank.
 
     Returns dict with:
-        routes: list of scored routes (best first)
+        routes: list of scored routes (best first), deduplicated
         best_route: the top route (or None)
         sources_used: list of sources that returned data
-        total_found: total candidates before ranking
+        total_found: total candidates before dedup/ranking
     """
     all_routes: list[dict[str, Any]] = []
     sources_used: list[str] = []
 
-    # 1. ORD search
+    # 1. ORD search (primary)
     ord_results = ord_search_by_product(smiles, limit=15)
     if ord_results:
         all_routes.extend(ord_results)
         sources_used.append("ord")
         logger.info("ORD: %d routes found", len(ord_results))
 
-    # 2. ASKCOS fallback (always try for more options)
-    askcos_results = askcos_one_step(smiles, top_n=10)
-    if askcos_results:
-        all_routes.extend(askcos_results)
-        sources_used.append("askcos")
-        logger.info("ASKCOS: %d routes found", len(askcos_results))
+    # 2. Local retro model (standalone, extracted from ASKCOS)
+    try:
+        from .retro_predictor import predict_retro
+        model_results = predict_retro(smiles, top_n=10)
+        if model_results:
+            all_routes.extend(model_results)
+            sources_used.append("retro_model")
+            logger.info("Retro model: %d routes found", len(model_results))
+    except Exception as e:
+        logger.warning("Retro model failed: %s", e)
+
+    total_found = len(all_routes)
 
     if not all_routes:
         return {
@@ -378,7 +338,11 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
     for route in all_routes:
         score_route(route)
 
-    # 4. Sort by score (best first) and take top N
+    # 4. Deduplicate by canonical reactant set
+    all_routes = _deduplicate_routes(all_routes)
+    logger.info("After dedup: %d routes (from %d)", len(all_routes), total_found)
+
+    # 5. Sort by score (best first) and take top N
     all_routes.sort(key=lambda r: r.get("final_score", 0), reverse=True)
     top_routes = all_routes[:top_n]
 
@@ -386,5 +350,5 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
         "routes": top_routes,
         "best_route": top_routes[0] if top_routes else None,
         "sources_used": sources_used,
-        "total_found": len(all_routes),
+        "total_found": total_found,
     }
