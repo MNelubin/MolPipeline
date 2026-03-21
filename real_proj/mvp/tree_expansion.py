@@ -213,7 +213,8 @@ def _build_node(
     # Select best route — priority system:
     #   1. No cycle AND no class 1-2 hazard in direct reactants  (ideal)
     #   2. No cycle, but class 1-2 reactants present             (fallback)
-    #   3. All routes cycle → circular
+    #   3. All routes cycle → use best-scored route anyway; cyclic children
+    #      will be caught naturally by visited-set check when recursed into
 
     def _route_issues(candidate: dict) -> tuple[bool, bool]:
         """Return (would_cycle, has_high_hazard) for direct reactants of a candidate."""
@@ -227,11 +228,14 @@ def _build_node(
         return False, False
 
     chosen_route = None
-    fallback_route = None  # non-cycling but has class 1-2 reactants
+    fallback_route = None   # non-cycling but has class 1-2 reactants
+    last_resort_route = None  # cycling — only used if nothing better found
 
     for attempt, candidate in enumerate(routes):
         cycles, high_hazard = _route_issues(candidate)
         if cycles:
+            if last_resort_route is None:
+                last_resort_route = candidate  # remember best cyclic route
             continue
         if not high_hazard:
             chosen_route = candidate
@@ -248,18 +252,18 @@ def _build_node(
         chosen_route = fallback_route
         logger.debug("[tree] Fallback route (class 1-2 reactants) used for %s", canonical[:30])
 
+    if chosen_route is None and last_resort_route is not None:
+        # All routes cycle — expand the best-scored one anyway.
+        # Cyclic children will be marked "circular" by the visited-set check.
+        chosen_route = last_resort_route
+        logger.debug(
+            "[tree] All %d routes cycle for %s — using best-scored route regardless",
+            len(routes), canonical[:30],
+        )
+
+    # Defensive fallback (should never be hit since routes is non-empty above)
     if chosen_route is None:
-        logger.debug("[tree] All %d routes cycle for %s", len(routes), canonical[:30])
-        return {
-            "smiles": canonical,
-            "name": _resolve_name(canonical),
-            "status": "circular",
-            "depth": depth,
-            "is_buyable": False,
-            "guard": guard,
-            "route": None,
-            "children": [],
-        }
+        chosen_route = routes[0]
 
     route = chosen_route
     reactants_str = route.get("reactants", "")
