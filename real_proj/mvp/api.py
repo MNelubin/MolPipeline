@@ -23,6 +23,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from . import config as _cfg  # noqa: F401
+from .config import DATA_DIR
 from .graph import build_graph
 from .tools.retro_tools import _ord_search_via_api, score_route, _deduplicate_routes
 
@@ -59,7 +60,16 @@ _executor = ThreadPoolExecutor(max_workers=4)
 async def _startup():
     global _graph
     logger.info("Building graph (loading model weights)...")
-    _graph = build_graph()
+    try:
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        db_path = DATA_DIR / "checkpoints.db"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpointer = SqliteSaver.from_conn_string(str(db_path))
+        logger.info("Using SqliteSaver checkpointer at %s", db_path)
+    except Exception as e:
+        logger.warning("SqliteSaver unavailable (%s), falling back to MemorySaver", e)
+        checkpointer = None
+    _graph = build_graph(checkpointer=checkpointer)
     logger.info("Graph ready.")
 
 
@@ -257,6 +267,10 @@ def _run_interactive_start(query: str, thread_id: str) -> dict[str, Any]:
 def _run_resume(thread_id: str, resume_data: Any) -> dict[str, Any]:
     """Resume an interactive session with user-provided data."""
     config = {"configurable": {"thread_id": thread_id}}
+    # Check if thread exists before resuming
+    snapshot = _graph.get_state(config)
+    if not snapshot or not snapshot.values:
+        return {"error": "Сессия не найдена или истекла. Начните новый запрос."}
     _graph.invoke(Command(resume=resume_data), config=config)
     return _get_state(config)
 
