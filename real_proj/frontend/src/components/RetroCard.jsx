@@ -97,8 +97,30 @@ function RouteCard({ route, index, smiles }) {
       {open && (
         <div style={{ padding: '12px 14px' }}>
 
+          {/* Reaction equation */}
+          {route.reaction_smiles && (() => {
+            const parts = route.reaction_smiles.split('>>')
+            const reactantStr = (parts[0] || '').split('.').filter(Boolean).join(' + ')
+            const productStr = (parts[1] || '').split('.').filter(Boolean).join(' + ')
+            return (
+              <>
+                <div className="section-title">Реакция</div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-1)',
+                  background: 'var(--bg-card)', padding: '10px 12px', borderRadius: 'var(--r-sm)',
+                  border: '1px solid var(--border)', marginBottom: 12,
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                }}>
+                  <div style={{ color: 'var(--text-2)', wordBreak: 'break-all' }}>{reactantStr}</div>
+                  <div style={{ color: 'var(--cyan)', fontSize: 14, fontWeight: 700 }}>↓</div>
+                  <div style={{ color: 'var(--green)', wordBreak: 'break-all' }}>{productStr}</div>
+                </div>
+              </>
+            )
+          })()}
+
           {/* Reactants full */}
-          <div className="section-title">Реагенты</div>
+          <div className="section-title">Реагенты (SMILES)</div>
           <div className="smiles-box" style={{ wordBreak: 'break-all', marginBottom: 12 }}>
             {route.reactants || '—'}
           </div>
