@@ -5,6 +5,7 @@ import CalculatorCard from './components/CalculatorCard'
 import MoleculeCard from './components/MoleculeCard'
 import PathwaySelector from './components/PathwaySelector'
 import ExperimentProtocol from './components/ExperimentProtocol'
+import ProtocolGraph from './components/ProtocolGraph'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
@@ -233,9 +234,12 @@ export default function App() {
                 />
               )}
 
-              {/* ── Phase: completed — show experiment protocol ── */}
+              {/* ── Phase: completed — show synthesis graph + experiment protocol ── */}
               {!isRunning && phase === 'completed' && experimentProtocol && (
-                <ExperimentProtocol protocol={experimentProtocol} moleculeInfo={moleculeInfo} />
+                <>
+                  <ProtocolGraph protocol={experimentProtocol} />
+                  <ExperimentProtocol protocol={experimentProtocol} moleculeInfo={moleculeInfo} />
+                </>
               )}
 
               {/* ── Completed but no protocol (error/banned) ── */}
