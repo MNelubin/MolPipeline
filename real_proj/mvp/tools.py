@@ -227,35 +227,34 @@ def safety_lookup(smiles: str) -> dict:
 
     def _walk(sections_list: list[dict]) -> None:
         for sec in sections_list:
-            heading = sec.get("TOCHeading", "").lower()
-
             for info in sec.get("Information", []):
+                name = info.get("Name", "").lower()
                 val = info.get("Value", {})
+
                 for swm in val.get("StringWithMarkup", []):
                     text = swm.get("String", "")
-                    if not text:
-                        continue
 
-                    # Pictograms
-                    if "pictogram" in heading:
-                        m = re.search(r"GHS\d{2}", text)
-                        if m:
-                            pictograms.append(m.group())
-                    # Also check markup for pictogram URLs
-                    for markup in swm.get("Markup", []):
-                        extra = markup.get("Extra", "") or markup.get("URL", "")
-                        m = re.search(r"GHS\d{2}", extra)
-                        if m and m.group() not in pictograms:
-                            pictograms.append(m.group())
+                    # Pictograms — from markup Extra field
+                    if "pictogram" in name:
+                        for markup in swm.get("Markup", []):
+                            extra = markup.get("Extra", "") or markup.get("URL", "")
+                            m = re.search(r"GHS\d{2}", extra)
+                            if m and m.group() not in pictograms:
+                                pictograms.append(m.group())
+                        # Also check text itself
+                        if text:
+                            m = re.search(r"GHS\d{2}", text)
+                            if m and m.group() not in pictograms:
+                                pictograms.append(m.group())
 
-                    # H/P phrases
-                    if heading in ("hazard statements", "hazard statement",
-                                   "ghs hazard statements"):
-                        found_h = re.findall(r"H\d{3}[A-Za-z]?[^;]*", text)
+                    # H-phrases
+                    if "hazard" in name and "statement" in name and text:
+                        found_h = re.findall(r"H\d{3}[A-Za-z]?[^;,\[]*", text)
                         h_phrases.extend(s.strip() for s in found_h if s.strip())
-                    elif heading in ("precautionary statements", "precautionary statement",
-                                     "precautionary statement codes"):
-                        found_p = re.findall(r"P\d{3}[A-Za-z]?[^;]*", text)
+
+                    # P-phrases
+                    if "precautionary" in name and text:
+                        found_p = re.findall(r"P\d{3}(?:\+P\d{3})*", text)
                         p_phrases.extend(s.strip() for s in found_p if s.strip())
 
             children = sec.get("Section", [])
