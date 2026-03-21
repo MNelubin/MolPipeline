@@ -54,31 +54,35 @@ def _resolve_name(smiles: str) -> str | None:
         return None
 
 
-def _find_best_route(smiles: str) -> dict[str, Any] | None:
-    """Find the single best retrosynthesis route: ORD first, then model."""
-    # 1. ORD search (authoritative)
-    ord_results = ord_search_by_product(smiles, limit=5)
+def _find_top_routes(smiles: str, top_n: int = 5) -> list[dict[str, Any]]:
+    """Find up to top_n ranked routes: ORD first, then model fallback."""
+    results: list[dict[str, Any]] = []
+
+    # 1. ORD search — fetch extra to have room after dedup/sort
+    ord_results = ord_search_by_product(smiles, limit=top_n * 3)
     if ord_results:
         for r in ord_results:
             score_route(r)
         ord_results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
-        logger.debug("[tree] ORD hit for %s: score=%.3f", smiles[:30], ord_results[0]["final_score"])
-        return ord_results[0]
+        results.extend(ord_results[:top_n])
+        logger.debug("[tree] ORD: %d results for %s", len(results), smiles[:30])
 
-    # 2. ASKCOS model fallback
-    try:
-        predict = _get_predict_retro()
-        model_results = predict(smiles, top_n=3)
-        if model_results:
-            for r in model_results:
-                score_route(r)
-            model_results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
-            logger.debug("[tree] Model hit for %s: score=%.3f", smiles[:30], model_results[0]["final_score"])
-            return model_results[0]
-    except Exception as e:
-        logger.warning("[tree] Model failed for %s: %s", smiles[:30], e)
+    # 2. ASKCOS model — fill remaining slots
+    if len(results) < top_n:
+        try:
+            predict = _get_predict_retro()
+            need = top_n - len(results)
+            model_results = predict(smiles, top_n=need + 2)
+            if model_results:
+                for r in model_results:
+                    score_route(r)
+                model_results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
+                results.extend(model_results[:need])
+                logger.debug("[tree] Model: +%d results for %s", need, smiles[:30])
+        except Exception as e:
+            logger.warning("[tree] Model failed for %s: %s", smiles[:30], e)
 
-    return None
+    return results[:top_n]
 
 
 def _build_node(
@@ -175,9 +179,9 @@ def _build_node(
             "children": [],
         }
 
-    # Find best route for this intermediate
-    route = _find_best_route(canonical)
-    if route is None:
+    # Find best non-cyclic route — try up to 5 alternatives
+    routes = _find_top_routes(canonical, top_n=5)
+    if not routes:
         return {
             "smiles": canonical,
             "name": _resolve_name(canonical),
@@ -189,11 +193,44 @@ def _build_node(
             "children": [],
         }
 
-    # Parse reactants and recurse
+    visited_branch = visited | {canonical}
+
+    # Pick the first route whose direct reactants don't immediately cycle
+    chosen_route = None
+    for attempt, candidate in enumerate(routes):
+        reactants_str = candidate.get("reactants", "")
+        reactant_parts = [s.strip() for s in reactants_str.split(".") if s.strip()]
+        # Canonicalize and check against current path
+        would_cycle = any(
+            _canonicalize(r) in visited_branch
+            for r in reactant_parts
+            if r
+        )
+        if not would_cycle:
+            chosen_route = candidate
+            if attempt > 0:
+                logger.debug(
+                    "[tree] Cycle avoided for %s: skipped %d route(s), using attempt %d",
+                    canonical[:30], attempt, attempt + 1,
+                )
+            break
+
+    if chosen_route is None:
+        logger.debug("[tree] All %d routes lead to direct cycle for %s", len(routes), canonical[:30])
+        return {
+            "smiles": canonical,
+            "name": _resolve_name(canonical),
+            "status": "circular",
+            "depth": depth,
+            "is_buyable": False,
+            "guard": guard,
+            "route": None,
+            "children": [],
+        }
+
+    route = chosen_route
     reactants_str = route.get("reactants", "")
     reactant_parts = [s.strip() for s in reactants_str.split(".") if s.strip()]
-
-    visited_branch = visited | {canonical}
     children = []
     for reactant_smi in reactant_parts:
         child = _build_node(
