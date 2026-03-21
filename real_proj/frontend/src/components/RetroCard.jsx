@@ -17,7 +17,7 @@
  */
 
 import { useState } from 'react'
-import SynthesisTree from './SynthesisTree'
+import SynthesisGraph from './SynthesisGraph'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://hack.humaneconomy.ru'
 
@@ -52,6 +52,7 @@ function RouteCard({ route, index, smiles }) {
   const [tree, setTree] = useState(null)
   const [treeLoading, setTreeLoading] = useState(false)
   const [treeError, setTreeError] = useState(null)
+  const [graphOpen, setGraphOpen] = useState(false)
   const src = SOURCE_LABEL[route.source] || { text: route.source?.toUpperCase(), color: 'var(--text-3)' }
   const scoring = route.scoring || {}
   const steps = route.procedure_steps_ru || []
@@ -264,7 +265,33 @@ function RouteCard({ route, index, smiles }) {
               )}
 
               {tree && (
-                <SynthesisTree tree={tree.tree} stats={tree.stats} />
+                <>
+                  <button
+                    onClick={() => setGraphOpen(true)}
+                    style={{
+                      marginTop: 10,
+                      background: 'var(--cyan)18',
+                      border: '1px solid var(--cyan)40',
+                      color: 'var(--cyan)',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--r-sm)',
+                      fontSize: 12,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    ⬡ Открыть граф синтеза ({tree.stats?.total_nodes} узлов)
+                  </button>
+                  {graphOpen && (
+                    <SynthesisGraph
+                      tree={tree.tree}
+                      stats={tree.stats}
+                      onClose={() => setGraphOpen(false)}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}
