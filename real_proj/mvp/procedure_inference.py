@@ -378,7 +378,7 @@ _PROCEDURE_SYSTEM_PROMPT = """\
 def _translate_procedure_via_llm(text: str) -> list[dict[str, str]] | None:
     """Translate English procedure to structured Russian steps via LLM."""
     try:
-        from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
+        from .config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
     except ImportError:
         logger.debug("LLM procedure: config import failed")
         return None
