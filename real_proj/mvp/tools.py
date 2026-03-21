@@ -453,13 +453,18 @@ def get_cid_by_name(name: str) -> int | None:
 
 @lru_cache(maxsize=512)
 def get_smiles_by_cid(cid: int) -> str | None:
-    url = f"{PUBCHEM_BASE_URL}/compound/cid/{cid}/property/CanonicalSMILES/JSON"
+    url = f"{PUBCHEM_BASE_URL}/compound/cid/{cid}/property/CanonicalSMILES,IsomericSMILES/JSON"
     data = _get_json(url)
     if not data:
         return None
     try:
         props = data["PropertyTable"]["Properties"][0]
-        return props.get("CanonicalSMILES")
+        return (
+            props.get("CanonicalSMILES")
+            or props.get("IsomericSMILES")
+            or props.get("ConnectivitySMILES")
+            or props.get("SMILES")
+        )
     except (KeyError, IndexError, TypeError):
         return None
 
