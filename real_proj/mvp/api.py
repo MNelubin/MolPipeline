@@ -61,10 +61,12 @@ async def _startup():
     global _graph
     logger.info("Building graph (loading model weights)...")
     try:
+        import sqlite3
         from langgraph.checkpoint.sqlite import SqliteSaver
         db_path = DATA_DIR / "checkpoints.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpointer = SqliteSaver.from_conn_string(str(db_path))
+        _conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        checkpointer = SqliteSaver(_conn)
         logger.info("Using SqliteSaver checkpointer at %s", db_path)
     except Exception as e:
         logger.warning("SqliteSaver unavailable (%s), falling back to MemorySaver", e)
