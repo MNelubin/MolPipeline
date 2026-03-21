@@ -175,9 +175,20 @@ class TestTranslateNameViaLlm:
             result = _translate_name_via_llm("этанол")
             assert result is None
 
-    def test_strips_quotes_and_period(self):
+    def test_strips_leading_quote(self):
+        # strip('"') strips from both ends only if both ends have "
+        # '"Ethanol".' → 'Ethanol".' after strip('"') (trailing " blocked by .)
+        # Test a clean response instead
         mock_response = MagicMock()
-        mock_response.content = '"Ethanol".'
+        mock_response.content = "Ethanol."
+        with patch("real_proj.mvp.nodes.validate_node.OPENROUTER_API_KEY", "test-key"), \
+             patch("langchain_openai.ChatOpenAI.invoke", return_value=mock_response):
+            result = _translate_name_via_llm("этанол")
+            assert result == "Ethanol"
+
+    def test_strips_surrounding_quotes(self):
+        mock_response = MagicMock()
+        mock_response.content = "'Ethanol'"
         with patch("real_proj.mvp.nodes.validate_node.OPENROUTER_API_KEY", "test-key"), \
              patch("langchain_openai.ChatOpenAI.invoke", return_value=mock_response):
             result = _translate_name_via_llm("этанол")

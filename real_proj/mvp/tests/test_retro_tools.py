@@ -303,8 +303,9 @@ class TestSearchAndRank:
         assert result["best_route"] is None
 
     def test_no_results_returns_empty_structure(self):
+        # predict_retro is imported inside the function from retro_predictor
         with patch("real_proj.mvp.retro_tools.ord_search_by_product", return_value=[]), \
-             patch("real_proj.mvp.retro_tools.predict_retro", return_value=[]):
+             patch("real_proj.mvp.retro_predictor.predict_retro", return_value=[]):
             result = search_and_rank("CCO", top_n=5)
 
         assert result["routes"] == []
