@@ -175,37 +175,44 @@ def askcos_one_step(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
 
     data = resp.json()
 
-    # v2 response structure
-    all_results = data if isinstance(data, list) else [data]
-    results_data = all_results[0] if all_results else {}
-    if isinstance(results_data, dict):
-        results_data = results_data.get("result", results_data.get("outcomes", []))
-    if isinstance(results_data, list) and results_data:
-        # Nested: first element may contain templates
-        if isinstance(results_data[0], dict) and "templates" in results_data[0]:
-            templates = results_data[0]["templates"]
-        else:
-            templates = results_data
-    else:
-        templates = []
+    # ASKCOS v2 response: {status_code, message, result}
+    # result[0] = {templates: [...], reactants: [...], scores: [...]}
+    # reactants and scores are parallel arrays aligned with templates
+    result_wrapper = data if isinstance(data, dict) else {}
+    result_list = result_wrapper.get("result", [])
+    if not isinstance(result_list, list) or not result_list:
+        logger.warning("ASKCOS: unexpected response format")
+        return []
+
+    first_result = result_list[0] if result_list else {}
+    if not isinstance(first_result, dict):
+        return []
+
+    reactants_list = first_result.get("reactants", [])
+    scores_list = first_result.get("scores", [])
+    templates_list = first_result.get("templates", [])
 
     parsed = []
-    for r in templates[:top_n]:
-        reactants = r.get("smiles", r.get("precursors", ""))
+    n = min(top_n, len(reactants_list))
+    for i in range(n):
+        reactants = reactants_list[i] if i < len(reactants_list) else ""
         if isinstance(reactants, list):
             reactants = ".".join(reactants)
         if not reactants:
-            # Try to extract from reaction_smarts or other fields
             continue
 
-        score = r.get("template_score", r.get("score", r.get("prob", 0.0)))
+        score = scores_list[i] if i < len(scores_list) else 0.0
+        template = templates_list[i] if i < len(templates_list) else {}
+        num_examples = template.get("num_examples", template.get("count", 0)) if isinstance(template, dict) else 0
+        reaction_smarts = template.get("reaction_smarts", "") if isinstance(template, dict) else ""
+
         parsed.append({
             "reactants": reactants,
             "reaction_smiles": f"{reactants}>>{smiles}",
             "score": score,
-            "plausibility": min(score * 1.2, 1.0),  # approximate
-            "template": r.get("template", r.get("reaction_smarts", "")),
-            "num_examples": r.get("count", r.get("num_examples", 0)),
+            "plausibility": min(score * 1.5, 1.0),
+            "template": reaction_smarts,
+            "num_examples": num_examples,
             "source": "askcos",
         })
 
