@@ -26,6 +26,7 @@ import 'reactflow/dist/style.css'
 
 const SC = {
   buyable:      { color: '#22d3a0', label: 'Покупаемый',    icon: '✓' },
+  restricted:   { color: '#f4a522', label: 'Предупреждение', icon: '⚠' },
   banned:       { color: '#f05050', label: 'Запрещён',      icon: '✕' },
   intermediate: { color: '#06d6f0', label: 'Промежуточный', icon: '◆' },
   unresolved:   { color: '#f4a522', label: 'Не найден',     icon: '?' },

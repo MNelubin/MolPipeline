@@ -139,7 +139,8 @@ def _build_node(
 
     # Guard check (banlist)
     guard = banlist_check(canonical)
-    if guard.get("status") in ("banned", "restricted"):
+    if guard.get("status") == "banned":
+        # Class 1-2 (critical/high) — truly forbidden, hard stop
         name = guard.get("name") or _resolve_name(canonical)
         return {
             "smiles": canonical,
@@ -147,6 +148,20 @@ def _build_node(
             "status": "banned",
             "depth": depth,
             "is_buyable": False,
+            "guard": guard,
+            "route": None,
+            "children": [],
+        }
+    if guard.get("status") == "restricted":
+        # Class 3 (medium) — common lab chemicals (HCl, DCM, acetone…)
+        # Treat as buyable leaf with a warning badge
+        name = guard.get("name") or _resolve_name(canonical)
+        return {
+            "smiles": canonical,
+            "name": name,
+            "status": "restricted",
+            "depth": depth,
+            "is_buyable": True,
             "guard": guard,
             "route": None,
             "children": [],
@@ -279,7 +294,7 @@ def _build_node(
 def expand_tree(
     target_smiles: str,
     reactants: str,
-    max_depth: int = 6,
+    max_depth: int = 10,
     timeout_sec: float = 120.0,
 ) -> dict[str, Any]:
     """Expand a selected synthesis route into a full tree.
@@ -287,7 +302,7 @@ def expand_tree(
     Args:
         target_smiles: SMILES of the target molecule (root node).
         reactants: Dot-separated SMILES of reactants from the selected route.
-        max_depth: Maximum recursion depth (default 6).
+        max_depth: Maximum recursion depth (default 10).
         timeout_sec: Maximum elapsed time in seconds (default 120).
 
     Returns:
@@ -374,7 +389,7 @@ def _walk(node: dict, counts: dict):
     counts["total"] += 1
     counts["max_depth"] = max(counts["max_depth"], node.get("depth", 0))
     status = node.get("status", "")
-    if status == "buyable":
+    if status in ("buyable", "restricted"):
         counts["buyable"] += 1
     elif status == "banned":
         counts["banned"] += 1

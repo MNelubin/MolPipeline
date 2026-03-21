@@ -242,7 +242,7 @@ function RouteCard({ route, index, smiles }) {
                         body: JSON.stringify({
                           smiles,
                           reactants: route.reactants,
-                          max_depth: 6,
+                          max_depth: 10,
                           timeout_sec: 120,
                         }),
                       })
