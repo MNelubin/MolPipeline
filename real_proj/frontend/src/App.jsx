@@ -168,7 +168,7 @@ export default function App() {
               )}
 
               {/* ── Error state ── */}
-              {status === 'error' && error && (
+              {status === 'error' && (
                 <div style={{
                   margin: '16px 0',
                   padding: '12px 16px',
@@ -178,10 +178,12 @@ export default function App() {
                   color: 'var(--red)',
                   fontSize: 13,
                   fontFamily: 'var(--font-mono)',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
                 }}>
-                  Ошибка: {error}
+                  {error || 'Произошла ошибка'}
                   <button
-                    style={{ marginLeft: 16, fontSize: 11, cursor: 'pointer', color: 'var(--text-3)', background: 'none', border: 'none' }}
+                    style={{ display: 'block', marginTop: 10, fontSize: 11, cursor: 'pointer', color: 'var(--text-3)', background: 'none', border: 'none' }}
                     onClick={reset}
                   >
                     Сбросить
