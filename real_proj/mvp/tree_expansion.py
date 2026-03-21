@@ -195,28 +195,46 @@ def _build_node(
 
     visited_branch = visited | {canonical}
 
-    # Pick the first route whose direct reactants don't immediately cycle
+    # Select best route — priority system:
+    #   1. No cycle AND no class 1-2 hazard in direct reactants  (ideal)
+    #   2. No cycle, but class 1-2 reactants present             (fallback)
+    #   3. All routes cycle → circular
+
+    def _route_issues(candidate: dict) -> tuple[bool, bool]:
+        """Return (would_cycle, has_high_hazard) for direct reactants of a candidate."""
+        parts = [s.strip() for s in candidate.get("reactants", "").split(".") if s.strip()]
+        if any(_canonicalize(r) in visited_branch for r in parts if r):
+            return True, False  # cycles — skip hazard check
+        for r in parts:
+            cr = _canonicalize(r)
+            if cr and banlist_check(cr).get("danger_level") in ("critical", "high"):
+                return False, True
+        return False, False
+
     chosen_route = None
+    fallback_route = None  # non-cycling but has class 1-2 reactants
+
     for attempt, candidate in enumerate(routes):
-        reactants_str = candidate.get("reactants", "")
-        reactant_parts = [s.strip() for s in reactants_str.split(".") if s.strip()]
-        # Canonicalize and check against current path
-        would_cycle = any(
-            _canonicalize(r) in visited_branch
-            for r in reactant_parts
-            if r
-        )
-        if not would_cycle:
+        cycles, high_hazard = _route_issues(candidate)
+        if cycles:
+            continue
+        if not high_hazard:
             chosen_route = candidate
             if attempt > 0:
                 logger.debug(
-                    "[tree] Cycle avoided for %s: skipped %d route(s), using attempt %d",
+                    "[tree] Clean route for %s: skipped %d (cycle/hazard), attempt %d",
                     canonical[:30], attempt, attempt + 1,
                 )
             break
+        if fallback_route is None:
+            fallback_route = candidate
+
+    if chosen_route is None and fallback_route is not None:
+        chosen_route = fallback_route
+        logger.debug("[tree] Fallback route (class 1-2 reactants) used for %s", canonical[:30])
 
     if chosen_route is None:
-        logger.debug("[tree] All %d routes lead to direct cycle for %s", len(routes), canonical[:30])
+        logger.debug("[tree] All %d routes cycle for %s", len(routes), canonical[:30])
         return {
             "smiles": canonical,
             "name": _resolve_name(canonical),

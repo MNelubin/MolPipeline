@@ -95,12 +95,17 @@ def banlist_check(smiles: str) -> dict:
     for entry in _banned_chemicals():
         entry_canon = entry.get("canonical_smiles") or entry.get("smiles", "")
         if entry_canon == canon:
+            dl = entry.get("danger_level", "medium")
+            # class 3 (medium) = commonly used lab chemicals (acetone, DCM, etc.)
+            # → restricted/WARNING, pipeline continues
+            # class 1-2 (critical/high) = CWC/DEA prohibited → banned/CRITICAL_STOP
+            status = "restricted" if dl == "medium" else "banned"
             return {
                 "smiles": canon,
                 "name": entry.get("name"),
-                "status": "banned",
+                "status": status,
                 "category": entry.get("category"),
-                "danger_level": entry.get("danger_level"),
+                "danger_level": dl,
                 "reason": f"Exact match in banlist: {entry.get('name')}.",
             }
 
