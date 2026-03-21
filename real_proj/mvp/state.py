@@ -12,11 +12,14 @@ class MoleculeInfo(TypedDict, total=False):
     smiles: str
     molecular_formula: str
     molecular_weight: float
+    physical_description: str
     properties: dict[str, Any]
     description: str
     ghs_classification: list[str]
     pubchem_cid: int
-    structure_url: str
+    image_2d: str
+    image_3d: str
+    pubchem_url: str
 
 
 class GuardResult(TypedDict, total=False):

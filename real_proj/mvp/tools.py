@@ -422,6 +422,88 @@ def rdkit_properties(smiles: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Physical description from PubChem PUG View
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_physical_description(smiles: str) -> list[str]:
+    """Fetch physical description texts from PubChem (color, form, odor, etc.).
+
+    Returns a list of description strings. Empty list on failure.
+    """
+    encoded = quote(smiles, safe="")
+    cid_url = f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/cids/JSON"
+    cid_data = _get_json(cid_url)
+    if not cid_data:
+        return []
+    try:
+        cid = cid_data["IdentifierList"]["CID"][0]
+    except (KeyError, IndexError, TypeError):
+        return []
+
+    url = f"{PUBCHEM_VIEW_URL}/data/compound/{cid}/JSON?heading=Physical+Description"
+    data = _get_json(url)
+    if not data:
+        return []
+
+    descriptions: list[str] = []
+    try:
+        sections = data["Record"]["Section"]
+    except (KeyError, TypeError):
+        return []
+
+    def _walk_phys(secs: list[dict]) -> None:
+        for sec in secs:
+            for info in sec.get("Information", []):
+                val = info.get("Value", {})
+                for swm in val.get("StringWithMarkup", []):
+                    text = swm.get("String", "").strip()
+                    if text and text not in descriptions:
+                        descriptions.append(text)
+            children = sec.get("Section", [])
+            if children:
+                _walk_phys(children)
+
+    _walk_phys(sections)
+    return descriptions
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Molecule image URLs (2D + 3D)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_molecule_images(smiles: str, cid: int | None = None) -> dict[str, str]:
+    """Get URLs for 2D structure image and 3D conformer from PubChem.
+
+    Returns dict with keys: image_2d, image_3d, pubchem_url.
+    """
+    result: dict[str, str] = {
+        "image_2d": "",
+        "image_3d": "",
+        "pubchem_url": "",
+    }
+
+    if cid is None:
+        encoded = quote(smiles, safe="")
+        cid_url = f"{PUBCHEM_BASE_URL}/compound/smiles/{encoded}/cids/JSON"
+        cid_data = _get_json(cid_url)
+        if cid_data:
+            try:
+                cid = cid_data["IdentifierList"]["CID"][0]
+            except (KeyError, IndexError, TypeError):
+                pass
+
+    if cid:
+        result["image_2d"] = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG?image_size=300x300"
+        result["image_3d"] = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG?record_type=3d&image_size=300x300"
+        result["pubchem_url"] = f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}"
+    elif smiles:
+        encoded = quote(smiles, safe="")
+        result["image_2d"] = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{encoded}/PNG?image_size=300x300"
+
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PubChem CID resolvers (for validation node)
 # ═══════════════════════════════════════════════════════════════════════════════
 

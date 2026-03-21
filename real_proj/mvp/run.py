@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Entry point for the MVP pipeline.
+"""Точка входа для MVP пайплайна.
 
-Usage:
-    python -m real_proj.mvp.run "aspirin"
+Использование:
+    python -m real_proj.mvp.run "аспирин"
     python -m real_proj.mvp.run "CC(=O)Oc1ccccc1C(O)=O"
-    python -m real_proj.mvp.run  # interactive mode
+    python -m real_proj.mvp.run  # интерактивный режим
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 import logging
 
-# Ensure config is loaded first (sets env vars for LangSmith)
+# Загружаем конфиг первым (устанавливает env vars для LangSmith)
 from . import config as _cfg  # noqa: F401
 from .graph import build_graph
 
@@ -24,17 +24,17 @@ logger = logging.getLogger("mvp")
 
 
 def run(query: str) -> dict:
-    """Run the MVP graph on a single query and return the final state."""
-    logger.info("Building graph...")
+    """Запуск MVP графа для одного запроса. Возвращает финальный стейт."""
+    logger.info("Построение графа...")
     app = build_graph()
 
-    logger.info("Running query: %r", query)
+    logger.info("Запрос: %r", query)
     result = app.invoke({"query": query})
 
-    # Print result
+    # Вывод результата
     if result.get("error"):
         print(f"\n{'!'*60}")
-        print(f"  ERROR: {result['error']}")
+        print(f"  ОШИБКА: {result['error']}")
         print(f"{'!'*60}")
 
         guard = result.get("guard_result", {})
@@ -42,22 +42,22 @@ def run(query: str) -> dict:
             mol_check = guard.get("molecule_check", {})
             rxn_check = guard.get("reaction_check", {})
             if mol_check.get("status") in ("banned", "restricted"):
-                print(f"\n  Molecule: {mol_check.get('name', 'Unknown')}")
-                print(f"  Status:   {mol_check.get('status')}")
-                print(f"  Category: {mol_check.get('category')}")
-                print(f"  Reason:   {mol_check.get('reason')}")
+                print(f"\n  Вещество:   {mol_check.get('name', 'Неизвестно')}")
+                print(f"  Статус:     {mol_check.get('status')}")
+                print(f"  Категория:  {mol_check.get('category')}")
+                print(f"  Причина:    {mol_check.get('reason')}")
             if rxn_check.get("status") in ("prohibited", "restricted"):
-                print(f"\n  Reaction: {rxn_check.get('reason')}")
+                print(f"\n  Реакция:    {rxn_check.get('reason')}")
 
         validation = result.get("validation", {})
         if validation and not validation.get("is_valid"):
-            print(f"\n  Validation failed: {validation.get('error')}")
+            print(f"\n  Ошибка валидации: {validation.get('error')}")
 
     elif result.get("final_answer"):
         print(f"\n{result['final_answer']}")
 
     else:
-        print("\n  No result produced.")
+        print("\n  Результат не получен.")
 
     return result
 
@@ -66,11 +66,11 @@ def main():
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
     else:
-        print("MVP Pipeline: validate → guard → molecule_info")
-        print("=" * 50)
-        query = input("Enter molecule (name or SMILES): ").strip()
+        print("MVP Пайплайн: валидация → проверка безопасности → информация о молекуле")
+        print("=" * 60)
+        query = input("Введите молекулу (название или SMILES): ").strip()
         if not query:
-            print("No input. Exiting.")
+            print("Пустой ввод. Выход.")
             sys.exit(0)
 
     run(query)
