@@ -234,14 +234,14 @@ def safety_lookup(smiles: str) -> dict:
                 for swm in val.get("StringWithMarkup", []):
                     text = swm.get("String", "")
 
-                    # Pictograms — from markup Extra field
+                    # Pictograms — check both URL and Extra fields
                     if "pictogram" in name:
                         for markup in swm.get("Markup", []):
-                            extra = markup.get("Extra", "") or markup.get("URL", "")
-                            m = re.search(r"GHS\d{2}", extra)
-                            if m and m.group() not in pictograms:
-                                pictograms.append(m.group())
-                        # Also check text itself
+                            for field in ("URL", "Extra"):
+                                val_str = markup.get(field, "")
+                                m = re.search(r"GHS\d{2}", val_str)
+                                if m and m.group() not in pictograms:
+                                    pictograms.append(m.group())
                         if text:
                             m = re.search(r"GHS\d{2}", text)
                             if m and m.group() not in pictograms:
