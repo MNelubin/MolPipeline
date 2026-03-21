@@ -350,6 +350,7 @@ def run_test(name: str, smiles: str):
 
     for i, r in enumerate(scored[:top_n]):
         s = r["scoring"]
+        bd = s.get("breakdown", {})
         print(f"\n  #{i+1}  [{r.get('source', '?').upper()}]  {r.get('description', '')}")
         print(f"  {'─'*60}")
         print(f"  Reactants:      {r.get('reactants', '?')}")
@@ -358,21 +359,23 @@ def run_test(name: str, smiles: str):
             if len(rxn) > 80:
                 rxn = rxn[:77] + "..."
             print(f"  Reaction:       {rxn}")
-        print(f"  Model score:    {s['model_score']:.4f}")
-        print(f"  Plausibility:   {s['plausibility']:.4f}")
-        print(f"  Num reactants:  {s['num_reactants']}")
 
         buyable_count = sum(1 for x in s.get("reactants", []) if x.get("buyable"))
-        print(f"  Buyability:     {s['buyability_ratio']:.0%} ({buyable_count}/{s['num_reactants']})")
-        print(f"  Total atoms:    {s['total_heavy_atoms']}")
+        print(f"  Atoms / React:  {s['total_heavy_atoms']} atoms, {s['num_reactants']} reactants")
         if s.get("rms_molecular_weight"):
             print(f"  RMS mol.wt:     {s['rms_molecular_weight']:.1f}")
-        print(f"  Raw penalty:    {s['raw_score']:.4f}")
 
         if r.get("expected_yield"):
             print(f"  Exp. yield:     {r['expected_yield']:.0%}")
 
-        print(f"  ═══ FINAL SCORE: {s['precursor_score']:.4f} ═══")
+        # Score breakdown
+        print(f"  Breakdown:")
+        print(f"    Model conf:   {bd.get('model_score', 0):.2f}  (x0.30)")
+        print(f"    Plausibility: {bd.get('plausibility', 0):.2f}  (x0.25)")
+        print(f"    Buyability:   {bd.get('buyability', 0):.0%} ({buyable_count}/{s['num_reactants']})  (x0.20)")
+        print(f"    Simplicity:   {bd.get('simplicity', 0):.2f}  (x0.15)")
+        print(f"    Efficiency:   {bd.get('efficiency', 0):.2f}  (x0.10)")
+        print(f"  ═══ FINAL SCORE: {s['precursor_score']:.4f} / 1.00 ═══")
 
     # Comparison table
     print(f"\n  {'─'*66}")

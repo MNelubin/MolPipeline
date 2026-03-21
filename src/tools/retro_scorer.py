@@ -104,11 +104,12 @@ def score_precursor_set(
 ) -> dict:
     """Score a set of precursors from a one-step retro prediction.
 
-    Reimplements ASKCOS expand_one relevance heuristic:
-        score = structural_penalty / model_score
-        structural_penalty = sum over reactants of:
-            -2.0 * atoms^1.5 - 1.0 * ring_bonds^1.5 - 2.0 * chiral^2.0
-        buyable reactants get bonus: -ppg/1000 (we use -0.01 for cheap)
+    Multi-factor scoring on 0-1 scale:
+        - model_score: confidence from retro model (30%)
+        - plausibility: reaction plausibility (25%)
+        - buyability: fraction of buyable reactants (20%)
+        - simplicity: structural simplicity of precursors (15%)
+        - efficiency: fewer reactants = better (10%)
 
     Args:
         precursor_smiles: Dot-separated SMILES of all precursors.
@@ -122,15 +123,15 @@ def score_precursor_set(
         return _score_precursor_fallback(precursor_smiles, model_score, plausibility)
 
     reactants = [s.strip() for s in precursor_smiles.split(".") if s.strip()]
-    scores = []
     buyable_count = 0
     total_atoms = 0
+    total_ring_bonds = 0
+    total_chiral = 0
     details = []
 
     for smi in reactants:
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
-            scores.append(-100.0)
             details.append({"smiles": smi, "error": "invalid SMILES"})
             continue
 
@@ -139,7 +140,9 @@ def score_precursor_set(
         ring_bonds = sum(
             1 for b in mol.GetBonds() if b.IsInRing() and not b.GetIsAromatic()
         )
+        total_ring_bonds += ring_bonds
         chiral = len(Chem.FindMolChiralCenters(mol))
+        total_chiral += chiral
         rings = Descriptors.RingCount(mol)
 
         canonical = Chem.MolToSmiles(mol, isomericSmiles=True)
@@ -147,16 +150,6 @@ def score_precursor_set(
         if buyable:
             buyable_count += 1
 
-        if buyable:
-            component_score = -0.01  # cheap buyable bonus
-        else:
-            component_score = (
-                -2.0 * math.pow(heavy, 1.5)
-                - 1.0 * math.pow(ring_bonds, 1.5)
-                - 2.0 * math.pow(chiral, 2.0)
-            )
-
-        scores.append(component_score)
         details.append({
             "smiles": canonical,
             "heavy_atoms": heavy,
@@ -164,35 +157,63 @@ def score_precursor_set(
             "ring_bonds": ring_bonds,
             "chiral_centers": chiral,
             "buyable": buyable,
-            "component_score": round(component_score, 3),
         })
-
-    raw_score = sum(scores)
-    # Normalize by model score (higher model score → less penalty)
-    normalized = raw_score / max(model_score, 0.001)
-
-    # Final composite: combine with plausibility
-    # ASKCOS uses plausibility as a filter (threshold), we blend it in
-    composite = normalized * plausibility
 
     n_reactants = len(reactants)
     buyability_ratio = buyable_count / max(n_reactants, 1)
 
-    # Complexity: RMS molecular weight of precursors (ASKCOS uses this)
+    # --- Simplicity score (0-1): penalize complex precursors ---
+    # Typical target: 20-40 atoms. Precursor with 5 atoms = simple (1.0),
+    # precursor with 30 atoms = complex (0.1)
+    max_atoms_per_reactant = max(
+        (d.get("heavy_atoms", 0) for d in details if "error" not in d),
+        default=0,
+    )
+    simplicity = 1.0 / (1.0 + 0.08 * max_atoms_per_reactant)
+    # Chirality and ring bond penalty
+    simplicity *= 1.0 / (1.0 + 0.3 * total_chiral)
+    simplicity *= 1.0 / (1.0 + 0.05 * total_ring_bonds)
+
+    # --- Efficiency: fewer reactants = better ---
+    # 1 reactant = 1.0, 2 = 0.8, 3 = 0.6, 4 = 0.5
+    efficiency = 1.0 / (1.0 + 0.25 * (n_reactants - 1))
+
+    # --- Composite score (0-1) ---
+    WEIGHTS = {
+        "model_score": 0.30,
+        "plausibility": 0.25,
+        "buyability": 0.20,
+        "simplicity": 0.15,
+        "efficiency": 0.10,
+    }
+    composite = (
+        WEIGHTS["model_score"] * min(model_score, 1.0)
+        + WEIGHTS["plausibility"] * min(plausibility, 1.0)
+        + WEIGHTS["buyability"] * buyability_ratio
+        + WEIGHTS["simplicity"] * simplicity
+        + WEIGHTS["efficiency"] * efficiency
+    )
+
+    # RMS molecular weight
     rms_mw = 0.0
-    if HAS_RDKIT:
-        mws = []
-        for smi in reactants:
-            mol = Chem.MolFromSmiles(smi)
-            if mol:
-                mws.append(Descriptors.ExactMolWt(mol))
-        if mws:
-            rms_mw = math.sqrt(sum(w * w for w in mws) / len(mws))
+    mws = []
+    for smi in reactants:
+        mol = Chem.MolFromSmiles(smi)
+        if mol:
+            mws.append(Descriptors.ExactMolWt(mol))
+    if mws:
+        rms_mw = math.sqrt(sum(w * w for w in mws) / len(mws))
 
     return {
         "precursor_score": round(composite, 4),
-        "raw_score": round(raw_score, 4),
-        "normalized_score": round(normalized, 4),
+        "breakdown": {
+            "model_score": round(min(model_score, 1.0), 4),
+            "plausibility": round(min(plausibility, 1.0), 4),
+            "buyability": round(buyability_ratio, 4),
+            "simplicity": round(simplicity, 4),
+            "efficiency": round(efficiency, 4),
+        },
+        "weights": WEIGHTS,
         "model_score": round(model_score, 4),
         "plausibility": round(plausibility, 4),
         "num_reactants": n_reactants,
@@ -208,21 +229,36 @@ def _score_precursor_fallback(
 ) -> dict:
     """Fallback scoring without RDKit — uses string length as complexity proxy."""
     reactants = [s.strip() for s in precursor_smiles.split(".") if s.strip()]
-    total_len = sum(len(r) for r in reactants)
-    # Longer SMILES = more complex = worse score
-    raw = -total_len * 0.5
-    normalized = raw / max(model_score, 0.001)
-    composite = normalized * plausibility
+    n_reactants = len(reactants)
+    max_len = max((len(r) for r in reactants), default=0)
+
+    simplicity = 1.0 / (1.0 + 0.05 * max_len)
+    efficiency = 1.0 / (1.0 + 0.25 * (n_reactants - 1))
+    buyability = 0.5  # unknown without RDKit
+
+    composite = (
+        0.30 * min(model_score, 1.0)
+        + 0.25 * min(plausibility, 1.0)
+        + 0.20 * buyability
+        + 0.15 * simplicity
+        + 0.10 * efficiency
+    )
 
     return {
         "precursor_score": round(composite, 4),
-        "raw_score": round(raw, 4),
-        "normalized_score": round(normalized, 4),
+        "breakdown": {
+            "model_score": round(min(model_score, 1.0), 4),
+            "plausibility": round(min(plausibility, 1.0), 4),
+            "buyability": round(buyability, 4),
+            "simplicity": round(simplicity, 4),
+            "efficiency": round(efficiency, 4),
+        },
+        "weights": {"model_score": 0.30, "plausibility": 0.25, "buyability": 0.20, "simplicity": 0.15, "efficiency": 0.10},
         "model_score": round(model_score, 4),
         "plausibility": round(plausibility, 4),
-        "num_reactants": len(reactants),
-        "buyability_ratio": 0.5,
-        "total_heavy_atoms": total_len,
+        "num_reactants": n_reactants,
+        "buyability_ratio": buyability,
+        "total_heavy_atoms": sum(len(r) for r in reactants),
         "rms_molecular_weight": 0.0,
         "reactants": [{"smiles": r, "fallback": True} for r in reactants],
     }
