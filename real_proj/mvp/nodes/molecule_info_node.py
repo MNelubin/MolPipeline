@@ -25,6 +25,7 @@ from ..tools import (
     get_cas_number,
     enrich_ghs_pictograms,
 )
+from ..tools.pubchem import pubchem_lookup_by_cid
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,13 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
 
     if smiles:
         rdkit_result = rdkit_properties(smiles)
+
+    # Prefer CID-based lookup (unambiguous) over name/SMILES lookup
+    if cid:
+        pubchem_data = pubchem_lookup_by_cid(cid)
+        if "error" not in pubchem_data:
+            pubchem_result = pubchem_data
+    elif smiles:
         pubchem_data = pubchem_lookup(smiles)
         if "error" not in pubchem_data:
             pubchem_result = pubchem_data

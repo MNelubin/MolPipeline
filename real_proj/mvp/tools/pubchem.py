@@ -163,6 +163,46 @@ def pubchem_lookup(name_or_smiles: str) -> dict:
     }
 
 
+def pubchem_lookup_by_cid(cid: int) -> dict:
+    """Get compound data from PubChem by CID (unambiguous, no name confusion)."""
+    url = (
+        f"{PUBCHEM_BASE_URL}/compound/cid/{cid}/property/"
+        "MolecularFormula,MolecularWeight,IUPACName,IsomericSMILES,CanonicalSMILES,XLogP,TPSA/JSON"
+    )
+    data = _get_json(url)
+    if data is None:
+        return {"error": f"CID {cid} not found in PubChem"}
+    try:
+        props = data["PropertyTable"]["Properties"][0]
+    except (KeyError, IndexError, TypeError):
+        return {"error": "Unexpected PubChem response format"}
+
+    synonyms: list[str] = []
+    syn_url = f"{PUBCHEM_BASE_URL}/compound/cid/{cid}/synonyms/JSON"
+    syn_data = _get_json(syn_url)
+    if syn_data:
+        try:
+            all_syns = (
+                syn_data.get("InformationList", {})
+                .get("Information", [{}])[0]
+                .get("Synonym", [])
+            )
+            synonyms = [s for s in all_syns if len(s) < 80][:10]
+        except (KeyError, IndexError, TypeError):
+            pass
+
+    return {
+        "cid": cid,
+        "formula": props.get("MolecularFormula"),
+        "weight": props.get("MolecularWeight"),
+        "iupac": props.get("IUPACName"),
+        "smiles": props.get("IsomericSMILES") or props.get("CanonicalSMILES"),
+        "logp": props.get("XLogP"),
+        "tpsa": props.get("TPSA"),
+        "synonyms": synonyms,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Physical description from PubChem PUG View
 # ═══════════════════════════════════════════════════════════════════════════════
