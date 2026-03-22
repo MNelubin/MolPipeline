@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any
 
-from ..config import get_openai_api_key, get_openai_base_url, get_openai_model
+from ..config import get_openai_api_key, get_openai_base_url, get_openai_model, SOCKS_PROXY
 from ..models.research import CandidateMolecule, ResearchQuery
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,12 @@ def _client():
     except ImportError:
         logger.warning("openai package not installed; LLM disabled")
         return None
-    return OpenAI(api_key=key, base_url=get_openai_base_url())
+    kwargs: dict = dict(api_key=key, base_url=get_openai_base_url())
+    if SOCKS_PROXY:
+        import httpx
+        transport = httpx.HTTPTransport(proxy=SOCKS_PROXY)
+        kwargs["http_client"] = httpx.Client(transport=transport, timeout=120.0)
+    return OpenAI(**kwargs)
 
 
 def _chat_json(system: str, user: str) -> dict[str, Any] | None:

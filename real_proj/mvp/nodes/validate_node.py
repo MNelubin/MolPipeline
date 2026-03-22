@@ -13,7 +13,7 @@ from typing import Any
 from rdkit import Chem
 from rdkit.Chem import Descriptors, rdMolDescriptors
 
-from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
+from ..config import make_llm, OPENROUTER_API_KEY
 from ..tools import get_cid_by_name, get_cid_by_smiles, get_smiles_by_cid, get_compound_properties
 
 logger = logging.getLogger(__name__)
@@ -120,12 +120,7 @@ def _translate_name_via_llm(name_ru: str) -> str | None:
     if not OPENROUTER_API_KEY:
         return None
     try:
-        from langchain_openai import ChatOpenAI
-
-        llm = ChatOpenAI(
-            model=LLM_MODEL,
-            api_key=OPENROUTER_API_KEY,
-            base_url=OPENROUTER_BASE_URL,
+        llm = make_llm(
             temperature=0,
             max_tokens=100,
         )

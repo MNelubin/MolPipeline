@@ -77,16 +77,9 @@ def _build_llm_prompt(sections: list[dict], mol_name: str) -> str:
 def _llm_enrich_procedures(sections: list[dict], mol_name: str, model: str | None = None) -> list[dict]:
     """Call LLM once for all sections, replace generic procedures with specific ones."""
     try:
-        from langchain_openai import ChatOpenAI
-        from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
+        from ..config import make_llm
 
-        llm = ChatOpenAI(
-            model=model or LLM_MODEL,
-            temperature=0.2,
-            api_key=OPENROUTER_API_KEY,
-            base_url=OPENROUTER_BASE_URL,
-            max_tokens=4096,
-        )
+        llm = make_llm(model=model, temperature=0.2, max_tokens=4096)
 
         prompt = _build_llm_prompt(sections, mol_name)
         response = llm.invoke(prompt)

@@ -12,9 +12,8 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
 
-from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL, LLM_TEMPERATURE
+from ..config import make_llm
 from ..tools import (
     pubchem_lookup,
     rdkit_properties,
@@ -72,13 +71,8 @@ _MOLECULE_CARD_PROMPT = PromptTemplate.from_template("""
 """)
 
 
-def _get_llm(model: str | None = None) -> ChatOpenAI:
-    return ChatOpenAI(
-        model=model or LLM_MODEL,
-        temperature=LLM_TEMPERATURE,
-        api_key=OPENROUTER_API_KEY,
-        base_url=OPENROUTER_BASE_URL,
-    )
+def _get_llm(model: str | None = None):
+    return make_llm(model=model)
 
 
 def _safe_int(val: Any, default: int = 0) -> int:
