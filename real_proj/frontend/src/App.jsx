@@ -79,6 +79,16 @@ export default function App() {
     } catch { /* localStorage full — ignore */ }
   }, [pipelineState, phase, threadId, error, model])
 
+  const deleteSession = useCallback((entry) => {
+    try { localStorage.removeItem('mol_session_' + entry.threadId) } catch {}
+    setHistory(prev => {
+      const next = prev.filter(h => h.threadId !== entry.threadId)
+      try { localStorage.setItem('mol_sessions_index', JSON.stringify(next)) } catch {}
+      return next
+    })
+    if (threadId === entry.threadId) reset()
+  }, [threadId, reset])
+
   const restoreSession = useCallback((entry) => {
     try {
       const saved = JSON.parse(localStorage.getItem('mol_session_' + entry.threadId))
@@ -136,7 +146,10 @@ export default function App() {
                 <div className="sidebar-empty">Нет запросов</div>
               ) : (
                 history.map((entry, i) => (
-                  <div key={entry.threadId || i} className="history-item" onClick={() => restoreSession(entry)} title={entry.query}>{entry.query}</div>
+                  <div key={entry.threadId || i} className="history-item" onClick={() => restoreSession(entry)} title={entry.query}>
+                    <span className="history-item-text">{entry.query}</span>
+                    <span className="history-item-delete" onClick={e => { e.stopPropagation(); deleteSession(entry) }}>×</span>
+                  </div>
                 ))
               )}
             </div>
