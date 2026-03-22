@@ -104,20 +104,29 @@ class TestDetermineOverallStatus:
 # validate_and_guard_node — mocked resolution
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _mock_resolve(smiles="CCO", cid=702, status="found"):
+def _mock_resolve_found(smiles="CCO", cid=702):
+    """Simulate successful _resolve_molecule return."""
     return {
-        "resolve_status": status,
-        "canonical_smiles": smiles,
+        "validation": {"is_valid": True, "resolve_method": "smiles"},
+        "smiles": smiles,
         "pubchem_cid": cid,
-        "iupac_name": "ethanol",
+    }
+
+
+def _mock_resolve_not_found():
+    """Simulate _resolve_molecule returning not-found."""
+    return {
+        "validation": {"is_valid": False, "error": "not found"},
+        "smiles": None,
+        "pubchem_cid": None,
     }
 
 
 def _mock_safety(overall="SAFE"):
     return {
         "overall_status": overall,
-        "molecule_check": {"status": "clear"},
-        "reaction_check": {"status": "allowed"},
+        "molecule_check": {"status": "clear", "reason": ""},
+        "reaction_check": {"status": "allowed", "reason": ""},
         "safety_data": {},
         "ppe_recommendations": [],
     }
@@ -126,7 +135,7 @@ def _mock_safety(overall="SAFE"):
 class TestValidateAndGuardNode:
     def test_found_and_safe_sets_smiles(self, mock_journal):
         with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value=_mock_resolve("CCO", 702, "found")), \
+                   return_value=_mock_resolve_found("CCO", 702)), \
              patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("SAFE")):
             result = validate_and_guard_node({"query": "ethanol"})
@@ -135,53 +144,53 @@ class TestValidateAndGuardNode:
 
     def test_found_and_safe_sets_guard_result(self, mock_journal):
         with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value=_mock_resolve(status="found")), \
+                   return_value=_mock_resolve_found()), \
              patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("SAFE")):
             result = validate_and_guard_node({"query": "ethanol"})
         assert result["guard_result"]["overall_status"] == "SAFE"
 
+    def test_found_sets_resolve_status_found(self, mock_journal):
+        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+                   return_value=_mock_resolve_found()), \
+             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+                   return_value=_mock_safety("SAFE")):
+            result = validate_and_guard_node({"query": "ethanol"})
+        assert result["validation"]["resolve_status"] == "found"
+
     def test_not_found_returns_not_found_status(self, mock_journal):
         with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value={
-                       "resolve_status": "not_found",
-                       "canonical_smiles": None,
-                       "pubchem_cid": None,
-                   }):
+                   return_value=_mock_resolve_not_found()):
             result = validate_and_guard_node({"query": "xyzunknownmolecule"})
         validation = result.get("validation", {})
         assert validation.get("resolve_status") == "not_found"
 
-    def test_banned_returns_banned_status(self, mock_journal):
+    def test_critical_stop_sets_resolve_banned(self, mock_journal):
+        """CRITICAL_STOP from guard → validation.resolve_status == 'banned'."""
         with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value={
-                       "resolve_status": "banned",
-                       "canonical_smiles": "FENTANYL_SMILES",
-                       "pubchem_cid": 3345,
-                   }):
-            result = validate_and_guard_node({"query": "fentanyl"})
-        validation = result.get("validation", {})
-        assert validation.get("resolve_status") == "banned"
-
-    def test_critical_stop_sets_error(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value=_mock_resolve(status="found")), \
+                   return_value=_mock_resolve_found("FENTANYL", 3345)), \
              patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("CRITICAL_STOP")):
             result = validate_and_guard_node({"query": "fentanyl"})
         assert result["guard_result"]["overall_status"] == "CRITICAL_STOP"
+        assert result["validation"]["resolve_status"] == "banned"
+
+    def test_critical_stop_sets_error_key(self, mock_journal):
+        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+                   return_value=_mock_resolve_found()), \
+             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+                   return_value=_mock_safety("CRITICAL_STOP")):
+            result = validate_and_guard_node({"query": "fentanyl"})
+        assert "error" in result
 
     def test_warning_status_preserved(self, mock_journal):
         with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value=_mock_resolve(status="found")), \
+                   return_value=_mock_resolve_found()), \
              patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("WARNING")):
             result = validate_and_guard_node({"query": "something"})
         assert result["guard_result"]["overall_status"] == "WARNING"
 
-    def test_empty_query(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
-                   return_value={"resolve_status": "not_found", "canonical_smiles": None, "pubchem_cid": None}):
-            result = validate_and_guard_node({"query": ""})
-        # Should not crash; validation key should exist
-        assert "validation" in result or "smiles" in result or "error" in result
+    def test_empty_query_returns_error(self, mock_journal):
+        result = validate_and_guard_node({"query": ""})
+        assert "error" in result or "validation" in result
