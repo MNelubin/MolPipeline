@@ -23,11 +23,27 @@ logger = logging.getLogger(__name__)
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _build_section_prompt(sec: dict, mol_name: str) -> str:
+def _build_section_prompt(sec: dict, mol_name: str, fallback: bool = False) -> str:
     step_num = sec.get("step_number", 1)
     rxn = sec.get("reaction_smiles", "")
     product = sec.get("product_name") or sec.get("product_smiles", "")[:60]
     reagents = [r.get("name", r.get("smiles", "?")) for r in sec.get("reagent_table", [])]
+
+    if fallback:
+        # Simpler prompt: don't require reagent-specific knowledge, just the transformation type
+        return "\n".join([
+            f"Ты опытный химик-синтетик. Напиши общий лабораторный протокол для получения: {product}",
+            f"(стадия {step_num} синтеза {mol_name})",
+            "",
+            f"Уравнение реакции (SMILES): {rxn}",
+            "",
+            "Определи тип реакции по SMILES и напиши 6 реалистичных шагов для типичной лабораторной",
+            "процедуры этого класса реакций. Не оставляй массив пустым — если реакция нестандартная,",
+            "напиши разумные общие шаги для органического синтеза.",
+            "",
+            "Верни ТОЛЬКО валидный JSON массив:",
+            '[{"step":"1","description":"...","reason":"..."}]',
+        ])
 
     return "\n".join([
         f"Ты опытный химик-синтетик. Напиши подробный лабораторный протокол для стадии {step_num} синтеза {mol_name}.",
@@ -64,27 +80,46 @@ def _parse_llm_procedure(raw: str) -> list[dict]:
     return json.loads(raw)
 
 
+_ENRICH_DELAY_SEC = 1.5   # pause between sections to avoid rate limits
+_ENRICH_MAX_RETRIES = 3   # retries per section on empty/error response
+_ENRICH_RETRY_DELAYS = [3, 8]  # seconds to wait before retry 2 and 3
+
+
 def _llm_enrich_procedures(sections: list[dict], mol_name: str, model: str | None = None) -> list[dict]:
-    """Call LLM separately for each section so token limits never truncate results."""
+    """Call LLM separately for each section with rate-limit protection."""
+    import time
     from ..config import make_llm
 
     llm = make_llm(model=model, temperature=0.2, max_tokens=2048)
     enriched = []
 
-    for sec in sections:
+    for i, sec in enumerate(sections):
         sn = sec.get("step_number", "?")
-        try:
-            prompt = _build_section_prompt(sec, mol_name)
-            response = llm.invoke(prompt)
-            steps = _parse_llm_procedure(response.content)
-            if steps:
-                sec = dict(sec)
-                sec["procedure_steps"] = steps
-                logger.info("[experiment_planner] section %s: LLM gave %d steps", sn, len(steps))
-            else:
-                logger.warning("[experiment_planner] section %s: LLM returned empty steps", sn)
-        except Exception as e:
-            logger.warning("[experiment_planner] section %s enrichment failed: %s", sn, e)
+        if i > 0:
+            time.sleep(_ENRICH_DELAY_SEC)
+
+        steps = []
+        prompt = _build_section_prompt(sec, mol_name)
+        for attempt in range(_ENRICH_MAX_RETRIES):
+            if attempt > 0:
+                delay = _ENRICH_RETRY_DELAYS[min(attempt - 1, len(_ENRICH_RETRY_DELAYS) - 1)]
+                logger.info("[experiment_planner] section %s: retry %d after %ds", sn, attempt, delay)
+                time.sleep(delay)
+            try:
+                response = llm.invoke(prompt)
+                steps = _parse_llm_procedure(response.content)
+                if steps:
+                    break
+                logger.warning("[experiment_planner] section %s attempt %d: empty response", sn, attempt + 1)
+            except Exception as e:
+                logger.warning("[experiment_planner] section %s attempt %d failed: %s", sn, attempt + 1, e)
+
+        if steps:
+            sec = dict(sec)
+            sec["procedure_steps"] = steps
+            logger.info("[experiment_planner] section %s: %d steps", sn, len(steps))
+        else:
+            logger.error("[experiment_planner] section %s: all retries failed, keeping fallback", sn)
         enriched.append(sec)
 
     return enriched
