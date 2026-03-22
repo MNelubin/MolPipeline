@@ -137,15 +137,19 @@ def parse_reaction_smiles(reaction_smiles: str) -> tuple[list[str], list[str]]:
         if len(parts) != 2:
             raise ValueError(f"Expected exactly one '>>' in: {reaction_smiles}")
         reactants_str, products_str = parts
+        agents_str = ""
     elif ">" in reaction_smiles:
         parts = reaction_smiles.split(">")
         if len(parts) != 3:
             raise ValueError(f"Expected 'reactants>agents>products': {reaction_smiles}")
-        reactants_str, _, products_str = parts
+        reactants_str, agents_str, products_str = parts
     else:
         raise ValueError(f"No '>>' or '>' separator found in: {reaction_smiles}")
 
     reactants = [s.strip() for s in reactants_str.split(".") if s.strip()]
+    # Include agents (catalysts/solvents) as reactants for stoichiometry
+    if agents_str:
+        reactants.extend(s.strip() for s in agents_str.split(".") if s.strip())
     products  = [s.strip() for s in products_str.split(".")  if s.strip()]
     if not reactants:
         raise ValueError("No reactants found")
@@ -367,7 +371,14 @@ def stoichiometry_calc(request: StoichiometryRequest) -> CalculationResult:
     target_mw    = get_average_molecular_weight(target_smiles)
     target_moles = request.target_mass_g / target_mw
 
-    coeff_map     = dict(Counter([canonicalize(s) for s in reactant_list]))
+    canonical_reactants = []
+    for s in reactant_list:
+        c = canonicalize(s)
+        if not validate_smiles(c):
+            warnings.append(f"Невалидный SMILES реагента пропущен: {s}")
+            continue
+        canonical_reactants.append(c)
+    coeff_map     = dict(Counter(canonical_reactants))
     product_coeff = Counter([canonicalize(s) for s in product_list]).get(target_smiles, 1)
 
     reagents = [
