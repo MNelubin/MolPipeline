@@ -64,7 +64,9 @@ def _deduplicate_routes(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
 import sqlite3
 from pathlib import Path
 
-# DB is at <project_root>/data/ord_reactions.db
+# DBs are at <project_root>/data/
+# ord_reactions.db  — ORD reactions index
+# buyables.db       — vendor catalogs (eMolecules, Mcule, ChemBridge, ChemSpace, SA)
 _ORD_DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "ord_reactions.db"
 
 
@@ -185,9 +187,45 @@ def _get_cheap_canonical() -> set[str]:
     return canonical
 
 
+_BUYABLES_DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "buyables.db"
+
+
+def _buyables_lookup(smiles: str) -> dict | None:
+    """Lookup SMILES in local buyables SQLite.
+
+    DB built from 4 vendor catalogs (eMolecules, Mcule, ChemBridge, ChemSpace, SA)
+    totaling ~690K commercially available molecules with price (ppg = $/g).
+    Located at data/buyables.db alongside data/ord_reactions.db.
+
+    Returns {"ppg": float, "source": str} or None if not in any catalog.
+    """
+    if not _BUYABLES_DB_PATH.exists():
+        return None
+    try:
+        conn = sqlite3.connect(str(_BUYABLES_DB_PATH), check_same_thread=False)
+        row = conn.execute(
+            "SELECT ppg, source FROM buyables WHERE smiles = ?", (smiles,)
+        ).fetchone()
+        conn.close()
+        return {"ppg": row[0], "source": row[1]} if row else None
+    except Exception:
+        return None
+
+
 def _is_buyable(smiles: str) -> bool:
+    """Check commercial availability.
+
+    Priority:
+      1. Hardcoded common solvents/reagents (instant, no I/O)
+      2. Local buyables SQLite — ~690K molecules from real vendor catalogs:
+         eMolecules (EM), Mcule (MC), ChemBridge (CB), ChemSpace (CS),
+         Sigma-Aldrich (SA). Same data/ directory as ORD index.
+      3. Structural heuristic fallback (small/simple = likely available)
+    """
     cheap = _get_cheap_canonical()
     if smiles in cheap:
+        return True
+    if _buyables_lookup(smiles) is not None:
         return True
     if not HAS_RDKIT:
         return len(smiles) < 15
