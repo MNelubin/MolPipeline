@@ -194,7 +194,7 @@ def _buyables_lookup(smiles: str) -> dict | None:
     """Lookup SMILES in local buyables SQLite.
 
     DB built from 4 vendor catalogs (eMolecules, Mcule, ChemBridge, ChemSpace, SA)
-    totaling ~690K commercially available molecules with price (ppg = $/g).
+    totaling ~390K commercially available molecules with price (ppg = $/g).
     Located at data/buyables.db alongside data/ord_reactions.db.
 
     Returns {"ppg": float, "source": str} or None if not in any catalog.
@@ -202,6 +202,11 @@ def _buyables_lookup(smiles: str) -> dict | None:
     if not _BUYABLES_DB_PATH.exists():
         return None
     try:
+        # canonicalize before lookup — DB stores RDKit canonical SMILES
+        if HAS_RDKIT:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol:
+                smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
         conn = sqlite3.connect(str(_BUYABLES_DB_PATH), check_same_thread=False)
         row = conn.execute(
             "SELECT ppg, source FROM buyables WHERE smiles = ?", (smiles,)
