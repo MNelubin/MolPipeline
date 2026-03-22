@@ -331,21 +331,42 @@ def _web_search_retro(smiles: str, target_name: str | None = None) -> list[dict[
     t0 = _time.monotonic()
 
     # Resolve name for better search queries
+    common_name = None
+    iupac_name = None
     if not target_name:
         try:
-            from ..tools import get_compound_properties
+            from ..tools import get_compound_properties, get_cid_by_smiles
             props = get_compound_properties(smiles)
-            target_name = props.get("IUPACName") or props.get("Title") or smiles[:40]
+            iupac_name = props.get("IUPACName")
+            # Get common name via CID synonyms
+            cid = get_cid_by_smiles(smiles)
+            if cid:
+                import requests
+                try:
+                    r = requests.get(
+                        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/synonyms/JSON",
+                        timeout=5,
+                    )
+                    if r.status_code == 200:
+                        syns = r.json().get("InformationList", {}).get("Information", [{}])[0].get("Synonym", [])
+                        if syns:
+                            common_name = syns[0]
+                except Exception:
+                    pass
+            target_name = common_name or iupac_name or smiles[:40]
         except Exception:
             target_name = smiles[:40]
 
-    # Search
+    # Search — use common name (more search hits) + IUPAC as fallback
     try:
         from ..services.web_search import search_all
+        search_name = common_name or target_name
         queries = [
-            f"{target_name} synthesis procedure reagents",
-            f"{target_name} retrosynthesis starting materials",
+            f"{search_name} synthesis procedure reagents step by step",
+            f"{search_name} total synthesis starting materials SMILES",
         ]
+        if iupac_name and iupac_name != search_name:
+            queries.append(f"{iupac_name} synthesis")
         all_sources = []
         seen_urls: set[str] = set()
         for q in queries:
