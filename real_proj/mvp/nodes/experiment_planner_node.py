@@ -23,22 +23,43 @@ logger = logging.getLogger(__name__)
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+def _format_reagent_list(sec: dict) -> str:
+    """Format reagent table with exact masses for LLM prompt."""
+    lines = []
+    for r in sec.get("reagent_table", []):
+        name = r.get("name", r.get("smiles", "?"))
+        mass = r.get("mass_g", 0)
+        vol = r.get("volume_ml")
+        equiv = r.get("equivalents", 1.0)
+        parts = [f"{name}: {mass:.4f} г"]
+        if vol:
+            parts.append(f"{vol:.3f} мл")
+        parts.append(f"{equiv:.2f} экв.")
+        lines.append(", ".join(parts))
+    return "\n".join(lines)
+
+
 def _build_section_prompt(sec: dict, mol_name: str, fallback: bool = False) -> str:
     step_num = sec.get("step_number", 1)
     rxn = sec.get("reaction_smiles", "")
     product = sec.get("product_name") or sec.get("product_smiles", "")[:60]
-    reagents = [r.get("name", r.get("smiles", "?")) for r in sec.get("reagent_table", [])]
+    product_mass = sec.get("product_mass_g", 0)
+    reagent_list = _format_reagent_list(sec)
 
     if fallback:
-        # Simpler prompt: don't require reagent-specific knowledge, just the transformation type
         return "\n".join([
             f"Ты опытный химик-синтетик. Напиши общий лабораторный протокол для получения: {product}",
             f"(стадия {step_num} синтеза {mol_name})",
+            f"Целевая масса продукта: {product_mass:.4f} г",
             "",
             f"Уравнение реакции (SMILES): {rxn}",
             "",
+            f"Рассчитанные массы реагентов (ИСПОЛЬЗУЙ ИМЕННО ЭТИ КОЛИЧЕСТВА в протоколе):",
+            reagent_list,
+            "",
             "Определи тип реакции по SMILES и напиши 6 реалистичных шагов для типичной лабораторной",
-            "процедуры этого класса реакций. Не оставляй массив пустым — если реакция нестандартная,",
+            "процедуры этого класса реакций. Указывай точные массы и объёмы реагентов из таблицы выше.",
+            "Не оставляй массив пустым — если реакция нестандартная,",
             "напиши разумные общие шаги для органического синтеза.",
             "",
             "Верни ТОЛЬКО валидный JSON массив:",
@@ -49,12 +70,19 @@ def _build_section_prompt(sec: dict, mol_name: str, fallback: bool = False) -> s
         f"Ты опытный химик-синтетик. Напиши подробный лабораторный протокол для стадии {step_num} синтеза {mol_name}.",
         "",
         f"Продукт: {product}",
+        f"Целевая масса продукта: {product_mass:.4f} г",
         f"Реакция SMILES: {rxn}",
-        f"Реагенты: {', '.join(reagents)}",
+        "",
+        f"Рассчитанные массы реагентов (ИСПОЛЬЗУЙ ИМЕННО ЭТИ КОЛИЧЕСТВА в описании шагов):",
+        reagent_list,
+        "",
+        "ВАЖНО: в описании шагов указывай точные массы (г) и объёмы (мл) реагентов из таблицы выше.",
+        "Не придумывай свои количества — бери только из рассчитанных данных.",
+        "Объёмы растворителей подбирай пропорционально массе реагентов.",
         "",
         "Напиши 6-8 конкретных шагов с учётом типа реакции. Включи:",
         "- подготовку реагентов и посуды, атмосферу (N₂/Ar или воздух)",
-        "- порядок и скорость добавления реагентов, температуру и время",
+        "- порядок и скорость добавления реагентов с точными массами/объёмами",
         "- контроль реакции (ТСХ/GC), метод выделения продукта",
         "- очистку (перекристаллизация/хроматография/дистилляция), выход",
         "",
