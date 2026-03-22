@@ -73,7 +73,11 @@ def canonicalize(smiles: str) -> str:
 def parse_reaction_smiles(
     reaction_smiles: str,
 ) -> tuple[list[str], list[str]]:
-    """Split 'A.B>>C.D' into ([reactant_smiles, ...], [product_smiles, ...])."""
+    """Split 'A.B>>C.D' or 'A.B>agent>C.D' into ([reactant_smiles, ...], [product_smiles, ...]).
+
+    Agents (catalysts/solvents between single '>' delimiters) are included
+    in the reactants list so that stoichiometry accounts for them.
+    """
     if ">>" in reaction_smiles:
         parts = reaction_smiles.split(">>")
         if len(parts) != 2:
@@ -81,19 +85,23 @@ def parse_reaction_smiles(
                 f"Expected exactly one '>>' in reaction SMILES: {reaction_smiles}"
             )
         reactants_str, products_str = parts
+        agents_str = ""
     elif ">" in reaction_smiles:
         parts = reaction_smiles.split(">")
         if len(parts) != 3:
             raise ValueError(
                 f"Expected 'reactants>agents>products' format: {reaction_smiles}"
             )
-        reactants_str, _, products_str = parts
+        reactants_str, agents_str, products_str = parts
     else:
         raise ValueError(
             f"No '>>' or '>' separator found in reaction SMILES: {reaction_smiles}"
         )
 
     reactants = [s.strip() for s in reactants_str.split(".") if s.strip()]
+    # Include agents (catalysts/solvents) as reactants for stoichiometry
+    if agents_str:
+        reactants.extend(s.strip() for s in agents_str.split(".") if s.strip())
     products = [s.strip() for s in products_str.split(".") if s.strip()]
 
     if not reactants:

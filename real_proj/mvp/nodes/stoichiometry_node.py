@@ -116,7 +116,7 @@ def _calc_node(
         return
 
     reaction_smiles = route.get("reaction_smiles", "")
-    if not reaction_smiles or ">>" not in reaction_smiles:
+    if not reaction_smiles or ">" not in reaction_smiles:
         reaction_smiles = f"{reactants_str}>>{product_smiles}"
 
     try:
@@ -173,7 +173,7 @@ def _calc_single_step(
         if reactants and target_smiles:
             reaction_smiles = f"{reactants}>>{target_smiles}"
 
-    if not reaction_smiles or ">>" not in reaction_smiles:
+    if not reaction_smiles or ">" not in reaction_smiles:
         logger.warning("[stoichiometry] no valid reaction SMILES, skipping")
         return {
             "calculations": {

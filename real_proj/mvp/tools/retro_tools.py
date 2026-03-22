@@ -133,13 +133,21 @@ def _rows_to_retro_dicts(cursor) -> list[dict]:
     results = []
     for row in cursor:
         rxn_id, rxn_smi, yield_pct, temp, solvent, catalyst = row
-        if not rxn_smi or ">>" not in rxn_smi:
+        if not rxn_smi or (">" not in rxn_smi):
             continue
-        reactant_str = rxn_smi.split(">>")[0]
-        # Join reactants as dot-separated string (expected by score_route)
-        reactants_clean = ".".join(
-            s.strip() for s in reactant_str.split(".") if s.strip()
-        )
+        # Handle both 'A.B>>C' and 'A.B>agent>C' formats
+        if ">>" in rxn_smi:
+            reactant_str = rxn_smi.split(">>")[0]
+            agents_str = ""
+        else:
+            parts = rxn_smi.split(">")
+            reactant_str = parts[0] if len(parts) >= 1 else ""
+            agents_str = parts[1] if len(parts) >= 3 else ""
+        # Join reactants + agents as dot-separated string
+        all_parts = [s.strip() for s in reactant_str.split(".") if s.strip()]
+        if agents_str:
+            all_parts.extend(s.strip() for s in agents_str.split(".") if s.strip())
+        reactants_clean = ".".join(all_parts)
         route: dict[str, Any] = {
             "reaction_id": rxn_id,
             "reaction_smiles": rxn_smi,
