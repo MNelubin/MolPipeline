@@ -120,7 +120,7 @@ export default function App() {
             <button
               key={item.id}
               className={`nav-item${page === item.id ? ' active' : ''}`}
-              onClick={() => setPage(item.id)}
+              onClick={() => { setPage(item.id); if (item.id === 'chat' && status !== 'idle') reset() }}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
