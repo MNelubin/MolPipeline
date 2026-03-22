@@ -9,12 +9,114 @@ Builds a full experiment protocol for the selected synthesis pathway:
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
 from ..procedure_inference import format_procedure_russian
 
 logger = logging.getLogger(__name__)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LLM procedure enrichment
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _is_generic_procedure(steps: list[dict]) -> bool:
+    """Return True if all steps are fallback-inferred (no real data)."""
+    if not steps:
+        return True
+    generic_reasons = {"inferred", "Время реакции (оценка по условиям)",
+                       "Продукт — твёрдое вещество, нерастворимое в реакционной среде",
+                       "Твёрдый продукт с примесями → перекристаллизация",
+                       "Удаление растворителя", "Растворитель не указан"}
+    inferred_count = sum(
+        1 for s in steps
+        if s.get("reason", "") in generic_reasons or s.get("reason", "").startswith("Время")
+    )
+    return inferred_count >= len(steps) - 1
+
+
+def _build_llm_prompt(sections: list[dict], mol_name: str) -> str:
+    lines = [
+        f"Ты опытный химик-синтетик. Нужно составить подробный лабораторный протокол синтеза: {mol_name}.",
+        "",
+        "Для КАЖДОЙ стадии напиши конкретные пошаговые инструкции (5-8 шагов) с учётом типа реакции.",
+        "Включи: подготовку реагентов, порядок добавления, атмосферу (N₂/Ar или воздух), температуру,",
+        "время, способ перемешивания, контроль реакции (ТСХ/GC), метод выделения продукта,",
+        "очистку (перекристаллизация/хроматография/дистилляция), выход.",
+        "",
+        "Стадии синтеза:",
+    ]
+
+    for sec in sections:
+        step_num = sec.get("step_number", "?")
+        rxn = sec.get("reaction_smiles", "")
+        product = sec.get("product_name") or sec.get("product_smiles", "")[:40]
+        reagents = [r.get("name", r.get("smiles", "?")) for r in sec.get("reagent_table", [])]
+        lines.append(f"\nСтадия {step_num}: получение {product}")
+        lines.append(f"  Реакция SMILES: {rxn}")
+        lines.append(f"  Реагенты: {', '.join(reagents)}")
+
+    lines += [
+        "",
+        "Верни ТОЛЬКО валидный JSON массив без пояснений:",
+        '[',
+        '  {',
+        '    "step_number": 1,',
+        '    "procedure": [',
+        '      {"step": "1", "description": "...", "reason": "..."},',
+        '      {"step": "2", "description": "...", "reason": "..."}',
+        '    ]',
+        '  }',
+        ']',
+    ]
+    return "\n".join(lines)
+
+
+def _llm_enrich_procedures(sections: list[dict], mol_name: str) -> list[dict]:
+    """Call LLM once for all sections, replace generic procedures with specific ones."""
+    try:
+        from langchain_openai import ChatOpenAI
+        from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
+
+        llm = ChatOpenAI(
+            model=LLM_MODEL,
+            temperature=0.2,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            max_tokens=4096,
+        )
+
+        prompt = _build_llm_prompt(sections, mol_name)
+        response = llm.invoke(prompt)
+        raw = response.content.strip()
+
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+
+        llm_data: list[dict] = json.loads(raw)
+
+        # Patch sections
+        enriched = []
+        llm_map = {item["step_number"]: item.get("procedure", []) for item in llm_data}
+        for sec in sections:
+            sn = sec.get("step_number")
+            if sn in llm_map and llm_map[sn]:
+                sec = dict(sec)
+                sec["procedure_steps"] = llm_map[sn]
+            enriched.append(sec)
+
+        logger.info("[experiment_planner] LLM enriched %d/%d sections", len(llm_map), len(sections))
+        return enriched
+
+    except Exception as e:
+        logger.warning("[experiment_planner] LLM enrichment failed: %s", e)
+        return sections
 
 
 def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -48,12 +150,24 @@ def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
             protocol = _build_single_step_protocol(pathway, calculations, mol_name)
 
         sections = protocol.get("reaction_sections", [])
+
+        # LLM enrichment: if all procedures are generic fallbacks, call LLM
+        needs_enrichment = all(
+            _is_generic_procedure(s.get("procedure_steps", []))
+            for s in sections
+        )
+        if needs_enrichment and sections:
+            logger.info("[experiment_planner] all procedures are generic → calling LLM")
+            sections = _llm_enrich_procedures(sections, mol_name)
+            protocol["reaction_sections"] = sections
+
         total_steps = sum(len(s.get("procedure_steps", [])) for s in sections)
         j.decision(
             "experiment_planner",
             f"Протокол сформирован: {len(sections)} стадий, ~{total_steps} шагов процедуры",
             {"sections_count": len(sections), "procedure_steps_total": total_steps,
-             "is_multistep": protocol.get("is_multistep", False), "molecule": mol_name},
+             "is_multistep": protocol.get("is_multistep", False), "molecule": mol_name,
+             "llm_enriched": needs_enrichment},
         )
 
     protocol_text = _format_protocol_text(protocol, mol_name)
