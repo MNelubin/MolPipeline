@@ -92,7 +92,10 @@ export default function App() {
   const restoreSession = useCallback((entry) => {
     try {
       const saved = JSON.parse(localStorage.getItem('mol_session_' + entry.threadId))
-      if (saved) restore(saved)
+      if (saved) {
+        currentQueryRef.current = saved.query || entry.query || ''
+        restore(saved)
+      }
     } catch { /* corrupt data — ignore */ }
   }, [restore])
 
@@ -130,7 +133,7 @@ export default function App() {
             <button
               key={item.id}
               className={`nav-item${page === item.id ? ' active' : ''}`}
-              onClick={() => { setPage(item.id); if (item.id === 'chat' && status !== 'idle') reset() }}
+              onClick={() => { setPage(item.id); if (item.id === 'chat' && status !== 'idle') { currentQueryRef.current = ''; reset() } }}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
