@@ -129,12 +129,12 @@ export default function MoleculeCard({ moleculeInfo, guardResult, retroResult })
           <div>
             <div className="section-title">Физические свойства</div>
             <div className="props-grid">
-              <PropItem label="Т. плавления"   value={p.melting_point !== 'Н/Д' ? `${p.melting_point} °C` : null} />
-              <PropItem label="Т. кипения"     value={p.boiling_point !== 'Н/Д' ? `${p.boiling_point} °C` : null} />
-              <PropItem label="Плотность"      value={p.density !== 'Н/Д' ? `${p.density} г/мл` : null} />
-              <PropItem label="Т. вспышки"     value={p.flash_point ? `${p.flash_point} °C` : null} />
-              <PropItem label="Давление паров" value={p.vapor_pressure} />
-              <PropItem label="Состояние"      value={p.physical_state !== 'Н/Д' ? p.physical_state : null} />
+              <PropItem label="Т. плавления"   value={p.melting_point != null && p.melting_point !== 'Н/Д' ? `${p.melting_point} °C` : null} />
+              <PropItem label="Т. кипения"     value={p.boiling_point != null && p.boiling_point !== 'Н/Д' ? `${p.boiling_point} °C` : null} />
+              <PropItem label="Плотность"      value={p.density != null && p.density !== 'Н/Д' ? `${p.density} г/мл` : null} />
+              <PropItem label="Т. вспышки"     value={p.flash_point != null ? `${p.flash_point} °C` : null} />
+              <PropItem label="Давление паров" value={p.vapor_pressure != null ? p.vapor_pressure : null} />
+              <PropItem label="Состояние"      value={p.physical_state != null && p.physical_state !== 'Н/Д' ? p.physical_state : null} />
             </div>
             <div className="section-title">Растворимость</div>
             <div className="description-text">{p.solubility || 'Нет данных'}</div>
