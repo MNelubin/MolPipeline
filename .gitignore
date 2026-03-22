@@ -12,3 +12,6 @@ data/vectordb/
 data/processed/
 *.db
 .claude/
+node_modules/
+*.7z
+ARCHITECTURE.md
