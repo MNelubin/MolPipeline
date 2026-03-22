@@ -37,7 +37,7 @@ def mock_journal():
     mock_j = MagicMock()
     mock_j.step.return_value.__enter__ = lambda s: None
     mock_j.step.return_value.__exit__ = MagicMock(return_value=False)
-    with patch("real_proj.mvp.nodes.stoichiometry_node.AgentJournal") as cls:
+    with patch("real_proj.mvp.journal.AgentJournal") as cls:
         cls.for_session.return_value = mock_j
         yield mock_j
 
