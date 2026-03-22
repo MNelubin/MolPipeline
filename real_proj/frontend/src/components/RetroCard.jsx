@@ -21,6 +21,7 @@ import { useState } from 'react'
 const SOURCE_LABEL = {
   ord:          { text: 'ORD',   color: 'var(--green)' },
   retro_model:  { text: 'MODEL', color: 'var(--purple)' },
+  web:          { text: 'WEB',   color: 'var(--cyan)' },
 }
 
 function ScoreBar({ value, max = 1 }) {
@@ -186,6 +187,7 @@ export default function RetroCard({ retroResult }) {
   const SOURCE_LABEL_FULL = {
     ord:         'Open Reaction Database',
     retro_model: 'Template-relevance модель',
+    web:         'Web Search (PubMed + DuckDuckGo)',
   }
 
   return (
