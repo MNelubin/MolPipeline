@@ -314,12 +314,151 @@ def score_route(route: dict[str, Any]) -> dict[str, Any]:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# Web search for retrosynthesis
+# ═════════════════════════════════════════════════════════════════════════════
+
+_WEB_SEARCH_TIMEOUT = 15  # seconds for entire web search + LLM extraction
+
+
+def _web_search_retro(smiles: str, target_name: str | None = None) -> list[dict[str, Any]]:
+    """Search web for synthesis routes and extract structured reaction data.
+
+    Returns routes in the same format as ORD/model results.
+    All SMILES are validated via RDKit — invalid routes are discarded.
+    """
+    import time as _time
+
+    t0 = _time.monotonic()
+
+    # Resolve name for better search queries
+    if not target_name:
+        try:
+            from ..tools import get_compound_properties
+            props = get_compound_properties(smiles)
+            target_name = props.get("IUPACName") or props.get("Title") or smiles[:40]
+        except Exception:
+            target_name = smiles[:40]
+
+    # Search
+    try:
+        from ..services.web_search import search_all
+        queries = [
+            f"{target_name} synthesis procedure reagents",
+            f"{target_name} retrosynthesis starting materials",
+        ]
+        all_sources = []
+        seen_urls: set[str] = set()
+        for q in queries:
+            if _time.monotonic() - t0 > _WEB_SEARCH_TIMEOUT * 0.5:
+                break
+            for s in search_all(q, max_results=4):
+                if s.url not in seen_urls:
+                    seen_urls.add(s.url)
+                    all_sources.append(s)
+    except Exception as e:
+        logger.warning("[web_retro] search failed: %s", e)
+        return []
+
+    if not all_sources:
+        return []
+
+    # LLM extraction
+    snippets = "\n---\n".join(
+        f"Title: {s.title}\nSnippet: {s.snippet}" for s in all_sources[:6]
+    )
+
+    try:
+        from ..services.research_llm import _chat_json
+    except ImportError:
+        logger.warning("[web_retro] research_llm not available")
+        return []
+
+    if _time.monotonic() - t0 > _WEB_SEARCH_TIMEOUT:
+        logger.warning("[web_retro] timeout before LLM call")
+        return []
+
+    result = _chat_json(
+        "You are a retrosynthesis expert. Given web search results about a molecule's synthesis, "
+        "extract reaction routes. Return JSON: {\"routes\": [{\"reactants_smiles\": [\"SMI1\", \"SMI2\"], "
+        "\"reaction_smiles\": \"SMI1.SMI2>>PRODUCT\", \"yield_pct\": number|null, "
+        "\"procedure\": \"brief description\"}]}. "
+        "CRITICAL: reactants_smiles MUST be valid SMILES strings, not names. "
+        "If you cannot determine valid SMILES for reactants, omit that route. "
+        "Return at most 3 routes. Product SMILES: " + smiles,
+        f"Target molecule: {target_name}\nSMILES: {smiles}\n\nSearch results:\n{snippets}",
+    )
+
+    if not result or not isinstance(result.get("routes"), list):
+        return []
+
+    # Validate and convert to standard format
+    routes: list[dict[str, Any]] = []
+    for raw in result["routes"]:
+        reactant_smiles_list = raw.get("reactants_smiles", [])
+        if not isinstance(reactant_smiles_list, list) or not reactant_smiles_list:
+            continue
+
+        # Validate every SMILES with RDKit
+        valid_parts: list[str] = []
+        all_valid = True
+        for smi in reactant_smiles_list:
+            if not isinstance(smi, str) or not smi.strip():
+                all_valid = False
+                break
+            mol = Chem.MolFromSmiles(smi.strip())
+            if mol is None:
+                all_valid = False
+                break
+            valid_parts.append(Chem.MolToSmiles(mol, isomericSmiles=True))
+
+        if not all_valid or not valid_parts:
+            continue
+
+        # Check product SMILES is not among reactants (no self-loops)
+        product_canon = smiles
+        if HAS_RDKIT:
+            pmol = Chem.MolFromSmiles(smiles)
+            if pmol:
+                product_canon = Chem.MolToSmiles(pmol, isomericSmiles=True)
+        if product_canon in valid_parts:
+            continue
+
+        reactants_str = ".".join(valid_parts)
+        rxn_smi = raw.get("reaction_smiles", f"{reactants_str}>>{product_canon}")
+
+        # Validate reaction SMILES format
+        if ">>" not in rxn_smi:
+            rxn_smi = f"{reactants_str}>>{product_canon}"
+
+        route: dict[str, Any] = {
+            "reactants": reactants_str,
+            "reaction_smiles": rxn_smi,
+            "source": "web",
+            "score": 0.5,
+            "plausibility": 0.5,  # lower confidence than ORD/model
+        }
+        if raw.get("yield_pct") is not None:
+            try:
+                route["expected_yield"] = float(raw["yield_pct"]) / 100.0
+            except (ValueError, TypeError):
+                pass
+        if raw.get("procedure"):
+            route["procedure_details"] = str(raw["procedure"])[:500]
+
+        routes.append(route)
+
+    elapsed = _time.monotonic() - t0
+    logger.info("[web_retro] %d valid routes extracted in %.1fs", len(routes), elapsed)
+    return routes
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # Main pipeline
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
-    """Full retrosynthesis pipeline: ORD API -> local retro model -> deduplicate -> score -> rank."""
+    """Full retrosynthesis pipeline: ORD -> web search -> local retro model -> deduplicate -> score -> rank."""
     all_routes: list[dict[str, Any]] = []
     sources_used: list[str] = []
 
@@ -332,8 +471,19 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
     if ord_results:
         all_routes.extend(ord_results)
         sources_used.append("ord")
-        logger.info("ORD: %d routes found — skipping model (ORD is authoritative)", len(ord_results))
+        logger.info("ORD: %d routes found — skipping web/model (ORD is authoritative)", len(ord_results))
     else:
+        # Tier 2: web search
+        try:
+            web_results = _web_search_retro(smiles)
+            if web_results:
+                all_routes.extend(web_results)
+                sources_used.append("web")
+                logger.info("Web search: %d routes found", len(web_results))
+        except Exception as e:
+            logger.warning("Web search retro failed: %s", e)
+
+        # Tier 3: local model (always try — complements web results)
         try:
             from ..retro_predictor import predict_retro
             model_results = predict_retro(smiles, top_n=10)
