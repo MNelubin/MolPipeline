@@ -19,15 +19,11 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
-// ── Status colour config ───────────────────────────────────────────────────────
-
 const SC = {
   target:       { color: '#06d6f0', label: 'Целевой',       icon: '★' },
   intermediate: { color: '#a78bfa', label: 'Промежуточный', icon: '◆' },
   buyable:      { color: '#22d3a0', label: 'Коммерч.',      icon: '✓' },
 }
-
-// ── Custom node ───────────────────────────────────────────────────────────────
 
 function MolNode({ data, selected }) {
   const cfg = SC[data.status] || SC.intermediate
@@ -36,24 +32,21 @@ function MolNode({ data, selected }) {
     : null
 
   return (
-    <div style={{
-      background: selected ? '#1a2740' : '#0f1929',
-      border: `1.5px solid ${selected ? cfg.color : cfg.color + '50'}`,
-      borderLeft: `3px solid ${cfg.color}`,
-      borderRadius: 8,
-      padding: '8px 10px',
-      width: 175,
-      cursor: 'pointer',
-      boxShadow: selected ? `0 0 14px ${cfg.color}45` : '0 2px 8px #00000060',
-      transition: 'border-color 0.15s, box-shadow 0.15s',
-    }}>
+    <div
+      className={`graph-node${selected ? ' selected' : ''}`}
+      style={{
+        borderColor: selected ? cfg.color : cfg.color + '50',
+        borderLeft: `3px solid ${cfg.color}`,
+        width: 175,
+        boxShadow: selected ? `0 0 14px ${cfg.color}45` : 'var(--shadow-card)',
+      }}
+    >
       <Handle type="target" position={Position.Top}
         style={{ background: cfg.color, border: 'none', width: 7, height: 7 }} />
 
-      {/* Molecule image */}
       {imgUrl && (
         <div style={{
-          background: '#fff', borderRadius: 4, marginBottom: 6,
+          background: '#fff', borderRadius: 'var(--r-xs, 4px)', marginBottom: 6,
           lineHeight: 0, overflow: 'hidden',
         }}>
           <img
@@ -65,35 +58,25 @@ function MolNode({ data, selected }) {
         </div>
       )}
 
-      {/* Status badge */}
       <div style={{ marginBottom: 4 }}>
-        <span style={{
-          fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
-          padding: '1px 6px', borderRadius: 3,
-          background: cfg.color + '18', color: cfg.color,
-          border: `1px solid ${cfg.color}35`,
-        }}>
+        <span
+          className="graph-node-badge"
+          style={{
+            background: cfg.color + '18',
+            color: cfg.color,
+            border: `1px solid ${cfg.color}35`,
+          }}
+        >
           {cfg.icon} {cfg.label}
         </span>
       </div>
 
-      {/* Name */}
-      <div style={{
-        fontSize: 11, fontWeight: 600, color: '#e8edf5',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
+      <div className="graph-node-name">
         {data.name || data.smiles?.slice(0, 24) || '—'}
       </div>
 
-      {/* SMILES */}
       {data.smiles && (
-        <div style={{
-          fontSize: 9, fontFamily: 'monospace', color: '#4d6585',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          marginTop: 2,
-        }}>
-          {data.smiles}
-        </div>
+        <div className="graph-node-smiles">{data.smiles}</div>
       )}
 
       <Handle type="source" position={Position.Bottom}
@@ -104,8 +87,6 @@ function MolNode({ data, selected }) {
 
 const NODE_TYPES = { mol: MolNode }
 
-// ── Graph builder ─────────────────────────────────────────────────────────────
-
 const NW = 175, NH = 145, HGAP = 45, VGAP = 170
 
 function buildGraph(sections) {
@@ -114,10 +95,8 @@ function buildGraph(sections) {
   const sorted = [...sections].sort((a, b) => a.step_number - b.step_number)
   const lastStep = sorted[sorted.length - 1].step_number
 
-  // Collect all unique molecules with metadata
-  const molMeta = new Map() // smiles → { name, status, producedAtStepIdx }
-
-  const edgePairs = [] // { from, to, label }
+  const molMeta = new Map()
+  const edgePairs = []
 
   for (let si = 0; si < sorted.length; si++) {
     const sec = sorted[si]
@@ -132,7 +111,6 @@ function buildGraph(sections) {
       })
     }
 
-    // Prefer reagent_table (has names + is_leaf); fallback to parsing reaction_smiles
     const reagentSmiles = []
     if (sec.reagent_table?.length) {
       for (const r of sec.reagent_table) {
@@ -165,21 +143,15 @@ function buildGraph(sections) {
     }
   }
 
-  // ── Layout: row = synthesis order ──
-  // Reagents used in step i → row i
-  // Product of step i → row i+1
-  // Target → last row
-
-  const rowMap = new Map() // row → smiles[]
+  const rowMap = new Map()
 
   for (const [smi, meta] of molMeta) {
     let row
     if (meta.status === 'target') {
-      row = sorted.length  // bottom
+      row = sorted.length
     } else if (meta.producedAtStepIdx != null) {
       row = meta.producedAtStepIdx + 1
     } else {
-      // Buyable: find earliest step that uses it
       let found = sorted.length - 1
       for (let si = 0; si < sorted.length; si++) {
         const sec = sorted[si]
@@ -193,7 +165,6 @@ function buildGraph(sections) {
     rowMap.get(row).push(smi)
   }
 
-  // Assign x/y positions
   const posMap = new Map()
   for (const [row, smilesList] of rowMap) {
     const total = smilesList.length * NW + (smilesList.length - 1) * HGAP
@@ -222,7 +193,7 @@ function buildGraph(sections) {
       type: 'smoothstep',
       style: { stroke: '#06d6f065', strokeWidth: 1.5 },
       markerEnd: { type: 'arrowclosed', color: '#06d6f0', width: 10, height: 10 },
-      labelStyle: { fontSize: 10, fill: '#5a7a9a', fontFamily: 'monospace' },
+      labelStyle: { fontSize: 10, fill: '#5a7a9a', fontFamily: 'var(--font-mono)' },
       labelBgStyle: { fill: '#0a1420', fillOpacity: 0.85 },
       labelBgPadding: [4, 3],
       labelBgBorderRadius: 4,
@@ -230,8 +201,6 @@ function buildGraph(sections) {
 
   return { nodes, edges }
 }
-
-// ── Detail panel (below graph) ────────────────────────────────────────────────
 
 function NodeDetail({ nodeData, onClose }) {
   if (!nodeData) return null
@@ -241,71 +210,41 @@ function NodeDetail({ nodeData, onClose }) {
     : null
 
   return (
-    <div style={{
-      marginTop: 10,
-      padding: '12px 16px',
-      background: '#0d1520',
-      border: `1px solid ${cfg.color}40`,
-      borderRadius: 8,
-      display: 'flex', gap: 16, alignItems: 'flex-start',
-    }}>
-      {/* 2D image */}
+    <div className="graph-detail-panel" style={{ borderColor: cfg.color + '40' }}>
       {imgUrl && (
-        <div style={{
-          flexShrink: 0, background: '#fff', borderRadius: 6,
-          overflow: 'hidden', width: 150,
-          border: `1px solid ${cfg.color}30`,
-        }}>
+        <div className="graph-detail-img" style={{ borderColor: cfg.color + '30' }}>
           <img
             src={imgUrl}
             alt={nodeData.name || nodeData.smiles}
-            style={{ width: '100%', display: 'block' }}
             onError={e => { e.target.parentElement.style.display = 'none' }}
           />
         </div>
       )}
 
-      {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="graph-detail-info">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <span style={{
-            fontSize: 10, fontFamily: 'monospace', fontWeight: 700,
-            padding: '2px 8px', borderRadius: 4,
-            background: cfg.color + '18', color: cfg.color,
-            border: `1px solid ${cfg.color}40`,
-          }}>
-            {cfg.icon} {cfg.label}
-          </span>
-          <button
-            onClick={onClose}
+          <span
+            className="graph-node-badge"
             style={{
-              marginLeft: 'auto', background: 'none', border: 'none',
-              color: '#4d6585', fontSize: 16, cursor: 'pointer', lineHeight: 1,
+              background: cfg.color + '18',
+              color: cfg.color,
+              border: `1px solid ${cfg.color}40`,
             }}
           >
-            ✕
-          </button>
+            {cfg.icon} {cfg.label}
+          </span>
+          <button className="graph-detail-close" onClick={onClose}>✕</button>
         </div>
 
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#e8edf5', marginBottom: 4 }}>
-          {nodeData.name || '—'}
-        </div>
+        <div className="graph-detail-name">{nodeData.name || '—'}</div>
 
         {nodeData.smiles && (
-          <div style={{
-            fontSize: 11, fontFamily: 'monospace', color: '#8fa3bf',
-            background: '#121d2e', padding: '6px 10px', borderRadius: 6,
-            border: '1px solid #1e3050', wordBreak: 'break-all',
-          }}>
-            {nodeData.smiles}
-          </div>
+          <div className="graph-detail-smiles">{nodeData.smiles}</div>
         )}
       </div>
     </div>
   )
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export default function ProtocolGraph({ protocol }) {
   const [open, setOpen] = useState(true)
@@ -326,7 +265,6 @@ export default function ProtocolGraph({ protocol }) {
 
   if (!sections?.length) return null
 
-  // Dynamic height based on number of steps
   const numRows = new Set(sections.map(s => s.step_number)).size
   const graphHeight = Math.max(320, (numRows + 1) * VGAP + NH + 20)
 
@@ -335,37 +273,19 @@ export default function ProtocolGraph({ protocol }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-
-      {/* ── Section header ── */}
-      <div
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          marginBottom: 10, cursor: 'pointer', userSelect: 'none',
-        }}
-        onClick={() => { setOpen(o => !o); setSelectedData(null) }}
-      >
-        <div style={{
-          fontSize: 11, fontWeight: 700, color: 'var(--text-2)',
-          fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}>
+      <div className="graph-section-header" onClick={() => { setOpen(o => !o); setSelectedData(null) }}>
+        <div className="graph-section-title">
           Схема синтеза · {stepCount} {stepLabel}
         </div>
-        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-        <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+        <div className="graph-section-line" />
+        <span className="graph-section-toggle">
           {open ? 'свернуть ▴' : 'развернуть ▾'}
         </span>
       </div>
 
       {open && (
         <>
-          {/* ── Graph ── */}
-          <div style={{
-            height: graphHeight,
-            borderRadius: 8,
-            overflow: 'hidden',
-            border: '1px solid #1e3050',
-          }}>
+          <div className="graph-container" style={{ height: graphHeight }}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -378,42 +298,29 @@ export default function ProtocolGraph({ protocol }) {
               fitViewOptions={{ padding: 0.18 }}
               minZoom={0.08}
               maxZoom={2.5}
-              style={{ background: '#070b12' }}
+              style={{ background: 'var(--bg-0)' }}
               proOptions={{ hideAttribution: true }}
             >
               <Background color="#1a2740" gap={24} size={1} />
               <Controls style={{
-                background: '#0d1520', border: '1px solid #1e3050',
+                background: 'var(--bg-1)', border: '1px solid var(--border)',
                 borderRadius: 6, overflow: 'hidden',
               }} />
             </ReactFlow>
           </div>
 
-          {/* ── Legend ── */}
-          <div style={{
-            display: 'flex', gap: 18, marginTop: 7,
-            fontSize: 10, fontFamily: 'var(--font-mono)',
-          }}>
+          <div className="graph-legend">
             {Object.entries(SC).map(([key, cfg]) => (
-              <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: cfg.color, flexShrink: 0,
-                }} />
-                <span style={{ color: 'var(--text-3)' }}>{cfg.label}</span>
+              <span key={key} className="graph-legend-item">
+                <span className="graph-legend-dot" style={{ background: cfg.color }} />
+                <span className="graph-legend-label">{cfg.label}</span>
               </span>
             ))}
-            <span style={{ marginLeft: 'auto', color: 'var(--text-3)' }}>
-              Кликни на узел для деталей
-            </span>
+            <span className="graph-legend-hint">Кликни на узел для деталей</span>
           </div>
 
-          {/* ── Node detail panel ── */}
           {selectedData && (
-            <NodeDetail
-              nodeData={selectedData}
-              onClose={() => setSelectedData(null)}
-            />
+            <NodeDetail nodeData={selectedData} onClose={() => setSelectedData(null)} />
           )}
         </>
       )}

@@ -16,21 +16,13 @@ const SOURCE_LABEL = {
 
 function ScoreBar({ value, max = 1 }) {
   const pct = Math.min(Math.round((value / max) * 100), 100)
+  const level = pct > 70 ? 'high' : pct > 40 ? 'medium' : 'low'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{
-        flex: 1, height: 4, background: 'var(--bg-3)',
-        borderRadius: 2, overflow: 'hidden',
-      }}>
-        <div style={{
-          width: `${pct}%`, height: '100%',
-          background: pct > 70 ? 'var(--green)' : pct > 40 ? 'var(--amber)' : 'var(--red)',
-          borderRadius: 2, transition: 'width 0.4s',
-        }} />
+    <div className="score-bar">
+      <div className="score-track">
+        <div className={`score-fill ${level}`} style={{ width: `${pct}%` }} />
       </div>
-      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', minWidth: 32 }}>
-        {value.toFixed(3)}
-      </span>
+      <span className="score-value">{value.toFixed(3)}</span>
     </div>
   )
 }
@@ -49,11 +41,9 @@ export default function PathwaySelector({ pathways, onSelect }) {
 
   return (
     <div style={{ marginTop: 8, marginBottom: 16 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14 }}>
-        Выберите маршрут синтеза
-      </div>
+      <div className="pathway-heading">Выберите маршрут синтеза</div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+      <div className="pathway-list">
         {pathways.map((pathway, i) => {
           const src = SOURCE_LABEL[pathway.source] || { text: (pathway.source || 'UNKNOWN').toUpperCase(), color: 'var(--text-3)' }
           const score = pathway.final_score ?? 0
@@ -66,67 +56,36 @@ export default function PathwaySelector({ pathways, onSelect }) {
             <div
               key={i}
               onClick={() => setSelectedIdx(i)}
-              style={{
-                background: isSelected ? 'var(--bg-2)' : 'var(--bg-card)',
-                border: `1px solid ${isSelected ? 'var(--cyan)' : 'var(--border)'}`,
-                borderRadius: 'var(--r-md)',
-                padding: '12px 14px',
-                cursor: 'pointer',
-                transition: 'border-color 0.15s, background 0.15s',
-              }}
+              className={`pathway-card${isSelected ? ' selected' : ''}`}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                {/* Radio */}
-                <div style={{
-                  width: 16, height: 16, borderRadius: '50%',
-                  border: `2px solid ${isSelected ? 'var(--cyan)' : 'var(--border)'}`,
-                  background: isSelected ? 'var(--cyan)' : 'transparent',
-                  flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {isSelected && (
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--bg-1)' }} />
-                  )}
+              <div className="pathway-card-header">
+                <div className="pathway-radio">
+                  {isSelected && <div className="pathway-radio-dot" />}
                 </div>
 
-                {/* Source badge */}
-                <span style={{
-                  fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-                  padding: '2px 7px', borderRadius: 4,
-                  background: `${src.color}18`, color: src.color,
-                  border: `1px solid ${src.color}40`, flexShrink: 0,
-                }}>
+                <span
+                  className="source-badge"
+                  style={{
+                    background: `color-mix(in srgb, ${src.color} 10%, transparent)`,
+                    color: src.color,
+                    border: `1px solid color-mix(in srgb, ${src.color} 25%, transparent)`,
+                  }}
+                >
                   {src.text}
                 </span>
 
-                {/* Viability */}
                 {viable ? (
-                  <span style={{ fontSize: 11, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>
-                    ✓ Выполним
-                  </span>
+                  <span className="viable-text" style={{ color: 'var(--green)' }}>✓ Выполним</span>
                 ) : (
-                  <span style={{ fontSize: 11, color: 'var(--amber)', fontFamily: 'var(--font-mono)' }}>
-                    ⚠ Возможны проблемы
-                  </span>
+                  <span className="viable-text" style={{ color: 'var(--amber)' }}>⚠ Возможны проблемы</span>
                 )}
 
-                {/* Leaf counts */}
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                  {buyable} куп. / {unresolved} нераз.
-                </span>
+                <span className="leaf-counts">{buyable} куп. / {unresolved} нераз.</span>
               </div>
 
-              {/* Reactants SMILES */}
-              <div style={{
-                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                marginBottom: 8, paddingLeft: 26,
-              }}>
-                {pathway.reactants || '—'}
-              </div>
+              <div className="pathway-reactants">{pathway.reactants || '—'}</div>
 
-              {/* Score bar */}
-              <div style={{ paddingLeft: 26 }}>
+              <div className="pathway-score-area">
                 <ScoreBar value={score} />
               </div>
             </div>
@@ -134,37 +93,22 @@ export default function PathwaySelector({ pathways, onSelect }) {
         })}
       </div>
 
-      {/* Target mass input + confirm */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      {/* Target mass + confirm */}
+      <div className="pathway-controls">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 13, color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
-            Целевая масса:
-          </label>
+          <label className="pathway-label">Целевая масса:</label>
           <input
             type="number"
             min="0.001"
             step="0.1"
             value={targetMass}
             onChange={e => setTargetMass(e.target.value)}
-            style={{
-              width: 80,
-              padding: '6px 10px',
-              background: 'var(--bg-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--r-sm)',
-              color: 'var(--text-1)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 13,
-            }}
+            className="pathway-input"
           />
-          <span style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>г</span>
+          <span className="pathway-unit">г</span>
         </div>
 
-        <button
-          className="send-btn"
-          style={{ padding: '10px 24px', fontSize: 13, width: 'auto', borderRadius: 'var(--r-md)' }}
-          onClick={handleConfirm}
-        >
+        <button className="action-btn" onClick={handleConfirm}>
           Запустить расчёт
         </button>
       </div>

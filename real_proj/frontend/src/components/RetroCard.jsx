@@ -28,21 +28,13 @@ const SOURCE_LABEL = {
 
 function ScoreBar({ value, max = 1 }) {
   const pct = Math.round((value / max) * 100)
+  const level = pct > 70 ? 'high' : pct > 40 ? 'medium' : 'low'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{
-        flex: 1, height: 4, background: 'var(--bg-3)',
-        borderRadius: 2, overflow: 'hidden',
-      }}>
-        <div style={{
-          width: `${pct}%`, height: '100%',
-          background: pct > 70 ? 'var(--green)' : pct > 40 ? 'var(--amber)' : 'var(--red)',
-          borderRadius: 2, transition: 'width 0.4s',
-        }} />
+    <div className="score-bar">
+      <div className="score-track">
+        <div className={`score-fill ${level}`} style={{ width: `${pct}%` }} />
       </div>
-      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', minWidth: 32 }}>
-        {value.toFixed(2)}
-      </span>
+      <span className="score-value">{value.toFixed(2)}</span>
     </div>
   )
 }
@@ -58,44 +50,27 @@ function RouteCard({ route, index, smiles }) {
   const steps = route.procedure_steps_ru || []
 
   return (
-    <div style={{
-      background: 'var(--bg-2)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--r-md)',
-      overflow: 'hidden',
-      marginBottom: 10,
-    }}>
+    <div className="route-card">
       {/* Route header */}
-      <div
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 14px', cursor: 'pointer',
-          borderBottom: open ? '1px solid var(--border)' : 'none',
-        }}
-        onClick={() => setOpen(o => !o)}
-      >
-        <span style={{
-          fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-          padding: '2px 7px', borderRadius: 4,
-          background: `${src.color}18`, color: src.color,
-          border: `1px solid ${src.color}40`, flexShrink: 0,
-        }}>
+      <div className="route-header" style={{ borderBottom: open ? '1px solid var(--border)' : 'none' }} onClick={() => setOpen(o => !o)}>
+        <span
+          className="source-badge"
+          style={{
+            background: `color-mix(in srgb, ${src.color} 10%, transparent)`,
+            color: src.color,
+            border: `1px solid color-mix(in srgb, ${src.color} 25%, transparent)`,
+          }}
+        >
           {src.text}
         </span>
 
-        <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {route.reactants || '—'}
-        </span>
-
-        <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--cyan)', flexShrink: 0 }}>
-          {route.final_score?.toFixed(3)}
-        </span>
-
-        <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{open ? '▲' : '▼'}</span>
+        <span className="route-reactants-text">{route.reactants || '—'}</span>
+        <span className="route-score-text">{route.final_score?.toFixed(3)}</span>
+        <span className="route-toggle">{open ? '▲' : '▼'}</span>
       </div>
 
       {open && (
-        <div style={{ padding: '12px 14px' }}>
+        <div className="route-body">
 
           {/* Reaction equation */}
           {route.reaction_smiles && (() => {
@@ -105,27 +80,22 @@ function RouteCard({ route, index, smiles }) {
             return (
               <>
                 <div className="section-title">Реакция</div>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-1)',
-                  background: 'var(--bg-card)', padding: '10px 12px', borderRadius: 'var(--r-sm)',
-                  border: '1px solid var(--border)', marginBottom: 12,
-                  display: 'flex', flexDirection: 'column', gap: 4,
-                }}>
-                  <div style={{ color: 'var(--text-2)', wordBreak: 'break-all' }}>{reactantStr}</div>
-                  <div style={{ color: 'var(--cyan)', fontSize: 14, fontWeight: 700 }}>↓</div>
-                  <div style={{ color: 'var(--green)', wordBreak: 'break-all' }}>{productStr}</div>
+                <div className="route-reaction-box">
+                  <div className="route-reaction-reactants">{reactantStr}</div>
+                  <div className="route-reaction-arrow">↓</div>
+                  <div className="route-reaction-products">{productStr}</div>
                 </div>
               </>
             )
           })()}
 
-          {/* Reactants full */}
+          {/* Reactants SMILES */}
           <div className="section-title">Реагенты (SMILES)</div>
           <div className="smiles-box" style={{ wordBreak: 'break-all', marginBottom: 12 }}>
             {route.reactants || '—'}
           </div>
 
-          {/* Conditions row */}
+          {/* Conditions */}
           {(route.temperature || route.solvent || route.catalyst || route.expected_yield != null) && (
             <>
               <div className="section-title">Условия</div>
@@ -160,7 +130,7 @@ function RouteCard({ route, index, smiles }) {
 
           {/* Scoring breakdown */}
           <div className="section-title">Оценка маршрута</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', marginBottom: 12 }}>
+          <div className="score-grid">
             {[
               ['Итого', route.final_score],
               ['Достоверность', scoring.plausibility],
@@ -168,31 +138,23 @@ function RouteCard({ route, index, smiles }) {
               ['Простота', scoring.simplicity],
             ].map(([label, val]) => val != null && (
               <div key={label}>
-                <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</div>
+                <div className="score-label">{label}</div>
                 <ScoreBar value={val} />
               </div>
             ))}
           </div>
 
-          {/* Step-by-step procedure */}
+          {/* Procedure steps */}
           {steps.length > 0 && (
             <>
               <div className="section-title">Процедура синтеза</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="procedure-list">
                 {steps.map((step, i) => (
-                  <div key={i} style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    borderLeft: '3px solid var(--cyan-dim)',
-                    borderRadius: '0 var(--r-sm) var(--r-sm) 0',
-                    padding: '8px 12px',
-                  }}>
-                    <div style={{ fontSize: 11, color: 'var(--cyan)', fontFamily: 'var(--font-mono)', marginBottom: 3 }}>
-                      Шаг {step.step}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-1)', lineHeight: 1.5 }}>{step.description}</div>
+                  <div key={i} className="procedure-step">
+                    <div className="procedure-step-num">Шаг {step.step}</div>
+                    <div className="procedure-step-text">{step.description}</div>
                     {step.reason && step.reason !== 'ORD процедура' && (
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>↳ {step.reason}</div>
+                      <div className="procedure-step-reason">↳ {step.reason}</div>
                     )}
                   </div>
                 ))}
@@ -200,7 +162,7 @@ function RouteCard({ route, index, smiles }) {
             </>
           )}
 
-          {/* Raw procedure if no steps */}
+          {/* Raw procedure */}
           {steps.length === 0 && route.procedure_details && (
             <>
               <div className="section-title">Описание процедуры</div>
@@ -210,9 +172,7 @@ function RouteCard({ route, index, smiles }) {
 
           {/* ORD ID */}
           {route.reaction_id && (
-            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-              ORD ID: {route.reaction_id}
-            </div>
+            <div className="ord-id-text">ORD ID: {route.reaction_id}</div>
           )}
 
           {/* Tree expand button */}
@@ -220,18 +180,7 @@ function RouteCard({ route, index, smiles }) {
             <div style={{ marginTop: 14 }}>
               {!tree && !treeLoading && (
                 <button
-                  style={{
-                    background: 'var(--cyan)18',
-                    border: '1px solid var(--cyan)40',
-                    color: 'var(--cyan)',
-                    padding: '8px 16px',
-                    borderRadius: 'var(--r-sm)',
-                    fontSize: 12,
-                    fontFamily: 'var(--font-mono)',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}
+                  className="tree-btn"
                   onClick={async () => {
                     setTreeLoading(true)
                     setTreeError(null)
@@ -264,46 +213,19 @@ function RouteCard({ route, index, smiles }) {
               )}
 
               {treeLoading && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--cyan)',
-                }}>
+                <div className="tree-loading">
                   <div className="spinner" style={{ width: 14, height: 14 }} />
                   Строим дерево синтеза...
                 </div>
               )}
 
               {treeError && (
-                <div style={{
-                  fontSize: 12, color: 'var(--red)',
-                  fontFamily: 'var(--font-mono)',
-                  padding: '6px 10px',
-                  background: 'var(--red)10',
-                  border: '1px solid var(--red)30',
-                  borderRadius: 'var(--r-sm)',
-                }}>
-                  Ошибка: {treeError}
-                </div>
+                <div className="tree-error">Ошибка: {treeError}</div>
               )}
 
               {tree && (
                 <>
-                  <button
-                    onClick={() => setGraphOpen(true)}
-                    style={{
-                      marginTop: 10,
-                      background: 'var(--cyan)18',
-                      border: '1px solid var(--cyan)40',
-                      color: 'var(--cyan)',
-                      padding: '8px 16px',
-                      borderRadius: 'var(--r-sm)',
-                      fontSize: 12,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}
-                  >
+                  <button className="tree-btn" style={{ marginTop: 10 }} onClick={() => setGraphOpen(true)}>
                     ⬡ Открыть граф синтеза ({tree.stats?.total_nodes} узлов)
                   </button>
                   {graphOpen && (
@@ -325,11 +247,7 @@ function RouteCard({ route, index, smiles }) {
 
 export default function RetroCard({ retroResult, smiles }) {
   if (!retroResult) {
-    return (
-      <div style={{ color: 'var(--text-3)', fontSize: 13, fontFamily: 'var(--font-mono)', padding: '8px 0' }}>
-        Данные ретросинтеза недоступны
-      </div>
-    )
+    return <div className="retro-empty">Данные ретросинтеза недоступны</div>
   }
 
   const routes = retroResult.routes || []
@@ -358,9 +276,7 @@ export default function RetroCard({ retroResult, smiles }) {
       </div>
 
       {routes.length === 0 ? (
-        <div style={{ color: 'var(--text-3)', fontSize: 13, fontFamily: 'var(--font-mono)' }}>
-          Маршруты синтеза не найдены
-        </div>
+        <div className="retro-empty">Маршруты синтеза не найдены</div>
       ) : (
         routes.map((route, i) => (
           <RouteCard key={i} route={route} index={i} smiles={smiles} />

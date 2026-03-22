@@ -22,28 +22,13 @@ const STATE_COLORS = {
 
 function StateDot({ state }) {
   const s = STATE_COLORS[state] || STATE_COLORS.unknown
-  return (
-    <span style={{
-      display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-      background: s.color, marginRight: 5,
-    }} title={s.label} />
-  )
+  return <span className="state-dot" style={{ background: s.color }} title={s.label} />
 }
 
 function ReagentRow({ reagent }) {
   const isLiquid = reagent.state === 'liquid'
   return (
-    <div style={{
-      background: 'var(--bg-2)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--r-sm)',
-      padding: '10px 14px',
-      display: 'grid',
-      gridTemplateColumns: '1fr auto',
-      gap: '4px 16px',
-      alignItems: 'start',
-    }}>
-      {/* Left: name + smiles */}
+    <div className="reagent-result-row">
       <div>
         <div style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500, marginBottom: 2 }}>
           <StateDot state={reagent.state} />
@@ -59,7 +44,6 @@ function ReagentRow({ reagent }) {
         </div>
       </div>
 
-      {/* Right: amounts */}
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontSize: 15, fontFamily: 'var(--font-mono)', color: 'var(--cyan)', fontWeight: 700 }}>
           {reagent.mass_g} г
@@ -89,31 +73,19 @@ function ReagentRow({ reagent }) {
 
 function Input({ label, value, onChange, placeholder, type = 'text', disabled }) {
   return (
-    <div>
-      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-3)', marginBottom: 5 }}>
-        {label}
-      </div>
+    <div className="calc-input-group">
+      <label>{label}</label>
       <input
+        className="calc-input"
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        style={{
-          width: '100%', background: 'var(--bg-2)', border: '1px solid var(--border-hi)',
-          borderRadius: 'var(--r-sm)', padding: '8px 12px',
-          fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-1)',
-          outline: 'none', boxSizing: 'border-box',
-          opacity: disabled ? 0.5 : 1,
-        }}
-        onFocus={e => e.target.style.borderColor = 'var(--cyan-dim)'}
-        onBlur={e => e.target.style.borderColor = 'var(--border-hi)'}
       />
     </div>
   )
 }
-
-// ── Equivalents mode: dynamic reagent list ────────────────────────────────────
 
 function EquivReagentEditor({ rows, onChange }) {
   const add = () => onChange([...rows, { smiles: '', name: '', equivalents: '1.0' }])
@@ -123,55 +95,46 @@ function EquivReagentEditor({ rows, onChange }) {
   return (
     <div>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 0.7fr auto', gap: 6, marginBottom: 6 }}>
+        <div key={i} className="equiv-row">
           <input
+            className="equiv-input"
             placeholder="SMILES"
             value={r.smiles}
             onChange={e => update(i, 'smiles', e.target.value)}
-            style={{ background: 'var(--bg-2)', border: '1px solid var(--border-hi)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-1)', outline: 'none' }}
           />
           <input
+            className="equiv-input"
             placeholder="Название"
             value={r.name}
             onChange={e => update(i, 'name', e.target.value)}
-            style={{ background: 'var(--bg-2)', border: '1px solid var(--border-hi)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontSize: 12, color: 'var(--text-1)', outline: 'none' }}
           />
           <input
+            className="equiv-input"
             placeholder="экв"
             type="number"
             step="0.1"
             value={r.equivalents}
             onChange={e => update(i, 'equivalents', e.target.value)}
-            style={{ background: 'var(--bg-2)', border: '1px solid var(--border-hi)', borderRadius: 'var(--r-sm)', padding: '7px 10px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-1)', outline: 'none', textAlign: 'center' }}
+            style={{ textAlign: 'center' }}
           />
-          <button onClick={() => remove(i)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', color: 'var(--text-3)', cursor: 'pointer', padding: '0 8px', fontSize: 14 }}>×</button>
+          <button className="equiv-remove-btn" onClick={() => remove(i)}>×</button>
         </div>
       ))}
-      <button onClick={add} style={{
-        background: 'rgba(6,214,240,0.07)', border: '1px dashed var(--cyan-dim)',
-        borderRadius: 'var(--r-sm)', color: 'var(--cyan)', cursor: 'pointer',
-        padding: '6px 14px', fontSize: 12, fontFamily: 'var(--font-mono)', width: '100%', marginTop: 4,
-      }}>
-        + добавить реагент
-      </button>
+      <button className="equiv-add-btn" onClick={add}>+ добавить реагент</button>
     </div>
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 export default function CalculatorCard({ smiles: targetSmiles }) {
-  const [mode, setMode] = useState('stoichio')      // 'stoichio' | 'equiv'
+  const [mode, setMode] = useState('stoichio')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError]   = useState(null)
 
-  // Stoichiometry fields
   const [reactionSmiles, setReactionSmiles] = useState('')
   const [targetMass, setTargetMass]         = useState('1.0')
   const [targetProduct, setTargetProduct]   = useState(targetSmiles || '')
 
-  // Equivalents fields
   const [refSmiles, setRefSmiles]       = useState(targetSmiles || '')
   const [refAmount, setRefAmount]       = useState('1.0')
   const [amountType, setAmountType]     = useState('reagent_moles')
@@ -218,72 +181,56 @@ export default function CalculatorCard({ smiles: targetSmiles }) {
     }
   }
 
-  const btnStyle = {
-    background: 'rgba(6,214,240,0.12)', border: '1px solid var(--cyan-dim)',
-    borderRadius: 'var(--r-sm)', color: 'var(--cyan)', cursor: 'pointer',
-    padding: '9px 20px', fontSize: 13, fontFamily: 'var(--font-mono)',
-    transition: 'all 0.15s', opacity: loading ? 0.5 : 1,
-  }
-
   return (
     <div>
       {/* Mode switcher */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+      <div className="calc-mode-switcher">
         {[['stoichio', 'Стехиометрия'], ['equiv', 'По эквивалентам']].map(([m, label]) => (
-          <button key={m} onClick={() => { setMode(m); setResult(null); setError(null) }} style={{
-            padding: '5px 14px', fontSize: 12, fontFamily: 'var(--font-mono)',
-            borderRadius: '999px', border: '1px solid',
-            cursor: 'pointer', transition: 'all 0.15s',
-            borderColor: mode === m ? 'var(--cyan-dim)' : 'var(--border)',
-            color:       mode === m ? 'var(--cyan)'    : 'var(--text-3)',
-            background:  mode === m ? 'rgba(6,214,240,0.08)' : 'transparent',
-          }}>{label}</button>
+          <button
+            key={m}
+            className={`calc-mode-btn${mode === m ? ' active' : ''}`}
+            onClick={() => { setMode(m); setResult(null); setError(null) }}
+          >
+            {label}
+          </button>
         ))}
       </div>
 
-      {/* ── Stoichiometry form ── */}
+      {/* Stoichiometry form */}
       {mode === 'stoichio' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="calc-form">
           <Input label="Реакция (SMILES)" value={reactionSmiles} onChange={setReactionSmiles}
             placeholder="CC(=O)O.CCO>>CC(=O)OCC.O" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="calc-form-row">
             <Input label="Масса продукта (г)" type="number" value={targetMass} onChange={setTargetMass} placeholder="1.0" />
             <Input label="Целевой продукт (SMILES, опц.)" value={targetProduct} onChange={setTargetProduct} placeholder="автоматически" />
           </div>
-          <button style={btnStyle} onClick={calc} disabled={loading || !reactionSmiles}>
+          <button className="calc-btn" onClick={calc} disabled={loading || !reactionSmiles}>
             {loading ? 'Считаем...' : 'Рассчитать →'}
           </button>
         </div>
       )}
 
-      {/* ── Equivalents form ── */}
+      {/* Equivalents form */}
       {mode === 'equiv' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="calc-form">
+          <div className="calc-form-row">
             <Input label="Референсный SMILES" value={refSmiles} onChange={setRefSmiles} placeholder="CCO" />
             <Input label="Количество" type="number" value={refAmount} onChange={setRefAmount} placeholder="1.0" />
           </div>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-3)', marginBottom: 5 }}>
-              Тип количества
-            </div>
-            <select value={amountType} onChange={e => setAmountType(e.target.value)} style={{
-              background: 'var(--bg-2)', border: '1px solid var(--border-hi)', borderRadius: 'var(--r-sm)',
-              padding: '8px 12px', fontSize: 13, fontFamily: 'var(--font-mono)',
-              color: 'var(--text-1)', outline: 'none', width: '100%',
-            }}>
+          <div className="calc-input-group">
+            <label>Тип количества</label>
+            <select className="calc-select" value={amountType} onChange={e => setAmountType(e.target.value)}>
               <option value="reagent_moles">Моли реагента</option>
               <option value="reagent_mass">Масса реагента (г)</option>
               <option value="product_mass">Масса продукта (г)</option>
             </select>
           </div>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-3)', marginBottom: 8 }}>
-              Реагенты
-            </div>
+          <div className="calc-input-group">
+            <label>Реагенты</label>
             <EquivReagentEditor rows={equivRows} onChange={setEquivRows} />
           </div>
-          <button style={btnStyle} onClick={calc} disabled={loading || !refSmiles}>
+          <button className="calc-btn" onClick={calc} disabled={loading || !refSmiles}>
             {loading ? 'Считаем...' : 'Рассчитать →'}
           </button>
         </div>
@@ -299,7 +246,6 @@ export default function CalculatorCard({ smiles: targetSmiles }) {
         <div style={{ marginTop: 20 }}>
           <div className="divider" />
 
-          {/* Summary */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             <div className="prop-item">
               <div className="prop-label">Целевой продукт</div>
@@ -315,13 +261,11 @@ export default function CalculatorCard({ smiles: targetSmiles }) {
             </div>
           </div>
 
-          {/* Reagents */}
           <div className="section-title">Реагенты</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {result.reagents.map((r, i) => <ReagentRow key={i} reagent={r} />)}
           </div>
 
-          {/* Warnings */}
           {result.warnings?.length > 0 && (
             <div style={{ marginTop: 12 }}>
               {result.warnings.map((w, i) => (

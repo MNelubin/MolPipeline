@@ -10,7 +10,6 @@ import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
 
-// ── Sidebar nav items ─────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   {
     id: 'chat',
@@ -36,7 +35,7 @@ const NAV_ITEMS = [
 ]
 
 export default function App() {
-  const [page, setPage] = useState('chat')        // 'chat' | 'calculator'
+  const [page, setPage] = useState('chat')
   const [input, setInput] = useState('')
   const [model, setModel] = useState('openai/gpt-4o')
   const [history, setHistory] = useState([])
@@ -79,14 +78,13 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="logo-mark">MolPipeline</div>
           <div className="logo-sub">Molecule Analysis</div>
         </div>
 
-        {/* Navigation */}
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
             <button
@@ -100,15 +98,12 @@ export default function App() {
           ))}
         </nav>
 
-        {/* History — only visible on chat page */}
         {page === 'chat' && (
           <>
             <div className="sidebar-section-title">История</div>
             <div className="sidebar-history">
               {history.length === 0 ? (
-                <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                  Нет запросов
-                </div>
+                <div className="sidebar-empty">Нет запросов</div>
               ) : (
                 history.map((q, i) => (
                   <div key={i} className="history-item" onClick={() => setInput(q)} title={q}>{q}</div>
@@ -119,7 +114,7 @@ export default function App() {
         )}
 
         <div className="sidebar-footer">
-          <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
+          <div className="sidebar-footer-text">
             classify → validate<br />
             → molecule_info → retro<br />
             → stoichiometry → plan
@@ -127,17 +122,17 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ── Main area ── */}
+      {/* Main area */}
       <main className="main">
 
-        {/* ════════════════ CHAT PAGE ════════════════ */}
+        {/* CHAT PAGE */}
         {page === 'chat' && (
           <>
             <div className="topbar">
               <span className="topbar-title">
                 {isRunning ? (
-                  <span style={{ color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="spinner" style={{ width: 12, height: 12 }} />
+                  <span className="topbar-status">
+                    <div className="spinner spinner-sm" />
                     Обработка...
                   </span>
                 ) : 'Введите название или SMILES молекулы'}
@@ -147,10 +142,21 @@ export default function App() {
 
             <div className="messages">
 
-              {/* ── Empty state ── */}
+              {/* Empty state */}
               {status === 'idle' && (
                 <div className="empty-state">
-                  <div className="empty-icon">⬡</div>
+                  <div className="empty-icon">
+                    <svg width="52" height="52" viewBox="0 0 52 52" fill="none" stroke="currentColor" strokeWidth="1.2" opacity="0.5">
+                      <polygon points="26,2 49,14.5 49,37.5 26,50 3,37.5 3,14.5" stroke="var(--cyan-dim)" />
+                      <circle cx="26" cy="26" r="6" stroke="var(--cyan)" strokeWidth="1.5" />
+                      <line x1="26" y1="2" x2="26" y2="20" stroke="var(--border-hi)" />
+                      <line x1="49" y1="14.5" x2="32" y2="24" stroke="var(--border-hi)" />
+                      <line x1="49" y1="37.5" x2="32" y2="28" stroke="var(--border-hi)" />
+                      <line x1="26" y1="50" x2="26" y2="32" stroke="var(--border-hi)" />
+                      <line x1="3" y1="37.5" x2="20" y2="28" stroke="var(--border-hi)" />
+                      <line x1="3" y1="14.5" x2="20" y2="24" stroke="var(--border-hi)" />
+                    </svg>
+                  </div>
                   <div className="empty-title">MolPipeline</div>
                   <div className="empty-sub">Введите название или SMILES</div>
                   <div className="empty-examples">
@@ -161,39 +167,25 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── Running spinner ── */}
+              {/* Running spinner */}
               {isRunning && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '24px 0', color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                  <div className="spinner" style={{ width: 18, height: 18 }} />
+                <div className="loading-row">
+                  <div className="spinner spinner-md" />
                   Выполняется анализ...
                 </div>
               )}
 
-              {/* ── Error state ── */}
+              {/* Error state */}
               {status === 'error' && (
-                <div style={{
-                  margin: '16px 0',
-                  padding: '12px 16px',
-                  background: 'var(--red)12',
-                  border: '1px solid var(--red)40',
-                  borderRadius: 'var(--r-md)',
-                  color: 'var(--red)',
-                  fontSize: 13,
-                  fontFamily: 'var(--font-mono)',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                }}>
+                <div className="error-block">
                   {error || 'Произошла ошибка'}
-                  <button
-                    style={{ display: 'block', marginTop: 10, fontSize: 11, cursor: 'pointer', color: 'var(--text-3)', background: 'none', border: 'none' }}
-                    onClick={reset}
-                  >
+                  <button className="reset-link" onClick={reset}>
                     Сбросить
                   </button>
                 </div>
               )}
 
-              {/* ── Phase: card_ready — show molecule card + confirm button ── */}
+              {/* Phase: card_ready — molecule card + confirm button */}
               {!isRunning && (phase === 'card_ready' || phase === 'select_pathway' || phase === 'completed') && moleculeInfo && (
                 <div style={{ marginBottom: 16 }}>
                   <MoleculeCard
@@ -204,22 +196,10 @@ export default function App() {
 
                   {phase === 'card_ready' && (
                     <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
-                      <button
-                        className="send-btn"
-                        style={{ padding: '10px 24px', fontSize: 13, width: 'auto', borderRadius: 'var(--r-md)' }}
-                        onClick={confirmSynthesis}
-                        disabled={isRunning}
-                      >
+                      <button className="action-btn" onClick={confirmSynthesis} disabled={isRunning}>
                         Продолжить синтез
                       </button>
-                      <button
-                        style={{
-                          padding: '10px 24px', fontSize: 13, borderRadius: 'var(--r-md)',
-                          background: 'none', border: '1px solid var(--border)',
-                          color: 'var(--text-2)', cursor: 'pointer',
-                        }}
-                        onClick={reset}
-                      >
+                      <button className="action-btn-ghost" onClick={reset}>
                         Сбросить
                       </button>
                     </div>
@@ -227,7 +207,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── Phase: select_pathway — show pathway selector ── */}
+              {/* Phase: select_pathway */}
               {!isRunning && phase === 'select_pathway' && synthesisPaths.length > 0 && (
                 <PathwaySelector
                   pathways={synthesisPaths}
@@ -235,7 +215,7 @@ export default function App() {
                 />
               )}
 
-              {/* ── Phase: completed — show synthesis graph + experiment protocol ── */}
+              {/* Phase: completed — graph + protocol */}
               {!isRunning && phase === 'completed' && experimentProtocol && (
                 <>
                   <ProtocolGraph protocol={experimentProtocol} />
@@ -243,17 +223,9 @@ export default function App() {
                 </>
               )}
 
-              {/* ── Completed but no protocol (error/banned) ── */}
+              {/* Completed but no protocol */}
               {!isRunning && phase === 'completed' && !experimentProtocol && pipelineState?.error && (
-                <div style={{
-                  padding: '12px 16px',
-                  background: 'var(--red)12',
-                  border: '1px solid var(--red)40',
-                  borderRadius: 'var(--r-md)',
-                  color: 'var(--red)',
-                  fontSize: 13,
-                  fontFamily: 'var(--font-mono)',
-                }}>
+                <div className="error-block">
                   {pipelineState.error}
                 </div>
               )}
@@ -288,14 +260,14 @@ export default function App() {
                   </svg>
                 </button>
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+              <div className="input-hint">
                 Enter — отправить · Shift+Enter — новая строка
               </div>
             </div>
           </>
         )}
 
-        {/* ════════════════ CALCULATOR PAGE ════════════════ */}
+        {/* CALCULATOR PAGE */}
         {page === 'calculator' && (
           <>
             <div className="topbar">
@@ -304,10 +276,8 @@ export default function App() {
             <div className="calculator-page">
               <div className="calculator-page-inner">
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-1)', marginBottom: 6 }}>
-                    Калькулятор стехиометрии
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                  <div className="calc-page-title">Калькулятор стехиометрии</div>
+                  <div className="calc-page-desc">
                     Рассчитайте массы и объёмы реагентов для любой реакции
                   </div>
                 </div>

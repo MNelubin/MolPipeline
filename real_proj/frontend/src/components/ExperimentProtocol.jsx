@@ -28,7 +28,6 @@ function ReactionFormula({ reactionSmiles, reagentTable }) {
   const reactantSmiles = lhs.split('.').filter(Boolean)
   const productSmiles = (rhs || '').split('.').filter(Boolean)
 
-  // Build name map from reagent table
   const nameMap = {}
   reagentTable?.forEach(r => {
     if (r.smiles) nameMap[r.smiles] = r.name
@@ -37,47 +36,21 @@ function ReactionFormula({ reactionSmiles, reagentTable }) {
   const fmt = (smi) => nameMap[smi] || smi.slice(0, 30) + (smi.length > 30 ? '…' : '')
 
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--r-sm)',
-      padding: '10px 14px',
-      marginBottom: 12,
-      fontFamily: 'var(--font-mono)',
-      fontSize: 12,
-    }}>
-      <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        Уравнение реакции
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+    <div className="reaction-formula">
+      <div className="reaction-formula-label">Уравнение реакции</div>
+      <div className="reaction-formula-row">
         {reactantSmiles.map((smi, i) => (
           <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {i > 0 && <span style={{ color: 'var(--text-3)' }}>+</span>}
-            <span style={{
-              color: 'var(--text-2)',
-              background: 'var(--bg-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              padding: '2px 8px',
-              fontSize: 11,
-              wordBreak: 'break-all',
-            }}>{fmt(smi)}</span>
+            <span className="reactant-pill">{fmt(smi)}</span>
           </span>
         ))}
-        <span style={{ color: 'var(--cyan)', fontWeight: 700, fontSize: 16, margin: '0 4px' }}>→</span>
+        <span className="reaction-formula-arrow">→</span>
         {productSmiles.map((smi, i) => (
-          <span key={i} style={{
-            color: 'var(--green)',
-            background: 'var(--green-dim, #0a2a1a)',
-            border: '1px solid var(--green)40',
-            borderRadius: 4,
-            padding: '2px 8px',
-            fontSize: 11,
-            wordBreak: 'break-all',
-          }}>{fmt(smi)}</span>
+          <span key={i} className="product-pill">{fmt(smi)}</span>
         ))}
       </div>
-      <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-3)', wordBreak: 'break-all' }}>
+      <div className="reaction-smiles-hint">
         SMILES: {reactionSmiles.slice(0, 120)}{reactionSmiles.length > 120 ? '…' : ''}
       </div>
     </div>
@@ -87,48 +60,26 @@ function ReactionFormula({ reactionSmiles, reagentTable }) {
 function ReagentTable({ rows, compact }) {
   if (!rows?.length) return null
   return (
-    <div style={{
-      background: compact ? 'var(--bg-card)' : 'var(--bg-2)',
-      border: '1px solid var(--border)',
-      borderRadius: compact ? 'var(--r-sm)' : 'var(--r-md)',
-      overflow: 'auto',
-      marginBottom: compact ? 0 : 0,
-    }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+    <div className={`reagent-table-wrap${compact ? ' compact' : ''}`}>
+      <table className="reagent-table">
         <thead>
-          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          <tr>
             {['Реагент', 'Масса, г', 'Объём, мл', 'Моль', 'Экв.'].map(h => (
-              <th key={h} style={{
-                padding: compact ? '6px 10px' : '8px 12px',
-                textAlign: 'left',
-                color: 'var(--text-3)',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 600,
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                whiteSpace: 'nowrap',
-              }}>{h}</th>
+              <th key={h}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none' }}>
-              <td style={{ padding: compact ? '6px 10px' : '8px 12px', color: 'var(--text-1)', fontWeight: 500 }}>
+            <tr key={i}>
+              <td>
                 {row.name || row.smiles || '—'}
-                {row.notes ? <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 6 }}>({row.notes})</span> : null}
+                {row.notes ? <span className="notes-text">({row.notes})</span> : null}
               </td>
-              <td style={{ padding: compact ? '6px 10px' : '8px 12px', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
-                {row.mass_g != null ? row.mass_g.toFixed(4) : '—'}
-              </td>
-              <td style={{ padding: compact ? '6px 10px' : '8px 12px', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
-                {row.volume_ml != null ? row.volume_ml.toFixed(3) : '—'}
-              </td>
-              <td style={{ padding: compact ? '6px 10px' : '8px 12px', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
-                {row.moles != null ? row.moles.toExponential(3) : '—'}
-              </td>
-              <td style={{ padding: compact ? '6px 10px' : '8px 12px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+              <td>{row.mass_g != null ? row.mass_g.toFixed(4) : '—'}</td>
+              <td>{row.volume_ml != null ? row.volume_ml.toFixed(3) : '—'}</td>
+              <td>{row.moles != null ? row.moles.toExponential(3) : '—'}</td>
+              <td style={{ color: 'var(--text-3)' }}>
                 {row.equivalents != null ? row.equivalents.toFixed(2) : '—'}
               </td>
             </tr>
@@ -312,69 +263,29 @@ export default function ExperimentProtocol({ protocol, moleculeInfo, sessionId }
 
   return (
     <div style={{ marginTop: 8 }}>
-      {/* ── Header ── */}
-      <div style={{
-        fontSize: 16, fontWeight: 700, color: 'var(--cyan)', marginBottom: 16,
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-      }}>
+      {/* Header */}
+      <div className="protocol-header">
         Протокол эксперимента
         {targetMass != null && (
-          <span style={{
-            fontSize: 12, fontWeight: 500,
-            background: 'var(--cyan)18', color: 'var(--cyan)',
-            border: '1px solid var(--cyan)40',
-            padding: '2px 10px', borderRadius: 20,
-            fontFamily: 'var(--font-mono)',
-          }}>
+          <span className="protocol-badge protocol-badge-cyan">
             {Number(targetMass).toFixed(3)} г
           </span>
         )}
         {isMulti && (
-          <span style={{
-            fontSize: 11, fontWeight: 500,
-            background: 'var(--green)18', color: 'var(--green)',
-            border: '1px solid var(--green)40',
-            padding: '2px 10px', borderRadius: 20,
-            fontFamily: 'var(--font-mono)',
-          }}>
+          <span className="protocol-badge protocol-badge-green">
             {sections.length} стадии
           </span>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div className="protocol-actions">
           {sessionId && (
-            <button
-              onClick={handleDownloadJournal}
-              title="Скачать журнал агента (Markdown)"
-              style={{
-                padding: '6px 14px', fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-                background: 'var(--bg-2)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--r-sm)',
-                color: 'var(--text-3)',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}
-            >
+            <button onClick={handleDownloadJournal} title="Скачать журнал агента (Markdown)" className="action-btn-secondary">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 2h7l3 3v9H3z" /><path d="M10 2v3h3" /><path d="M6 7h4M6 10h4M6 13h2" />
               </svg>
               Журнал агента
             </button>
           )}
-          <button
-            onClick={handleDownloadPdf}
-            style={{
-              padding: '6px 14px', fontSize: 12,
-              fontFamily: 'var(--font-mono)',
-              background: 'var(--bg-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--r-sm)',
-              color: 'var(--text-2)',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
+          <button onClick={handleDownloadPdf} className="action-btn-secondary" style={{ color: 'var(--text-2)' }}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 2v9M4 7l4 4 4-4M2 14h12" />
             </svg>
@@ -383,69 +294,37 @@ export default function ExperimentProtocol({ protocol, moleculeInfo, sessionId }
         </div>
       </div>
 
-      {/* ── Summary reagent table (only for multi-step) ── */}
-      {isMulti && reagentTable.length > 0 && (
+      {/* Summary reagent table */}
+      {reagentTable.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div className="section-title">Сводная таблица реагентов</div>
           <ReagentTable rows={reagentTable} />
         </div>
       )}
 
-      {/* Single-step: summary at top */}
-      {!isMulti && reagentTable.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <div className="section-title">Сводная таблица реагентов</div>
-          <ReagentTable rows={reagentTable} />
-        </div>
-      )}
-
-      {/* ── Reaction sections ── */}
+      {/* Reaction sections */}
       {sections.map((section, si) => (
-        <div key={si} style={{
-          marginBottom: 20,
-          background: 'var(--bg-2)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--r-md)',
-          overflow: 'hidden',
-        }}>
-          {/* Section header */}
-          <div style={{
-            padding: '10px 14px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          }}>
-            <span style={{
-              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-              padding: '2px 8px', borderRadius: 4,
-              background: 'var(--cyan)18', color: 'var(--cyan)',
-              border: '1px solid var(--cyan)40',
-            }}>
+        <div key={si} className="protocol-section">
+          <div className="protocol-section-header">
+            <span className="step-badge">
               {isMulti ? `Стадия ${section.step_number ?? si + 1}` : `Шаг ${section.step_number ?? si + 1}`}
             </span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
+            <span className="step-product-name">
               {section.product_name || `Реакция ${si + 1}`}
             </span>
             {section.product_mass_g != null && (
-              <span style={{
-                marginLeft: 'auto', fontSize: 11,
-                fontFamily: 'var(--font-mono)', color: 'var(--green)',
-                background: 'var(--green)12', border: '1px solid var(--green)30',
-                padding: '1px 8px', borderRadius: 10,
-              }}>
+              <span className="step-mass-badge">
                 {Number(section.product_mass_g).toFixed(3)} г
               </span>
             )}
           </div>
 
-          <div style={{ padding: '12px 14px' }}>
-
-            {/* Reaction formula */}
+          <div className="protocol-section-body">
             <ReactionFormula
               reactionSmiles={section.reaction_smiles}
               reagentTable={section.reagent_table}
             />
 
-            {/* Reagent table for this step */}
             {section.reagent_table?.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 <div className="section-title">Реагенты этого шага</div>
@@ -453,32 +332,18 @@ export default function ExperimentProtocol({ protocol, moleculeInfo, sessionId }
               </div>
             )}
 
-            {/* Procedure steps */}
             {section.procedure_steps?.length > 0 && (
               <div>
                 <div className="section-title">Процедура</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="procedure-list">
                   {section.procedure_steps.map((step, pi) => (
-                    <div key={pi} style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      borderLeft: '3px solid var(--cyan-dim)',
-                      borderRadius: '0 var(--r-sm) var(--r-sm) 0',
-                      padding: '8px 12px',
-                    }}>
-                      <div style={{
-                        fontSize: 10, color: 'var(--cyan)', fontFamily: 'var(--font-mono)',
-                        marginBottom: 3, fontWeight: 600,
-                      }}>
-                        {pi + 1}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--text-1)', lineHeight: 1.55 }}>
+                    <div key={pi} className="procedure-step">
+                      <div className="procedure-step-num">{pi + 1}</div>
+                      <div className="procedure-step-text">
                         {typeof step === 'string' ? step : (step.description || JSON.stringify(step))}
                       </div>
                       {typeof step === 'object' && step.reason && step.reason !== 'inferred' && step.reason !== 'ORD процедура' && (
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, fontStyle: 'italic' }}>
-                          {step.reason}
-                        </div>
+                        <div className="procedure-step-reason">{step.reason}</div>
                       )}
                     </div>
                   ))}
@@ -491,15 +356,7 @@ export default function ExperimentProtocol({ protocol, moleculeInfo, sessionId }
 
       {/* Warnings */}
       {protocol.calculations?.warnings?.length > 0 && (
-        <div style={{
-          padding: '10px 14px',
-          background: 'var(--amber)12',
-          border: '1px solid var(--amber)40',
-          borderRadius: 'var(--r-md)',
-          fontSize: 12,
-          color: 'var(--amber)',
-          fontFamily: 'var(--font-mono)',
-        }}>
+        <div className="warning-block">
           {protocol.calculations.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
         </div>
       )}
