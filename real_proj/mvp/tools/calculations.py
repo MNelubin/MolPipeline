@@ -111,7 +111,13 @@ def stoichiometry_calc(request: StoichiometryRequest) -> CalculationResult:
     target_mw = get_average_molecular_weight(target_smiles)
     target_moles = request.target_mass_g / target_mw
 
-    canonical_reactants = [canonicalize(s) for s in reactant_list]
+    canonical_reactants = []
+    for s in reactant_list:
+        c = canonicalize(s)
+        if not validate_smiles(c):
+            warnings.append(f"Невалидный SMILES реагента пропущен: {s}")
+            continue
+        canonical_reactants.append(c)
     coeff_map: dict[str, int] = dict(Counter(canonical_reactants))
 
     canonical_products_all = [canonicalize(s) for s in product_list]
