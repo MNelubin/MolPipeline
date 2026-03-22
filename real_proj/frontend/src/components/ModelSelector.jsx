@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 
 const FALLBACK = [
+  { id: 'openai/gpt-5.4-nano',         name: 'GPT-5.4 Nano',      provider: 'OpenAI' },
   { id: 'openai/gpt-4o',               name: 'GPT-4o',            provider: 'OpenAI' },
   { id: 'openai/gpt-4o-mini',          name: 'GPT-4o Mini',       provider: 'OpenAI' },
   { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+  { id: 'anthropic/claude-3-haiku',    name: 'Claude 3 Haiku',    provider: 'Anthropic' },
   { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash',  provider: 'Google' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral Small 3.1', provider: 'Mistral' },
 ]
 
 export default function ModelSelector({ value, onChange, disabled }) {

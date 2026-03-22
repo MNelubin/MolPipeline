@@ -186,7 +186,7 @@ export default function App() {
               )}
 
               {/* Phase: card_ready — molecule card + confirm button */}
-              {!isRunning && (phase === 'card_ready' || phase === 'select_pathway' || phase === 'completed') && moleculeInfo && (
+              {!isRunning && moleculeInfo && (
                 <div style={{ marginBottom: 16 }}>
                   <MoleculeCard
                     moleculeInfo={moleculeInfo}
