@@ -48,7 +48,7 @@ export function useInteractivePipeline() {
       const res = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, mode: 'interactive' }),
+        body: JSON.stringify({ query, mode: 'interactive', model }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
       const data = await res.json()

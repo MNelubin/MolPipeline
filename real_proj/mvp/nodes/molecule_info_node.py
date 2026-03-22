@@ -72,9 +72,9 @@ _MOLECULE_CARD_PROMPT = PromptTemplate.from_template("""
 """)
 
 
-def _get_llm() -> ChatOpenAI:
+def _get_llm(model: str | None = None) -> ChatOpenAI:
     return ChatOpenAI(
-        model=LLM_MODEL,
+        model=model or LLM_MODEL,
         temperature=LLM_TEMPERATURE,
         api_key=OPENROUTER_API_KEY,
         base_url=OPENROUTER_BASE_URL,
@@ -161,7 +161,7 @@ def molecule_info_node(state: dict[str, Any]) -> dict[str, Any]:
     ghs_enriched = enrich_ghs_pictograms(ghs_codes)
 
     # 8. LLM synthesis
-    llm = _get_llm()
+    llm = _get_llm(state.get("llm_model"))
     prompt_value = _MOLECULE_CARD_PROMPT.format(
         query=query,
         pubchem_data=json.dumps(pubchem_result, ensure_ascii=False),

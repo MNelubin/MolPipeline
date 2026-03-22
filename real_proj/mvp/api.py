@@ -84,6 +84,10 @@ class AnalyzeRequest(BaseModel):
         default="auto",
         description="'auto' runs end-to-end with defaults; 'interactive' pauses at interrupts",
     )
+    model: str | None = Field(
+        default=None,
+        description="LLM model override (e.g. 'openai/gpt-4o'). If omitted, uses server default.",
+    )
 
 
 class AnalyzeResponse(BaseModel):
@@ -218,12 +222,15 @@ def _sanitize(obj: Any) -> Any:
     return str(obj)
 
 
-def _run_auto(query: str) -> dict[str, Any]:
+def _run_auto(query: str, model: str | None = None) -> dict[str, Any]:
     """Run graph end-to-end in auto mode: auto-resume all interrupts."""
     thread_id = f"auto-{uuid.uuid4().hex[:12]}"
     config = {"configurable": {"thread_id": thread_id}}
 
-    _graph.invoke({"query": query}, config=config)
+    initial_state: dict[str, Any] = {"query": query}
+    if model:
+        initial_state["llm_model"] = model
+    _graph.invoke(initial_state, config=config)
     state = _get_state(config)
 
     if state.get("error") or not state.get("molecule_info"):
@@ -260,7 +267,7 @@ def _run_auto(query: str) -> dict[str, Any]:
     return _get_state(config)
 
 
-def _run_interactive_start(query: str, thread_id: str) -> dict[str, Any]:
+def _run_interactive_start(query: str, thread_id: str, model: str | None = None) -> dict[str, Any]:
     """Start an interactive session — runs until first interrupt."""
     from .journal import AgentJournal
     # Wipe any old journal for this thread so it starts fresh
@@ -270,7 +277,10 @@ def _run_interactive_start(query: str, thread_id: str) -> dict[str, Any]:
     AgentJournal.close_session(thread_id)
 
     config = {"configurable": {"thread_id": thread_id}}
-    _graph.invoke({"query": query, "session_id": thread_id}, config=config)
+    initial_state: dict[str, Any] = {"query": query, "session_id": thread_id}
+    if model:
+        initial_state["llm_model"] = model
+    _graph.invoke(initial_state, config=config)
     return _get_state(config)
 
 
@@ -374,7 +384,9 @@ async def analyze(req: AnalyzeRequest):
 
     try:
         if req.mode == "auto":
-            state = await loop.run_in_executor(_executor, _run_auto, query)
+            state = await loop.run_in_executor(
+                _executor, _run_auto, query, req.model,
+            )
             output = _make_output(state)
             status = _derive_status(state)
             return AnalyzeResponse(
@@ -388,7 +400,7 @@ async def analyze(req: AnalyzeRequest):
         else:
             thread_id = f"session-{uuid.uuid4().hex[:12]}"
             state = await loop.run_in_executor(
-                _executor, _run_interactive_start, query, thread_id,
+                _executor, _run_interactive_start, query, thread_id, req.model,
             )
             output = _make_output(state)
             status = _derive_status(state)

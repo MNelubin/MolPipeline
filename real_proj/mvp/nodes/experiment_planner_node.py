@@ -74,14 +74,14 @@ def _build_llm_prompt(sections: list[dict], mol_name: str) -> str:
     return "\n".join(lines)
 
 
-def _llm_enrich_procedures(sections: list[dict], mol_name: str) -> list[dict]:
+def _llm_enrich_procedures(sections: list[dict], mol_name: str, model: str | None = None) -> list[dict]:
     """Call LLM once for all sections, replace generic procedures with specific ones."""
     try:
         from langchain_openai import ChatOpenAI
         from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL
 
         llm = ChatOpenAI(
-            model=LLM_MODEL,
+            model=model or LLM_MODEL,
             temperature=0.2,
             api_key=OPENROUTER_API_KEY,
             base_url=OPENROUTER_BASE_URL,
@@ -158,7 +158,7 @@ def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
         )
         if needs_enrichment and sections:
             logger.info("[experiment_planner] all procedures are generic → calling LLM")
-            sections = _llm_enrich_procedures(sections, mol_name)
+            sections = _llm_enrich_procedures(sections, mol_name, model=state.get("llm_model"))
             protocol["reaction_sections"] = sections
 
         total_steps = sum(len(s.get("procedure_steps", [])) for s in sections)

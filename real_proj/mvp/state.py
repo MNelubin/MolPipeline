@@ -117,3 +117,6 @@ class MVPState(TypedDict, total=False):
 
     # ── Journal ──
     session_id: str
+
+    # ── Model override ──
+    llm_model: str | None
