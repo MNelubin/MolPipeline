@@ -557,3 +557,74 @@ async def journal_jsonl(session_id: str):
         media_type="application/x-ndjson",
         filename=f"journal_{safe_id}.jsonl",
     )
+
+
+# ── Test runner ───────────────────────────────────────────────────────────────
+
+@app.post("/tests/run")
+async def run_tests():
+    """Run the full pytest suite and return structured results."""
+    import re
+    import subprocess
+    import time
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+
+    def _run():
+        start = time.time()
+        result = subprocess.run(
+            ["python", "-m", "pytest", "real_proj/mvp/tests/", "-v", "--tb=short", "--no-header", "-q"],
+            capture_output=True,
+            text=True,
+            cwd="/opt/projects/chemist-agent",
+        )
+        elapsed = round(time.time() - start, 2)
+        stdout = result.stdout + result.stderr
+
+        # Parse individual test lines: "tests/foo.py::TestClass::test_name PASSED"
+        tests = []
+        for line in stdout.splitlines():
+            m = re.match(r"^(.*::\S+)\s+(PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)", line)
+            if m:
+                raw_name = m.group(1).strip()
+                status = m.group(2)
+                # Shorten path: keep only after last "tests/"
+                short = re.sub(r"^.*tests/", "", raw_name)
+                tests.append({"name": short, "status": status})
+
+        # Summary line: "5 failed, 184 passed in 5.07s"
+        counts = {"passed": 0, "failed": 0, "error": 0, "skipped": 0}
+        m_sum = re.search(r"(\d+) passed", stdout)
+        if m_sum:
+            counts["passed"] = int(m_sum.group(1))
+        m_sum = re.search(r"(\d+) failed", stdout)
+        if m_sum:
+            counts["failed"] = int(m_sum.group(1))
+        m_sum = re.search(r"(\d+) error", stdout)
+        if m_sum:
+            counts["error"] = int(m_sum.group(1))
+        m_sum = re.search(r"(\d+) skipped", stdout)
+        if m_sum:
+            counts["skipped"] = int(m_sum.group(1))
+
+        # If parsing found no tests, derive from counts
+        if not tests and counts["passed"] + counts["failed"] > 0:
+            counts_total = counts["passed"] + counts["failed"] + counts["error"] + counts["skipped"]
+        else:
+            counts_total = len(tests)
+
+        return {
+            "passed": counts["passed"],
+            "failed": counts["failed"],
+            "error": counts["error"],
+            "skipped": counts["skipped"],
+            "total": counts_total or len(tests),
+            "duration_sec": elapsed,
+            "returncode": result.returncode,
+            "tests": tests,
+            "output": stdout[-8000:],  # last 8k chars
+        }
+
+    result = await loop.run_in_executor(_executor, _run)
+    return result
