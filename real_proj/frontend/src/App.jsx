@@ -38,9 +38,14 @@ export default function App() {
   const [page, setPage] = useState('chat')
   const [input, setInput] = useState('')
   const [model, setModel] = useState('openai/gpt-4o')
-  const [history, setHistory] = useState([])
+  const [history, setHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('mol_sessions_index') || '[]')
+    } catch { return [] }
+  })
 
   const textareaRef = useRef(null)
+  const currentQueryRef = useRef('')
 
   const {
     status,
@@ -52,9 +57,34 @@ export default function App() {
     confirmSynthesis,
     selectPathway,
     reset,
+    restore,
   } = useInteractivePipeline()
 
   const isRunning = status === 'running'
+
+  // Save session to localStorage whenever pipeline state updates
+  useEffect(() => {
+    if (!pipelineState || !threadId) return
+    const query = currentQueryRef.current || pipelineState?.query || ''
+    if (!query) return
+    try {
+      const sessionData = { pipelineState, phase, threadId, error, query, model, ts: Date.now() }
+      localStorage.setItem('mol_session_' + threadId, JSON.stringify(sessionData))
+      setHistory(prev => {
+        const entry = { query, threadId, ts: Date.now() }
+        const next = [entry, ...prev.filter(h => h.threadId !== threadId)].slice(0, 20)
+        localStorage.setItem('mol_sessions_index', JSON.stringify(next))
+        return next
+      })
+    } catch { /* localStorage full — ignore */ }
+  }, [pipelineState, phase, threadId, error, model])
+
+  const restoreSession = useCallback((entry) => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mol_session_' + entry.threadId))
+      if (saved) restore(saved)
+    } catch { /* corrupt data — ignore */ }
+  }, [restore])
 
   const handleSubmit = useCallback(async () => {
     const query = input.trim()
@@ -62,7 +92,7 @@ export default function App() {
 
     setInput('')
     textareaRef.current?.focus()
-    setHistory(prev => [query, ...prev.filter(h => h !== query)].slice(0, 20))
+    currentQueryRef.current = query
 
     await startAnalysis(query, model)
   }, [input, isRunning, model, startAnalysis])
@@ -105,8 +135,8 @@ export default function App() {
               {history.length === 0 ? (
                 <div className="sidebar-empty">Нет запросов</div>
               ) : (
-                history.map((q, i) => (
-                  <div key={i} className="history-item" onClick={() => setInput(q)} title={q}>{q}</div>
+                history.map((entry, i) => (
+                  <div key={entry.threadId || i} className="history-item" onClick={() => restoreSession(entry)} title={entry.query}>{entry.query}</div>
                 ))
               )}
             </div>

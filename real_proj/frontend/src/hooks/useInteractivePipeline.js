@@ -19,6 +19,15 @@ export function useInteractivePipeline() {
     threadIdRef.current = null
   }, [])
 
+  const restore = useCallback((saved) => {
+    setPipelineState(saved.pipelineState)
+    setPhase(saved.phase)
+    setThreadId(saved.threadId)
+    threadIdRef.current = saved.threadId
+    setError(saved.error || null)
+    setStatus(saved.phase === 'completed' ? 'done' : saved.error ? 'error' : 'paused')
+  }, [])
+
   const _applyResponse = useCallback((data) => {
     setPipelineState(data.state)
     setPhase(data.phase)
@@ -98,5 +107,6 @@ export function useInteractivePipeline() {
     confirmSynthesis,
     selectPathway,
     reset,
+    restore,
   }
 }
