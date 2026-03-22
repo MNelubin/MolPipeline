@@ -26,9 +26,11 @@ function TreeNode({ node, defaultOpen = true }) {
   const cfg = STATUS_CONFIG[node.status] || STATUS_CONFIG.unresolved
   const hasChildren = node.children?.length > 0
 
-  const img2dUrl = node.smiles
-    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(node.smiles)}/PNG?image_size=200x150`
-    : null
+  const img2dUrl = node.pubchem_cid > 0
+    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${node.pubchem_cid}/PNG?image_size=200x150`
+    : node.smiles
+      ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(node.smiles)}/PNG?image_size=200x150`
+      : null
 
   return (
     <div style={{ marginLeft: node.depth > 0 ? 24 : 0, position: 'relative' }}>

@@ -40,10 +40,12 @@ export default function MoleculeCard({ moleculeInfo, guardResult, retroResult })
     })
   }
 
-  // 2D — напрямую через PubChem
-  const img2dUrl = m.smiles
-    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(m.smiles)}/PNG`
-    : null
+  // 2D — prefer CID (stable URL), fall back to SMILES
+  const img2dUrl = m.pubchem_cid > 0
+    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${m.pubchem_cid}/PNG`
+    : m.smiles
+      ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(m.smiles)}/PNG`
+      : null
 
   return (
     <div className="molecule-card">

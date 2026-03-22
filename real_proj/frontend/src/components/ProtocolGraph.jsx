@@ -27,9 +27,11 @@ const SC = {
 
 function MolNode({ data, selected }) {
   const cfg = SC[data.status] || SC.intermediate
-  const imgUrl = data.smiles
-    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(data.smiles)}/PNG?image_size=160x100`
-    : null
+  const imgUrl = data.pubchem_cid > 0
+    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${data.pubchem_cid}/PNG?image_size=160x100`
+    : data.smiles
+      ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(data.smiles)}/PNG?image_size=160x100`
+      : null
 
   return (
     <div
@@ -205,9 +207,11 @@ function buildGraph(sections) {
 function NodeDetail({ nodeData, onClose }) {
   if (!nodeData) return null
   const cfg = SC[nodeData.status] || SC.intermediate
-  const imgUrl = nodeData.smiles
-    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(nodeData.smiles)}/PNG?image_size=300x180`
-    : null
+  const imgUrl = nodeData.pubchem_cid > 0
+    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${nodeData.pubchem_cid}/PNG?image_size=300x180`
+    : nodeData.smiles
+      ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(nodeData.smiles)}/PNG?image_size=300x180`
+      : null
 
   return (
     <div className="graph-detail-panel" style={{ borderColor: cfg.color + '40' }}>

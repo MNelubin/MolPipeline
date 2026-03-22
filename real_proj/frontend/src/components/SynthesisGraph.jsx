@@ -154,9 +154,11 @@ function DetailPanel({ node, onClose }) {
   const route = d.route || {}
   const guard = d.guard || {}
 
-  const img2dUrl = d.smiles
-    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(d.smiles)}/PNG?image_size=280x180`
-    : null
+  const img2dUrl = d.pubchem_cid > 0
+    ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${d.pubchem_cid}/PNG?image_size=280x180`
+    : d.smiles
+      ? `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(d.smiles)}/PNG?image_size=280x180`
+      : null
 
   return (
     <div className="synth-detail-panel" style={{ borderLeft: `2px solid ${cfg.color}40` }}>
