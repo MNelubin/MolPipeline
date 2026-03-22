@@ -7,11 +7,27 @@ build/
 venv/
 .venv/
 .env
-data/raw/
-data/vectordb/
-data/processed/
 *.db
+*.7z
 .claude/
 node_modules/
-*.7z
 ARCHITECTURE.md
+CODE_REVIEW.md
+TEST_REPORT.md
+logs/
+
+# Старый код — только real_proj/ актуален
+/app/
+/src/
+/tests/
+/proj_v2/
+/data/
+/scripts/
+/langgraph.json
+/pytest.ini
+/requirements.txt
+
+# Данные внутри real_proj
+real_proj/mvp/data/
+real_proj/src/
+real_proj/public/

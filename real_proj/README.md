@@ -1,6 +1,6 @@
 # MolPipeline — ИИ-агент для ретросинтеза и планирования эксперимента
 
-> **Хакатон-проект** — мультиагентный пайплайн на LangGraph, который принимает целевую молекулу и выдаёт полный пошаговый протокол синтеза, подкреплённый реальными химическими базами данных.
+> Мультиагентный пайплайн на LangGraph, который принимает целевую молекулу и выдаёт полный пошаговый протокол синтеза, подкреплённый реальными химическими базами данных.
 
 **Демо:** `https://hack.humaneconomy.ru`
 
@@ -95,11 +95,13 @@ guard_safety_node   reagent_node     ← параллельный fan-out
 |---|---|
 | Граф агентов | LangGraph `StateGraph` с `MemorySaver` checkpointer |
 | LLM | OpenRouter API (GPT-4o и другие модели) |
-| Ретросинтез (БД) | Open Reaction Database (ORD) — SQLite, 1M+ реакций |
+| Ретросинтез (БД) | Open Reaction Database (ORD) — SQLite, 2.3M реакций |
 | Ретросинтез (веб) | PubMed + DuckDuckGo + LLM-экстракция маршрутов |
-| Ретросинтез (ML) | ASKCOS Molecular Transformer |
+| Ретросинтез (ML) | Template-relevance нейромодель (163K шаблонов, ~192 MB) |
+| RAG | SPECTER2 эмбеддинги + ChromaDB + BM25 гибридный поиск |
 | Валидация молекул | RDKit + PubChem REST API |
 | Безопасность | Банлист (ФСКН, КХО, двойного назначения) + PubChem GHS |
+| Покупаемость | БД buyables (690K+ молекул от eMolecules, Mcule, ChemBridge, ChemSpace) |
 | Backend API | FastAPI + SSE-стриминг |
 | Frontend | React 18 + Vite, ReactFlow визуализация графов |
 | Стехиометрия | Калькулятор масс/объёмов с PubChem-данными о плотности |
@@ -110,7 +112,6 @@ guard_safety_node   reagent_node     ← параллельный fan-out
 ## Структура проекта
 
 ```
-real_proj/
 ├── mvp/                              # Основной бэкенд
 │   ├── api.py                        # FastAPI приложение (SSE, прерывания)
 │   ├── graph.py                      # LangGraph StateGraph — определение графа
@@ -137,10 +138,10 @@ real_proj/
 │   │   ├── calculations.py           #   Стехиометрический калькулятор
 │   │   ├── rdkit_tools.py            #   RDKit: свойства, SMILES, парсинг реакций
 │   │   ├── pubchem.py                #   PubChem API: плотность, имена, CID
-│   │   ├── retro_tools.py            #   ORD + веб-поиск + скоринг
+│   │   ├── retro_tools.py            #   ORD + веб-поиск + скоринг + покупаемость
 │   │   ├── safety.py                 #   Проверка безопасности
 │   │   ├── research.py               #   Поиск информации
-│   │   └── rag_search.py             #   RAG-поиск
+│   │   └── rag_search.py             #   RAG-поиск по научной литературе
 │   ├── models/                       # Pydantic-модели
 │   │   ├── calculations.py           #   StoichiometryRequest, CalculationResult
 │   │   ├── validation.py             #   ValidationResult
@@ -149,20 +150,13 @@ real_proj/
 │   │   ├── research_llm.py           #   LLM-исследование
 │   │   ├── web_search.py             #   DuckDuckGo + PubMed
 │   │   └── web_scraper.py            #   Парсинг веб-страниц
-│   ├── rag/                          # RAG-система
-│   │   ├── bm25.py                   #   BM25-ранжирование
-│   │   ├── embeddings.py             #   Эмбеддинги
-│   │   ├── retriever.py              #   Ретривер
-│   │   └── models.py                 #   Модели RAG
-│   └── tests/                        # Тесты (284 юнит-теста)
-│       ├── test_classify_node.py
-│       ├── test_validate_and_guard_node.py
-│       ├── test_molecule_info_node.py
-│       ├── test_retrosynthesis_node.py
-│       ├── test_stoichiometry_node.py
-│       ├── test_tree_expansion.py
-│       ├── test_graph.py
-│       └── ...
+│   ├── rag/                          # RAG-система (Retrieval-Augmented Generation)
+│   │   ├── retriever.py              #   Гибридный ретривер (SPECTER2 + BM25)
+│   │   ├── embeddings.py             #   Эмбеддинги научных текстов (SPECTER2)
+│   │   ├── bm25.py                   #   BM25Okapi ранжирование
+│   │   ├── tracking.py               #   Трекинг проиндексированных документов
+│   │   └── models.py                 #   Модели: DocumentSource, LiteratureDocument
+│   └── tests/                        # Юнит-тесты (284 шт.)
 ├── backend/                          # Вспомогательный бэкенд
 │   ├── main.py                       # FastAPI: 2D/3D молекул, калькулятор
 │   └── calculator_combined.py        # Стехиометрический калькулятор (standalone)
@@ -170,23 +164,21 @@ real_proj/
     ├── index.html
     ├── package.json
     ├── vite.config.js
-    ├── public/
-    │   └── favicon.svg
     └── src/
         ├── App.jsx                   # Главный компонент + localStorage-персистенция
-        ├── main.jsx
         ├── components/
         │   ├── MoleculeCard.jsx      #   Карточка молекулы (вкладки)
         │   ├── RetroCard.jsx         #   Маршруты синтеза
         │   ├── SynthesisGraph.jsx    #   ReactFlow-визуализация дерева
         │   ├── SynthesisTree.jsx     #   Раскрывающееся дерево
         │   ├── ExperimentProtocol.jsx #  Протокол эксперимента
-        │   ├── ProtocolGraph.jsx     #   Визуализация протокола
         │   ├── CalculatorCard.jsx    #   Стехиометрический калькулятор
         │   ├── PathwaySelector.jsx   #   Выбор маршрута синтеза
         │   ├── ModelSelector.jsx     #   Выбор LLM-модели
         │   ├── PipelineProgress.jsx  #   Индикатор прогресса
         │   ├── TestPage.jsx          #   Страница запуска тестов
+        │   ├── ChatMessage.jsx       #   Сообщения чата
+        │   ├── ProtocolGraph.jsx     #   Визуализация протокола
         │   └── Viewer3D.jsx          #   3D-визуализация молекулы
         ├── hooks/
         │   ├── useInteractivePipeline.js  # Хук управления пайплайном
@@ -199,51 +191,55 @@ real_proj/
 
 ## Данные
 
-Проект использует следующие данные (не включены в репозиторий):
+Все данные хранятся на сервере в директории `data/` и **не включены в репозиторий**.
 
-| Файл / директория | Описание | Как получить |
+### Базы данных
+
+| Файл | Размер | Описание |
 |---|---|---|
-| `mvp/data/banned_chemicals.json` | Банлист контролируемых веществ (150 записей). Источники: CWC Schedules, ФСКН РФ, списки двойного назначения. Уровни: critical / high / medium | Скрипт `scripts/download_banned_data.py` |
-| `mvp/data/banned_reactions.json` | Запрещённые типы реакций (19 записей). Источники: маршруты синтеза по КХО, реакции двойного назначения | Скрипт `scripts/download_banned_data.py` |
-| ORD SQLite БД | Open Reaction Database — 1M+ реакций, индексированных по продукту. Используется для поиска реальных синтезов | Скрипт `scripts/build_ord_index.py` |
+| `ord_reactions.db` | 1.8 GB | Open Reaction Database — 2.3M реакций, индексированных по продукту (SQLite). Основной источник для ретросинтеза |
+| `buyables.db` | 22 MB | База коммерчески доступных реагентов — 690K+ молекул (SQLite). Источники: eMolecules, Mcule, ChemBridge, ChemSpace |
 
-### Формат банлиста химикатов
+### Сырые данные покупаемых реагентов
 
-```json
-{
-  "_meta": {
-    "total": 150,
-    "stats": { "critical": 36, "high": 78, "medium": 36 },
-    "sources": ["CWC Schedules", "ФСКН РФ", ...]
-  },
-  "chemicals": [
-    {
-      "name": "...",
-      "smiles": "...",
-      "cas": "...",
-      "severity": "critical",
-      "category": "CWC Schedule 1",
-      "reason": "..."
-    }
-  ]
-}
-```
+| Файл | Размер | Описание |
+|---|---|---|
+| `buyables/buyables.json.gz` | 16 MB | Объединённый каталог покупаемых молекул |
+| `buyables/chemspace_buyables_dedup_id_pub.json.gz` | 11 MB | ChemSpace каталог |
+| `buyables/mcule_buyables_fd2.json.gz` | 14 MB | Mcule каталог |
+| `buyables/chembridge_buyables.json.gz` | 821 KB | ChemBridge каталог |
 
-### Формат банлиста реакций
+### Модель ретросинтеза
 
-```json
-{
-  "_meta": { "total": 19, "stats": { "critical": 9, "high": 8, "medium": 2 } },
-  "reactions": [
-    {
-      "name": "...",
-      "pattern": "...",
-      "severity": "critical",
-      "reason": "..."
-    }
-  ]
-}
-```
+| Файл | Размер | Описание |
+|---|---|---|
+| `retro_model/model_latest.pt` | 192 MB | Веса template-relevance нейромодели (извлечена из ASKCOS v2) |
+| `retro_model/templates.jsonl` | 74 MB | 163K шаблонов реакций (SMARTS) |
+| `retro_model/*.py` | ~30 KB | Код инференса модели (handler, parser, utils) |
+
+### Банлисты безопасности
+
+| Файл | Размер | Описание |
+|---|---|---|
+| `banned_chemicals.json` | 17 KB | 150 контролируемых веществ (CWC, ФСКН РФ, двойное назначение). Поля: name, SMILES, CAS, severity (critical/high/medium), SMARTS-паттерны |
+| `banned_reactions.json` | 6 KB | 19 запрещённых типов реакций (синтез ОВ, взрывчатки, наркотиков). Поля: name, SMARTS pattern, severity |
+
+### RAG-система
+
+Гибридный поиск по научной литературе (SPECTER2 + BM25):
+
+| Компонент | Описание |
+|---|---|
+| ChromaDB vectorstore | Векторные эмбеддинги научных статей (SPECTER2, 384-dim) |
+| `literature_tracking.db` | SQLite: метаданные проиндексированных документов, parent/child чанки |
+| Источники документов | PMC, BigQuery Patents, USPTO, S2ORC, ручная индексация |
+
+### Рантайм-данные (создаются автоматически)
+
+| Файл | Описание |
+|---|---|
+| `mvp/data/checkpoints.db` | LangGraph checkpoints — состояние сессий для возобновления |
+| `mvp/logs/*.jsonl` | Журнал решений агента (JSONL) |
 
 ---
 
@@ -256,7 +252,6 @@ real_proj/
 | `POST` | `/resume/{thread_id}` | Продолжение после прерывания (выбор маршрута) |
 | `POST` | `/tree/expand` | Рекурсивное дерево синтеза для маршрута |
 | `POST` | `/api/calculate` | Стехиометрический калькулятор |
-| `POST` | `/tests/run` | Запуск pytest, возвращает JSON-результаты |
 | `GET` | `/health` | Health check |
 
 ### SSE-события
@@ -298,18 +293,17 @@ pip install -r requirements.txt
 cp .env.example .env
 # Заполнить OPENROUTER_API_KEY
 
-# 3. Подготовить данные
-python scripts/download_banned_data.py
-python scripts/build_ord_index.py
+# 3. Подготовить данные (см. раздел "Данные")
+# Разместить data/ рядом с проектом
 
 # 4. Запустить API агента
-uvicorn real_proj.mvp.api:app --port 8765 --reload
+uvicorn mvp.api:app --port 8765 --reload
 
 # 5. Запустить бэкенд калькулятора / молекул
-uvicorn real_proj.backend.main:app --port 8002 --reload
+uvicorn backend.main:app --port 8002 --reload
 
 # 6. Запустить фронтенд
-cd real_proj/frontend
+cd frontend
 npm install && npm run dev
 # → http://localhost:5173
 ```
@@ -319,15 +313,15 @@ npm install && npm run dev
 ## Запуск тестов
 
 ```bash
-# Быстрые юнит-тесты (без сети, без LLM) — ~2.3 мин, 284 теста
-pytest real_proj/mvp/tests/ -m "not integration and not slow and not llm"
+# Быстрые юнит-тесты (без сети, без LLM) — 284 теста
+pytest mvp/tests/ -m "not integration and not slow and not llm"
 
-# Все тесты включая интеграционные (PubChem + ORD) — ~5 мин
-pytest real_proj/mvp/tests/
+# Все тесты включая интеграционные (PubChem + ORD)
+pytest mvp/tests/
 ```
 
 ---
 
 ## Лицензия
 
-Хакатон-проект. Все права защищены.
+Все права защищены.

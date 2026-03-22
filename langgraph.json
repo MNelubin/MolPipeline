@@ -1,7 +1,0 @@
-{
-  "dependencies": ["."],
-  "graphs": {
-    "chemist_agent": "real_proj.mvp.graph:build_graph"
-  },
-  "env": ".env"
-}
