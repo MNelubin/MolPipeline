@@ -22,20 +22,6 @@ logger = logging.getLogger(__name__)
 # LLM procedure enrichment
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _is_generic_procedure(steps: list[dict]) -> bool:
-    """Return True if all steps are fallback-inferred (no real data)."""
-    if not steps:
-        return True
-    generic_reasons = {"inferred", "Время реакции (оценка по условиям)",
-                       "Продукт — твёрдое вещество, нерастворимое в реакционной среде",
-                       "Твёрдый продукт с примесями → перекристаллизация",
-                       "Удаление растворителя", "Растворитель не указан"}
-    inferred_count = sum(
-        1 for s in steps
-        if s.get("reason", "") in generic_reasons or s.get("reason", "").startswith("Время")
-    )
-    return inferred_count >= len(steps) - 1
-
 
 def _build_llm_prompt(sections: list[dict], mol_name: str) -> str:
     lines = [
@@ -144,13 +130,9 @@ def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
 
         sections = protocol.get("reaction_sections", [])
 
-        # LLM enrichment: if all procedures are generic fallbacks, call LLM
-        needs_enrichment = all(
-            _is_generic_procedure(s.get("procedure_steps", []))
-            for s in sections
-        )
-        if needs_enrichment and sections:
-            logger.info("[experiment_planner] all procedures are generic → calling LLM")
+        # Always enrich procedures with LLM — heuristic inference is never good enough
+        if sections:
+            logger.info("[experiment_planner] enriching %d section(s) with LLM", len(sections))
             sections = _llm_enrich_procedures(sections, mol_name, model=state.get("llm_model"))
             protocol["reaction_sections"] = sections
 
@@ -160,7 +142,7 @@ def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
             f"Протокол сформирован: {len(sections)} стадий, ~{total_steps} шагов процедуры",
             {"sections_count": len(sections), "procedure_steps_total": total_steps,
              "is_multistep": protocol.get("is_multistep", False), "molecule": mol_name,
-             "llm_enriched": needs_enrichment},
+             "llm_enriched": True},
         )
 
     protocol_text = _format_protocol_text(protocol, mol_name)
