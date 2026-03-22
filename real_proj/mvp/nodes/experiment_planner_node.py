@@ -23,79 +23,71 @@ logger = logging.getLogger(__name__)
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _build_llm_prompt(sections: list[dict], mol_name: str) -> str:
-    lines = [
-        f"Ты опытный химик-синтетик. Нужно составить подробный лабораторный протокол синтеза: {mol_name}.",
-        "",
-        "Для КАЖДОЙ стадии напиши конкретные пошаговые инструкции (5-8 шагов) с учётом типа реакции.",
-        "Включи: подготовку реагентов, порядок добавления, атмосферу (N₂/Ar или воздух), температуру,",
-        "время, способ перемешивания, контроль реакции (ТСХ/GC), метод выделения продукта,",
-        "очистку (перекристаллизация/хроматография/дистилляция), выход.",
-        "",
-        "Стадии синтеза:",
-    ]
+def _build_section_prompt(sec: dict, mol_name: str) -> str:
+    step_num = sec.get("step_number", 1)
+    rxn = sec.get("reaction_smiles", "")
+    product = sec.get("product_name") or sec.get("product_smiles", "")[:60]
+    reagents = [r.get("name", r.get("smiles", "?")) for r in sec.get("reagent_table", [])]
 
-    for sec in sections:
-        step_num = sec.get("step_number", "?")
-        rxn = sec.get("reaction_smiles", "")
-        product = sec.get("product_name") or sec.get("product_smiles", "")[:40]
-        reagents = [r.get("name", r.get("smiles", "?")) for r in sec.get("reagent_table", [])]
-        lines.append(f"\nСтадия {step_num}: получение {product}")
-        lines.append(f"  Реакция SMILES: {rxn}")
-        lines.append(f"  Реагенты: {', '.join(reagents)}")
-
-    lines += [
+    return "\n".join([
+        f"Ты опытный химик-синтетик. Напиши подробный лабораторный протокол для стадии {step_num} синтеза {mol_name}.",
+        "",
+        f"Продукт: {product}",
+        f"Реакция SMILES: {rxn}",
+        f"Реагенты: {', '.join(reagents)}",
+        "",
+        "Напиши 6-8 конкретных шагов с учётом типа реакции. Включи:",
+        "- подготовку реагентов и посуды, атмосферу (N₂/Ar или воздух)",
+        "- порядок и скорость добавления реагентов, температуру и время",
+        "- контроль реакции (ТСХ/GC), метод выделения продукта",
+        "- очистку (перекристаллизация/хроматография/дистилляция), выход",
         "",
         "Верни ТОЛЬКО валидный JSON массив без пояснений:",
-        '[',
-        '  {',
-        '    "step_number": 1,',
-        '    "procedure": [',
-        '      {"step": "1", "description": "...", "reason": "..."},',
-        '      {"step": "2", "description": "...", "reason": "..."}',
-        '    ]',
-        '  }',
-        ']',
-    ]
-    return "\n".join(lines)
+        '[{"step":"1","description":"...","reason":"..."},{"step":"2","description":"...","reason":"..."}]',
+    ])
+
+
+def _parse_llm_procedure(raw: str) -> list[dict]:
+    """Strip markdown fences and parse JSON procedure list."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1] if len(parts) > 1 else raw
+        if raw.startswith("json"):
+            raw = raw[4:]
+    raw = raw.strip()
+    # Find the JSON array
+    start = raw.find("[")
+    end = raw.rfind("]")
+    if start != -1 and end != -1:
+        raw = raw[start:end + 1]
+    return json.loads(raw)
 
 
 def _llm_enrich_procedures(sections: list[dict], mol_name: str, model: str | None = None) -> list[dict]:
-    """Call LLM once for all sections, replace generic procedures with specific ones."""
-    try:
-        from ..config import make_llm
+    """Call LLM separately for each section so token limits never truncate results."""
+    from ..config import make_llm
 
-        llm = make_llm(model=model, temperature=0.2, max_tokens=4096)
+    llm = make_llm(model=model, temperature=0.2, max_tokens=2048)
+    enriched = []
 
-        prompt = _build_llm_prompt(sections, mol_name)
-        response = llm.invoke(prompt)
-        raw = response.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip()
-
-        llm_data: list[dict] = json.loads(raw)
-
-        # Patch sections
-        enriched = []
-        llm_map = {item["step_number"]: item.get("procedure", []) for item in llm_data}
-        for sec in sections:
-            sn = sec.get("step_number")
-            if sn in llm_map and llm_map[sn]:
+    for sec in sections:
+        sn = sec.get("step_number", "?")
+        try:
+            prompt = _build_section_prompt(sec, mol_name)
+            response = llm.invoke(prompt)
+            steps = _parse_llm_procedure(response.content)
+            if steps:
                 sec = dict(sec)
-                sec["procedure_steps"] = llm_map[sn]
-            enriched.append(sec)
+                sec["procedure_steps"] = steps
+                logger.info("[experiment_planner] section %s: LLM gave %d steps", sn, len(steps))
+            else:
+                logger.warning("[experiment_planner] section %s: LLM returned empty steps", sn)
+        except Exception as e:
+            logger.warning("[experiment_planner] section %s enrichment failed: %s", sn, e)
+        enriched.append(sec)
 
-        logger.info("[experiment_planner] LLM enriched %d/%d sections", len(llm_map), len(sections))
-        return enriched
-
-    except Exception as e:
-        logger.warning("[experiment_planner] LLM enrichment failed: %s", e)
-        return sections
+    return enriched
 
 
 def experiment_planner_node(state: dict[str, Any]) -> dict[str, Any]:
