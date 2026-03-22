@@ -157,7 +157,7 @@ real_proj/
 │   │   └── askcos_api.py         ← ASKCOS model client
 │   ├── services/
 │   │   └── research_llm.py       ← web + LLM research service
-│   └── tests/                    ← 342 unit tests (see TEST_REPORT.md)
+│   └── tests/                    ← 284 unit tests (see TEST_REPORT.md)
 ├── backend/
 │   └── main.py                   ← molecule viewer API (port 8002)
 └── frontend/
@@ -219,10 +219,10 @@ npm install && npm run dev
 ## Running tests
 
 ```bash
-# Fast unit tests only (no network, no LLM) — ~2.5 min, 342 tests
+# Fast unit tests only (no network, no LLM) — ~2.3 min, 284 tests
 pytest real_proj/mvp/tests/ -m "not integration and not slow and not llm"
 
-# All tests including integration (PubChem + ORD) — ~5 min, 361 tests
+# All tests including integration (PubChem + ORD) — ~5 min, 312 tests
 pytest real_proj/mvp/tests/
 
 # Via browser (live server)

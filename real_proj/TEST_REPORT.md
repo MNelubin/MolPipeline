@@ -1,8 +1,8 @@
 # Test Report — MolPipeline
 
 **Date:** 2026-03-22
-**Total:** 361 tests collected · **342 passed** (unit) · **19 passed** (integration) · **0 failed** · **0 errors**
-**Runtime:** ~2.5 min (unit only) · ~5.5 min (full suite)
+**Total:** 312 tests collected · **284 passed** (unit) · **28 passed** (integration) · **0 failed** · **0 errors**
+**Runtime:** ~2.3 min (unit only) · ~5 min (full suite)
 
 ---
 
@@ -10,8 +10,8 @@
 
 | Category | Tests | Runtime | External calls |
 |---|---|---|---|
-| Unit (default) | 342 | ~2.5 min | None — all mocked |
-| Integration | 19 | +~3 min | PubChem API, ORD SQLite |
+| Unit (default) | 284 | ~2.3 min | None — all mocked |
+| Integration | 28 | +~3 min | PubChem API, ORD SQLite |
 | Slow (`@pytest.mark.slow`) | 0 active | — | ASKCOS model load |
 | LLM (`@pytest.mark.llm`) | 0 active | — | OpenRouter API |
 
@@ -21,7 +21,7 @@ Run configuration: `pytest -m "not slow and not llm"` (see `pytest.ini`)
 
 ## Results by module
 
-### `test_graph.py` — Graph construction & routing (9 tests)
+### `test_graph.py` — Graph construction & routing (10 tests)
 
 Tests the LangGraph graph structure and conditional routing functions.
 
@@ -30,12 +30,16 @@ Tests the LangGraph graph structure and conditional routing functions.
 | `TestBuildGraph` | graph builds without error | ✓ |
 | `TestBuildGraph` | graph is compiled (has `.invoke`) | ✓ |
 | `TestBuildGraph` | graph has nodes | ✓ |
-| `TestRouting` | `found` → `molecule_info` | ✓ |
-| `TestRouting` | `banned` → `end` | ✓ |
-| `TestRouting` | `not_found` → `research_fallback` | ✓ |
-| `TestRouting` | `not_found` + cycle → `end` | ✓ |
-| `TestRouting` | empty state → `research_fallback` | ✓ |
-| `TestPipelineStateIntegrity` *(integration)* | aspirin SMILES resolves to CID 2244 | ✓ |
+| `TestAfterClassify` | molecule → `validate_and_guard` | ✓ |
+| `TestAfterClassify` | research → `research` | ✓ |
+| `TestAfterClassify` | invalid → `end` | ✓ |
+| `TestAfterClassify` | missing → `end` | ✓ |
+| `TestAfterValidate` | `found` → `molecule_info` | ✓ |
+| `TestAfterValidate` | `banned` → `end` | ✓ |
+| `TestAfterValidate` | `not_found` → `research_fallback` | ✓ |
+| `TestAfterValidate` | `not_found` + cycle → `end` | ✓ |
+| `TestAfterValidate` | empty state → `research_fallback` | ✓ |
+| `TestPipelineStateIntegrity` *(integration)* | aspirin SMILES resolves to found | ✓ |
 
 ---
 
@@ -58,23 +62,6 @@ Pure heuristic classifier — no mocking needed, no network calls.
 
 ---
 
-### `test_validate_node.py` — SMILES validation & name resolution (22 tests)
-
-| Class | Tests | What is verified |
-|---|---|---|
-| `TestDetectInputType` | 11 | Input type detection across SMILES patterns and names |
-| `TestValidateSmiles` | 7 | RDKit validation, canonicalization, formula/weight extraction |
-| `TestValidateName` | 2 | PubChem lookup with mocked LLM, invalid SMILES from PubChem |
-| `TestTranslateNameViaLlm` | 6 | No API key → None; Cyrillic rejection; quote stripping; exception handling |
-| `TestValidateNode` | 5 | Empty/whitespace/invalid inputs; state key completeness |
-
-**Key invariants tested:**
-- Cyrillic in LLM response → rejected, not passed to PubChem
-- SMILES canonicalization via RDKit before any downstream use
-- `validation` dict always contains `is_valid`, `canonical_smiles`, `pubchem_cid`
-
----
-
 ### `test_validate_and_guard_node.py` — Combined validate + guard (29 tests)
 
 | Class | Tests | What is verified |
@@ -87,16 +74,6 @@ Pure heuristic classifier — no mocking needed, no network calls.
 - `banned` overrides `restricted` in status merge
 - CRITICAL_STOP → `resolve_status = "banned"` + `error` key set
 - WARNING → proceeds to `molecule_info` (not blocked)
-
----
-
-### `test_guard_node.py` — Banlist & safety check (13 tests)
-
-| Class | Tests | What is verified |
-|---|---|---|
-| `TestDetermineOverallStatus` | 6 | All combinations of mol/rxn statuses |
-| `TestBanlistCheck` | 4 | Aspirin/ethanol clear; fentanyl banned with reason |
-| *(additional)* | 3 | `restricted_overridden_by_banned`, ban reason text present |
 
 ---
 
