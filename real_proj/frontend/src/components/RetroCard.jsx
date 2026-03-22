@@ -17,9 +17,6 @@
  */
 
 import { useState } from 'react'
-import SynthesisGraph from './SynthesisGraph'
-
-const API_BASE = import.meta.env.VITE_API_URL || 'https://hack.humaneconomy.ru'
 
 const SOURCE_LABEL = {
   ord:          { text: 'ORD',   color: 'var(--green)' },
@@ -39,12 +36,8 @@ function ScoreBar({ value, max = 1 }) {
   )
 }
 
-function RouteCard({ route, index, smiles }) {
+function RouteCard({ route, index }) {
   const [open, setOpen] = useState(index === 0)
-  const [tree, setTree] = useState(null)
-  const [treeLoading, setTreeLoading] = useState(false)
-  const [treeError, setTreeError] = useState(null)
-  const [graphOpen, setGraphOpen] = useState(false)
   const src = SOURCE_LABEL[route.source] || { text: route.source?.toUpperCase(), color: 'var(--text-3)' }
   const scoring = route.scoring || {}
   const steps = route.procedure_steps_ru || []
@@ -175,77 +168,13 @@ function RouteCard({ route, index, smiles }) {
             <div className="ord-id-text">ORD ID: {route.reaction_id}</div>
           )}
 
-          {/* Tree expand button */}
-          {smiles && route.reactants && (
-            <div style={{ marginTop: 14 }}>
-              {!tree && !treeLoading && (
-                <button
-                  className="tree-btn"
-                  onClick={async () => {
-                    setTreeLoading(true)
-                    setTreeError(null)
-                    try {
-                      const res = await fetch(`${API_BASE}/tree/expand`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          smiles,
-                          reactants: route.reactants,
-                          max_depth: 20,
-                          timeout_sec: 120,
-                        }),
-                      })
-                      if (!res.ok) {
-                        const err = await res.text()
-                        throw new Error(`HTTP ${res.status}: ${err}`)
-                      }
-                      const data = await res.json()
-                      setTree(data)
-                    } catch (e) {
-                      setTreeError(e.message)
-                    } finally {
-                      setTreeLoading(false)
-                    }
-                  }}
-                >
-                  ⬡ Построить дерево синтеза
-                </button>
-              )}
-
-              {treeLoading && (
-                <div className="tree-loading">
-                  <div className="spinner" style={{ width: 14, height: 14 }} />
-                  Строим дерево синтеза...
-                </div>
-              )}
-
-              {treeError && (
-                <div className="tree-error">Ошибка: {treeError}</div>
-              )}
-
-              {tree && (
-                <>
-                  <button className="tree-btn" style={{ marginTop: 10 }} onClick={() => setGraphOpen(true)}>
-                    ⬡ Открыть граф синтеза ({tree.stats?.total_nodes} узлов)
-                  </button>
-                  {graphOpen && (
-                    <SynthesisGraph
-                      tree={tree.tree}
-                      stats={tree.stats}
-                      onClose={() => setGraphOpen(false)}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
   )
 }
 
-export default function RetroCard({ retroResult, smiles }) {
+export default function RetroCard({ retroResult }) {
   if (!retroResult) {
     return <div className="retro-empty">Данные ретросинтеза недоступны</div>
   }
@@ -279,7 +208,7 @@ export default function RetroCard({ retroResult, smiles }) {
         <div className="retro-empty">Маршруты синтеза не найдены</div>
       ) : (
         routes.map((route, i) => (
-          <RouteCard key={i} route={route} index={i} smiles={smiles} />
+          <RouteCard key={i} route={route} index={i} />
         ))
       )}
     </div>
