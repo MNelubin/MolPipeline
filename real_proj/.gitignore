@@ -1,4 +1,4 @@
-__pycache__/
+﻿__pycache__/
 *.py[cod]
 *.egg-info/
 dist/
@@ -14,6 +14,5 @@ node_modules/
 ARCHITECTURE.md
 CODE_REVIEW.md
 logs/
-src/
-mvp/data/
-public/
+/src/
+/public/

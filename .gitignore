@@ -1,3 +1,4 @@
+﻿# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -8,26 +9,25 @@ venv/
 .venv/
 .env
 *.db
-*.7z
-.claude/
-node_modules/
-ARCHITECTURE.md
-CODE_REVIEW.md
-TEST_REPORT.md
-logs/
+*.pt
 
-# Старый код — только real_proj/ актуален
-/app/
-/src/
-/tests/
-/proj_v2/
-/data/
-/scripts/
+# Frontend
+node_modules/
+real_proj/frontend/dist/
+
+# Data - гигантские файлы (GitHub не пропустит >100MB)
+data/retro_model/templates.jsonl
+
+# Logs
+real_proj/logs/
+*.log
+
+# Корневой мусор (старый код)
 /langgraph.json
 /pytest.ini
 /requirements.txt
+/.claude/
 
-# Данные внутри real_proj
-real_proj/mvp/data/
+# Внутри real_proj
 real_proj/src/
 real_proj/public/
