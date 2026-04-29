@@ -32,3 +32,6 @@ logs/
 real_proj/
 src/
 public/
+
+# Локальные planning notes
+CHEMCROW2_INTEGRATION_PRIORITIES.md
