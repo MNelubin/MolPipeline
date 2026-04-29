@@ -60,7 +60,7 @@ export default function TestPage() {
 
       {running && (
         <div style={{ color: '#94a3b8', marginBottom: 16 }}>
-          Running <code>pytest real_proj/mvp/tests/ -v</code> on server...
+          Running <code>pytest mvp/tests/ -v</code> on server...
         </div>
       )}
 
