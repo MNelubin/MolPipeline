@@ -13,6 +13,12 @@ from typing import Any
 
 from ..config import (
     AIZYNTH_BASE_URL,
+    AIZYNTH_EXPANSION_MODEL,
+    AIZYNTH_ITERATIONS,
+    AIZYNTH_MAX_TRANSFORMS,
+    AIZYNTH_STOCK,
+    AIZYNTH_TIME_LIMIT,
+    AIZYNTH_TIMEOUT_SEC,
     RETROCAST_BASE_URL,
     RETRO_ENABLE_AIZYNTH,
     RETRO_ENABLE_ORD,
@@ -546,18 +552,36 @@ def get_retro_model_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]
 
 
 def get_aizynthfinder_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
-    """Placeholder adapter for future AiZynthFinder integration."""
+    """Adapter for AiZynthFinder multi-step retrosynthesis routes."""
     if not RETRO_ENABLE_AIZYNTH:
         return []
     if not AIZYNTH_BASE_URL:
         logger.info("[retro] AiZynthFinder enabled but AIZYNTH_BASE_URL is not configured")
         return []
-    logger.info("[retro] AiZynthFinder adapter scaffolded but client is not implemented yet")
-    return []
+    from ..services.aizynth_client import normalize_aizynth_routes, run_aizynth_retrosynthesis
+
+    payload = run_aizynth_retrosynthesis(
+        AIZYNTH_BASE_URL,
+        smiles,
+        max_transforms=AIZYNTH_MAX_TRANSFORMS,
+        time_limit=AIZYNTH_TIME_LIMIT,
+        iterations=AIZYNTH_ITERATIONS,
+        expansion_model=AIZYNTH_EXPANSION_MODEL,
+        stock=AIZYNTH_STOCK,
+        timeout=int(AIZYNTH_TIMEOUT_SEC),
+    )
+    routes = normalize_aizynth_routes(payload, limit=top_n)
+    return _normalize_source_routes(routes, "aizynthfinder", "service_tree_search")
 
 
 def get_retrocast_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
-    """Placeholder adapter for future RetroCast integration."""
+    """Placeholder adapter for future RetroCast integration.
+
+    Upstream ChemCrow2 currently ships RetroCast datasets, but not a live
+    runtime service API comparable to AiZynthFinder. We keep the adapter seam
+    here so RetroCast can be added later without changing the orchestration
+    layer again.
+    """
     if not RETRO_ENABLE_RETROCAST:
         return []
     if not RETROCAST_BASE_URL:

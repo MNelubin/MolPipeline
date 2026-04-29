@@ -57,6 +57,12 @@ RETRO_ORD_AUTHORITATIVE = _get_bool_env("RETRO_ORD_AUTHORITATIVE", True)
 # Optional future endpoints for additive retrosynthesis sources
 AIZYNTH_BASE_URL = os.getenv("AIZYNTH_BASE_URL", "")
 RETROCAST_BASE_URL = os.getenv("RETROCAST_BASE_URL", "")
+AIZYNTH_TIMEOUT_SEC = float(os.getenv("AIZYNTH_TIMEOUT_SEC", "120"))
+AIZYNTH_MAX_TRANSFORMS = int(os.getenv("AIZYNTH_MAX_TRANSFORMS", "12"))
+AIZYNTH_TIME_LIMIT = int(os.getenv("AIZYNTH_TIME_LIMIT", "10"))
+AIZYNTH_ITERATIONS = int(os.getenv("AIZYNTH_ITERATIONS", "100"))
+AIZYNTH_EXPANSION_MODEL = os.getenv("AIZYNTH_EXPANSION_MODEL", "uspto")
+AIZYNTH_STOCK = os.getenv("AIZYNTH_STOCK", "zinc")
 
 
 def _make_httpx_client(timeout: float = 120.0):

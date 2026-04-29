@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from ..tools.retro_tools import collect_candidate_routes, search_and_rank
+from ..tools.retro_tools import collect_candidate_routes, get_aizynthfinder_routes, search_and_rank
 
 
 class TestCollectCandidateRoutes:
@@ -38,6 +38,31 @@ class TestCollectCandidateRoutes:
         routes, sources = collect_candidate_routes("")
         assert routes == []
         assert sources == []
+
+
+class TestAiZynthRuntimeAdapter:
+    def test_get_aizynthfinder_routes_calls_service_client(self):
+        normalized = [
+            {
+                "reactants": "CC=O.O",
+                "reaction_smiles": "CC=O.O>>CCO",
+                "source": "aizynthfinder",
+                "score": 0.75,
+                "plausibility": 0.75,
+                "provenance": {"provider": "aizynthfinder"},
+            }
+        ]
+
+        with patch("mvp.tools.retro_tools.RETRO_ENABLE_AIZYNTH", True), \
+             patch("mvp.tools.retro_tools.AIZYNTH_BASE_URL", "http://aizynth:8052"), \
+             patch("mvp.services.aizynth_client.run_aizynth_retrosynthesis", return_value={"routes": []}) as mock_run, \
+             patch("mvp.services.aizynth_client.normalize_aizynth_routes", return_value=normalized):
+            routes = get_aizynthfinder_routes("CCO", top_n=5)
+
+        mock_run.assert_called_once()
+        assert len(routes) == 1
+        assert routes[0]["source"] == "aizynthfinder"
+        assert routes[0]["provenance"]["provider"] == "aizynthfinder"
 
 
 class TestSearchAndRankRuntime:
