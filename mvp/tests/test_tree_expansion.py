@@ -93,37 +93,31 @@ class TestFindTopRoutes:
 
     def test_ord_hit_returns_routes(self):
         routes = self._ord_routes(2)
-        with patch("mvp.tree_expansion._ord_search_via_api", return_value=routes), \
+        with patch("mvp.tree_expansion.collect_candidate_routes", return_value=(routes, ["ord"])), \
              patch("mvp.tree_expansion.score_route", side_effect=lambda r: r):
             result = _find_top_routes("CCO")
             assert len(result) >= 1
 
     def test_ord_empty_falls_back_to_model(self):
         model_routes = [{"reactants": "X.Y", "source": "retro_model", "final_score": 0.7}]
-        with patch("mvp.tree_expansion._ord_search_via_api", return_value=[]), \
-             patch("mvp.tree_expansion._get_predict_retro",
-                   return_value=lambda s, top_n: model_routes), \
+        with patch("mvp.tree_expansion.collect_candidate_routes", return_value=(model_routes, ["retro_model"])), \
              patch("mvp.tree_expansion.score_route", side_effect=lambda r: r):
             result = _find_top_routes("CCO")
             assert len(result) >= 1
 
     def test_no_routes_returns_empty_list(self):
-        with patch("mvp.tree_expansion._ord_search_via_api", return_value=[]), \
-             patch("mvp.tree_expansion._get_predict_retro",
-                   return_value=lambda s, top_n: []):
+        with patch("mvp.tree_expansion.collect_candidate_routes", return_value=([], [])):
             result = _find_top_routes("CCO")
             assert result == []
 
     def test_model_exception_returns_empty(self):
-        with patch("mvp.tree_expansion._ord_search_via_api", return_value=[]), \
-             patch("mvp.tree_expansion._get_predict_retro",
-                   side_effect=Exception("model error")):
+        with patch("mvp.tree_expansion.collect_candidate_routes", side_effect=Exception("model error")):
             result = _find_top_routes("CCO")
             assert isinstance(result, list)
 
     def test_respects_top_n(self):
         routes = self._ord_routes(10)
-        with patch("mvp.tree_expansion._ord_search_via_api", return_value=routes), \
+        with patch("mvp.tree_expansion.collect_candidate_routes", return_value=(routes, ["ord"])), \
              patch("mvp.tree_expansion.score_route", side_effect=lambda r: r):
             result = _find_top_routes("CCO", top_n=3)
             assert len(result) <= 3

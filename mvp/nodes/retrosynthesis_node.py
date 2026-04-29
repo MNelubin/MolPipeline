@@ -1,6 +1,6 @@
 """Retrosynthesis node: find synthesis routes and expand into full trees.
 
-1. Searches ORD for published reactions + retro model for predictions
+1. Queries all enabled retrosynthesis sources via the shared runtime collector
 2. For each top route, recursively expands non-buyable reactants via tree_expansion
 3. Formats procedure details as step-by-step Russian instructions
 """
@@ -119,7 +119,10 @@ def _format_retro_text(
     """Format retrosynthesis results as Russian text with tree details."""
     source_labels = {
         "ord": "Open Reaction Database",
+        "web": "Веб-поиск синтеза",
         "retro_model": "Ретросинтез-модель (template-relevance)",
+        "aizynthfinder": "AiZynthFinder",
+        "retrocast": "RetroCast",
     }
     source_str = ", ".join(source_labels.get(s, s) for s in sources)
 
@@ -143,7 +146,10 @@ def _format_retro_text(
         source = route.get("source", "?")
         source_label = {
             "ord": "ORD",
+            "web": "WEB",
             "retro_model": "МОДЕЛЬ",
+            "aizynthfinder": "AIZYNTH",
+            "retrocast": "RETROCAST",
         }.get(source, source.upper())
 
         lines.append(f"  ── Путь #{i} [{source_label}] " + "─" * 40)

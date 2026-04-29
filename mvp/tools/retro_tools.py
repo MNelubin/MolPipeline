@@ -1,8 +1,8 @@
-"""Retrosynthesis tools: ORD API search, local model, scoring.
+"""Retrosynthesis tools: multi-source route collection, scoring and ranking.
 
-Searches ORD via external API for known synthesis routes,
-uses standalone retro model (extracted from ASKCOS) for prediction,
-deduplicates, scores and ranks all candidates.
+This module collects synthesis routes from all enabled sources, normalizes them
+into a common internal schema, deduplicates by reactant set, scores, and ranks
+the final route candidates consumed by the main pipeline.
 """
 
 from __future__ import annotations
@@ -10,6 +10,17 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from typing import Any
+
+from ..config import (
+    AIZYNTH_BASE_URL,
+    RETROCAST_BASE_URL,
+    RETRO_ENABLE_AIZYNTH,
+    RETRO_ENABLE_ORD,
+    RETRO_ENABLE_RETROCAST,
+    RETRO_ENABLE_RETRO_MODEL,
+    RETRO_ENABLE_WEB,
+    RETRO_ORD_AUTHORITATIVE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +66,33 @@ def _deduplicate_routes(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if existing is None or route.get("final_score", 0) > existing.get("final_score", 0):
             seen[key] = route
     return list(seen.values())
+
+
+def _merge_provenance(route: dict[str, Any], source: str, retrieval_mode: str) -> dict[str, Any]:
+    """Attach a stable source/provenance block to a route dict."""
+    result = dict(route)
+    result["source"] = source
+    provenance = dict(result.get("provenance") or {})
+    provenance.setdefault("provider", source)
+    provenance.setdefault("retrieval_mode", retrieval_mode)
+    if "raw_score" not in provenance and result.get("score") is not None:
+        provenance["raw_score"] = result.get("score")
+    result["provenance"] = provenance
+    return result
+
+
+def _normalize_source_routes(
+    routes: list[dict[str, Any]],
+    source: str,
+    retrieval_mode: str,
+) -> list[dict[str, Any]]:
+    """Normalize routes from a single source into a common internal schema."""
+    normalized: list[dict[str, Any]] = []
+    for route in routes:
+        if not isinstance(route, dict):
+            continue
+        normalized.append(_merge_provenance(route, source, retrieval_mode))
+    return normalized
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -154,6 +192,8 @@ def _rows_to_retro_dicts(cursor) -> list[dict]:
             "reactants": reactants_clean,
             "source": "ord",
             "num_examples": 1,
+            "score": 0.95,
+            "plausibility": 0.95,
         }
         if yield_pct is not None:
             route["expected_yield"] = float(yield_pct) / 100.0
@@ -163,7 +203,7 @@ def _rows_to_retro_dicts(cursor) -> list[dict]:
             route["solvent"] = solvent
         if catalyst:
             route["catalyst"] = catalyst
-        results.append(route)
+        results.append(_merge_provenance(route, "ord", "sqlite"))
     return results
 
 
@@ -474,11 +514,133 @@ def _web_search_retro(smiles: str, target_name: str | None = None) -> list[dict[
         if raw.get("procedure"):
             route["procedure_details"] = str(raw["procedure"])[:500]
 
-        routes.append(route)
+        routes.append(_merge_provenance(route, "web", "search_llm"))
 
     elapsed = _time.monotonic() - t0
     logger.info("[web_retro] %d valid routes extracted in %.1fs", len(routes), elapsed)
     return routes
+
+
+def get_ord_routes(smiles: str, limit: int = 15) -> list[dict[str, Any]]:
+    """Adapter for ORD-backed retrosynthesis routes."""
+    if not RETRO_ENABLE_ORD:
+        return []
+    return _normalize_source_routes(_ord_search_via_api(smiles, limit=limit), "ord", "sqlite")
+
+
+def get_web_routes(smiles: str, target_name: str | None = None) -> list[dict[str, Any]]:
+    """Adapter for web-extracted retrosynthesis routes."""
+    if not RETRO_ENABLE_WEB:
+        return []
+    return _normalize_source_routes(_web_search_retro(smiles, target_name=target_name), "web", "search_llm")
+
+
+def get_retro_model_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
+    """Adapter for the current local template-relevance retrosynthesis model."""
+    if not RETRO_ENABLE_RETRO_MODEL:
+        return []
+    from ..retro_predictor import predict_retro
+
+    routes = predict_retro(smiles, top_n=top_n)
+    return _normalize_source_routes(routes, "retro_model", "local_model")
+
+
+def get_aizynthfinder_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
+    """Placeholder adapter for future AiZynthFinder integration."""
+    if not RETRO_ENABLE_AIZYNTH:
+        return []
+    if not AIZYNTH_BASE_URL:
+        logger.info("[retro] AiZynthFinder enabled but AIZYNTH_BASE_URL is not configured")
+        return []
+    logger.info("[retro] AiZynthFinder adapter scaffolded but client is not implemented yet")
+    return []
+
+
+def get_retrocast_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
+    """Placeholder adapter for future RetroCast integration."""
+    if not RETRO_ENABLE_RETROCAST:
+        return []
+    if not RETROCAST_BASE_URL:
+        logger.info("[retro] RetroCast enabled but RETROCAST_BASE_URL is not configured")
+        return []
+    logger.info("[retro] RetroCast adapter scaffolded but client is not implemented yet")
+    return []
+
+
+def collect_candidate_routes(
+    smiles: str,
+    *,
+    ord_limit: int = 15,
+    model_top_n: int = 10,
+    use_web: bool = True,
+    target_name: str | None = None,
+    ord_authoritative: bool | None = None,
+    include_experimental: bool = False,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Collect raw route candidates from all enabled sources.
+
+    The default policy preserves current behavior:
+    if ORD returns routes and RETRO_ORD_AUTHORITATIVE is true, other sources are skipped.
+    """
+    if not smiles:
+        return [], []
+
+    authoritative = RETRO_ORD_AUTHORITATIVE if ord_authoritative is None else ord_authoritative
+    routes: list[dict[str, Any]] = []
+    sources_used: list[str] = []
+
+    try:
+        ord_routes = get_ord_routes(smiles, limit=ord_limit)
+    except Exception as e:
+        logger.warning("ORD route collection failed: %s", e)
+        ord_routes = []
+
+    if ord_routes:
+        routes.extend(ord_routes)
+        sources_used.append("ord")
+        if authoritative:
+            logger.info("ORD: %d routes found — authoritative mode, skipping fallback sources", len(ord_routes))
+            return routes, sources_used
+
+    if use_web:
+        try:
+            web_routes = get_web_routes(smiles, target_name=target_name)
+            if web_routes:
+                routes.extend(web_routes)
+                sources_used.append("web")
+                logger.info("Web search: %d routes found", len(web_routes))
+        except Exception as e:
+            logger.warning("Web search retro failed: %s", e)
+
+    try:
+        model_routes = get_retro_model_routes(smiles, top_n=model_top_n)
+        if model_routes:
+            routes.extend(model_routes)
+            sources_used.append("retro_model")
+            logger.info("Retro model: %d routes found", len(model_routes))
+    except Exception as e:
+        logger.warning("Retro model failed: %s", e)
+
+    if include_experimental:
+        try:
+            aizynth_routes = get_aizynthfinder_routes(smiles, top_n=model_top_n)
+            if aizynth_routes:
+                routes.extend(aizynth_routes)
+                sources_used.append("aizynthfinder")
+                logger.info("AiZynthFinder: %d routes found", len(aizynth_routes))
+        except Exception as e:
+            logger.warning("AiZynthFinder route collection failed: %s", e)
+
+        try:
+            retrocast_routes = get_retrocast_routes(smiles, top_n=model_top_n)
+            if retrocast_routes:
+                routes.extend(retrocast_routes)
+                sources_used.append("retrocast")
+                logger.info("RetroCast: %d routes found", len(retrocast_routes))
+        except Exception as e:
+            logger.warning("RetroCast route collection failed: %s", e)
+
+    return routes, sources_used
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -487,42 +649,14 @@ def _web_search_retro(smiles: str, target_name: str | None = None) -> list[dict[
 
 
 def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
-    """Full retrosynthesis pipeline: ORD -> web search -> local retro model -> deduplicate -> score -> rank."""
-    all_routes: list[dict[str, Any]] = []
-    sources_used: list[str] = []
-
-    try:
-        ord_results = _ord_search_via_api(smiles, limit=15)
-    except Exception as e:
-        logger.warning("ORD API search failed: %s", e)
-        ord_results = []
-
-    if ord_results:
-        all_routes.extend(ord_results)
-        sources_used.append("ord")
-        logger.info("ORD: %d routes found — skipping web/model (ORD is authoritative)", len(ord_results))
-    else:
-        # Tier 2: web search
-        try:
-            web_results = _web_search_retro(smiles)
-            if web_results:
-                all_routes.extend(web_results)
-                sources_used.append("web")
-                logger.info("Web search: %d routes found", len(web_results))
-        except Exception as e:
-            logger.warning("Web search retro failed: %s", e)
-
-        # Tier 3: local model (always try — complements web results)
-        try:
-            from ..retro_predictor import predict_retro
-            model_results = predict_retro(smiles, top_n=10)
-            if model_results:
-                all_routes.extend(model_results)
-                sources_used.append("retro_model")
-                logger.info("Retro model: %d routes found", len(model_results))
-        except Exception as e:
-            logger.warning("Retro model failed: %s", e)
-
+    """Full retrosynthesis pipeline over all enabled route sources."""
+    all_routes, sources_used = collect_candidate_routes(
+        smiles,
+        ord_limit=15,
+        model_top_n=10,
+        use_web=True,
+        include_experimental=True,
+    )
     total_found = len(all_routes)
 
     if not all_routes:
