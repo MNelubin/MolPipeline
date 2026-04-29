@@ -30,8 +30,8 @@ logs/
 
 # Старые каталоги вне рабочего проекта
 real_proj/
-src/
-public/
+/src/
+/public/
 
 # Локальные planning notes
 CHEMCROW2_INTEGRATION_PRIORITIES.md
