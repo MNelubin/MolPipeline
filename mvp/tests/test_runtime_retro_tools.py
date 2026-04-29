@@ -43,8 +43,8 @@ class TestCollectCandidateRoutes:
 class TestSearchAndRankRuntime:
     def test_search_and_rank_uses_collector_output(self):
         collected = [
-            {"reactants": "B.A", "source": "ord", "score": 0.5},
-            {"reactants": "A.B", "source": "web", "score": 0.9},
+            {"reactants": "CCO.O", "source": "ord", "score": 0.5},
+            {"reactants": "O.CCO", "source": "web", "score": 0.9},
         ]
 
         def _score_passthrough(route):
