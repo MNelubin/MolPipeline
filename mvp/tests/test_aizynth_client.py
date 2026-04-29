@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from ..services.aizynth_client import (
     _extract_first_disconnection,
     extract_route_trees,
@@ -64,3 +66,52 @@ class TestNormalizeAizynthRoutes:
             ],
         }
         assert normalize_aizynth_routes(payload) == []
+
+    def test_merges_retrocast_summary_into_provenance(self):
+        payload = {
+            "smiles": "CCO",
+            "routes": [
+                {
+                    "metadata": {"mapped_reaction_smiles": "CCO>>CC=O.O"},
+                    "children": [],
+                }
+            ],
+        }
+        retrocast_summary = {
+            "route_index": 0,
+            "target_smiles": "CCO",
+            "reactants": "CC=O.O",
+            "reaction_smiles": "CC=O.O>>CCO",
+            "num_steps": 4,
+            "leaf_smiles": ["CC=O", "O"],
+        }
+
+        with patch("mvp.services.aizynth_client.RETRO_ENABLE_RETROCAST", True), \
+             patch("mvp.services.retrocast_bridge.adapt_aizynth_payload_with_retrocast", return_value=[retrocast_summary]):
+            routes = normalize_aizynth_routes(payload)
+
+        assert routes[0]["num_steps"] == 4
+        assert routes[0]["provenance"]["retrocast"]["leaf_smiles"] == ["CC=O", "O"]
+
+    def test_uses_retrocast_first_step_when_raw_tree_has_no_mapping(self):
+        payload = {
+            "smiles": "CCO",
+            "routes": [
+                {"metadata": {}, "children": []},
+            ],
+        }
+        retrocast_summary = {
+            "route_index": 0,
+            "target_smiles": "CCO",
+            "reactants": "CC=O.O",
+            "reaction_smiles": "CC=O.O>>CCO",
+            "num_steps": 3,
+        }
+
+        with patch("mvp.services.aizynth_client.RETRO_ENABLE_RETROCAST", True), \
+             patch("mvp.services.retrocast_bridge.adapt_aizynth_payload_with_retrocast", return_value=[retrocast_summary]):
+            routes = normalize_aizynth_routes(payload)
+
+        assert len(routes) == 1
+        assert routes[0]["reactants"] == "CC=O.O"
+        assert routes[0]["reaction_smiles"] == "CC=O.O>>CCO"

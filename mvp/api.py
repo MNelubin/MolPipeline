@@ -29,6 +29,7 @@ from . import config as _cfg  # noqa: F401
 from .config import DATA_DIR
 from .graph import build_graph
 from .services.aizynth_client import get_aizynth_resources
+from .services.retrocast_bridge import get_retrocast_runtime_info
 from .tools.retro_tools import _ord_search_via_api, score_route, _deduplicate_routes, search_and_rank
 
 logging.basicConfig(
@@ -404,6 +405,7 @@ def _run_retro_search(query: str, top_n: int) -> dict[str, Any]:
 
 def _retro_sources_snapshot() -> dict[str, Any]:
     """Build a diagnostic snapshot of enabled retrosynthesis sources."""
+    retrocast_info = get_retrocast_runtime_info()
     sources: dict[str, dict[str, Any]] = {
         "ord": {
             "enabled": _cfg.RETRO_ENABLE_ORD,
@@ -429,11 +431,12 @@ def _retro_sources_snapshot() -> dict[str, Any]:
         },
         "retrocast": {
             "enabled": _cfg.RETRO_ENABLE_RETROCAST,
-            "configured": bool(_cfg.RETROCAST_BASE_URL),
-            "base_url": _cfg.RETROCAST_BASE_URL or None,
-            "reachable": None,
-            "mode": "service_placeholder",
-            "implemented": False,
+            "configured": retrocast_info["available"],
+            "reachable": retrocast_info["available"],
+            "mode": "canonicalization_bridge",
+            "standalone_source": False,
+            "version": retrocast_info["version"],
+            "adapters": retrocast_info["adapters"],
         },
     }
 
@@ -453,6 +456,9 @@ def _retro_sources_snapshot() -> dict[str, Any]:
         except Exception as exc:
             aizynth["reachable"] = False
             aizynth["error"] = str(exc)
+
+    if retrocast_info["error"]:
+        sources["retrocast"]["error"] = retrocast_info["error"]
 
     return {
         "ord_authoritative": _cfg.RETRO_ORD_AUTHORITATIVE,

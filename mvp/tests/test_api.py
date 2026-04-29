@@ -39,6 +39,7 @@ class TestRetroSearchHelpers:
         with patch("mvp.api._cfg.RETRO_ENABLE_AIZYNTH", True), \
              patch("mvp.api._cfg.AIZYNTH_BASE_URL", "http://aizynth:8052"), \
              patch("mvp.api._cfg.AIZYNTH_TIMEOUT_SEC", 15), \
+             patch("mvp.api.get_retrocast_runtime_info", return_value={"available": False, "version": None, "adapters": [], "error": "missing"}), \
              patch("mvp.api.get_aizynth_resources", return_value={"stocks": ["zinc"], "expansion_models": ["uspto"]}):
             snapshot = _retro_sources_snapshot()
 
@@ -47,6 +48,22 @@ class TestRetroSearchHelpers:
         assert aizynth["configured"] is True
         assert aizynth["reachable"] is True
         assert aizynth["details"]["stocks"] == ["zinc"]
+
+    def test_retro_sources_snapshot_reports_retrocast_bridge(self):
+        retrocast_info = {
+            "available": True,
+            "version": "0.5.3",
+            "adapters": ["aizynth", "retrostar"],
+            "error": None,
+        }
+        with patch("mvp.api.get_retrocast_runtime_info", return_value=retrocast_info):
+            snapshot = _retro_sources_snapshot()
+
+        retrocast = snapshot["sources"]["retrocast"]
+        assert retrocast["configured"] is True
+        assert retrocast["reachable"] is True
+        assert retrocast["standalone_source"] is False
+        assert retrocast["adapters"] == ["aizynth", "retrostar"]
 
 
 class TestRetroSearchEndpoints:

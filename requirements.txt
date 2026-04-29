@@ -24,6 +24,7 @@ beautifulsoup4>=4.12.0
 
 # Retrosynthesis APIs
 rxn4chemistry>=1.0.0
+retrocast>=0.5.3
 
 # Utils
 python-dotenv>=1.0.0

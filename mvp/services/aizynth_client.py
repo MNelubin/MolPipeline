@@ -7,6 +7,8 @@ from typing import Any
 
 import requests
 
+from ..config import RETRO_ENABLE_RETROCAST
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 120
@@ -124,14 +126,33 @@ def normalize_aizynth_routes(
     stock_info = payload.get("stock_info") if isinstance(payload.get("stock_info"), dict) else {}
     parameters = payload.get("parameters") if isinstance(payload.get("parameters"), dict) else {}
     target_smiles = str(payload.get("smiles", "")).strip()
+    retrocast_by_index: dict[int, dict[str, Any]] = {}
+
+    if RETRO_ENABLE_RETROCAST:
+        try:
+            from .retrocast_bridge import adapt_aizynth_payload_with_retrocast
+
+            retrocast_summaries = adapt_aizynth_payload_with_retrocast(payload, limit=limit)
+            retrocast_by_index = {
+                int(summary["route_index"]): summary
+                for summary in retrocast_summaries
+                if isinstance(summary, dict) and "route_index" in summary
+            }
+        except Exception as exc:
+            logger.warning("[aizynth] RetroCast bridge failed: %s", exc)
 
     solved_bonus = 0.1 if stats.get("is_solved") else 0.0
 
     for idx, tree in enumerate(trees[:limit]):
+        retrocast_summary = retrocast_by_index.get(idx, {})
         extracted = _extract_first_disconnection(tree)
-        if extracted is None:
+        if extracted is None and retrocast_summary.get("reactants") and retrocast_summary.get("target_smiles"):
+            reactants = str(retrocast_summary["reactants"]).strip()
+            product = str(retrocast_summary["target_smiles"]).strip()
+        elif extracted is None:
             continue
-        reactants, product = extracted
+        else:
+            reactants, product = extracted
         reaction_smiles = f"{reactants}>>{product}"
         route = {
             "reactants": reactants,
@@ -139,7 +160,7 @@ def normalize_aizynth_routes(
             "source": "aizynthfinder",
             "score": min(0.65 + solved_bonus, 0.95),
             "plausibility": 0.75,
-            "num_steps": _count_route_steps(tree),
+            "num_steps": retrocast_summary.get("num_steps") or _count_route_steps(tree),
             "target_smiles": target_smiles,
             "provenance": {
                 "provider": "aizynthfinder",
@@ -151,6 +172,8 @@ def normalize_aizynth_routes(
                 "raw_tree": tree,
             },
         }
+        if retrocast_summary:
+            route["provenance"]["retrocast"] = retrocast_summary
         routes.append(route)
 
     logger.info(

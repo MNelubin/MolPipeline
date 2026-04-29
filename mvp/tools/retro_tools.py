@@ -584,19 +584,15 @@ def get_aizynthfinder_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any
 
 
 def get_retrocast_routes(smiles: str, top_n: int = 10) -> list[dict[str, Any]]:
-    """Placeholder adapter for future RetroCast integration.
+    """RetroCast does not currently act as a standalone route generator here.
 
-    Upstream ChemCrow2 currently ships RetroCast datasets, but not a live
-    runtime service API comparable to AiZynthFinder. We keep the adapter seam
-    here so RetroCast can be added later without changing the orchestration
-    layer again.
+    The real RetroCast package is integrated as a canonicalization bridge for
+    planner outputs such as AiZynthFinder. Standalone route collection remains a
+    future seam because RetroCast itself is not a planner service.
     """
     if not RETRO_ENABLE_RETROCAST:
         return []
-    if not RETROCAST_BASE_URL:
-        logger.info("[retro] RetroCast enabled but RETROCAST_BASE_URL is not configured")
-        return []
-    logger.info("[retro] RetroCast adapter scaffolded but client is not implemented yet")
+    logger.info("[retro] RetroCast is enabled as an adaptation bridge; no standalone route source is registered")
     return []
 
 
