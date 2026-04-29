@@ -282,6 +282,13 @@ FRONTEND_DIST = next((path for path in _FRONTEND_DIST_CANDIDATES if path.is_dir(
 if FRONTEND_DIST is not None:
     from fastapi.responses import FileResponse
 
+    @app.get("/")
+    async def serve_spa_root():
+        index = FRONTEND_DIST / "index.html"
+        if index.is_file():
+            return FileResponse(index)
+        raise HTTPException(404, "Not found")
+
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """Serve frontend SPA — try file first, fallback to index.html."""
