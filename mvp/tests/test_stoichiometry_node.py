@@ -37,14 +37,14 @@ def mock_journal():
     mock_j = MagicMock()
     mock_j.step.return_value.__enter__ = lambda s: None
     mock_j.step.return_value.__exit__ = MagicMock(return_value=False)
-    with patch("real_proj.mvp.journal.AgentJournal") as cls:
+    with patch("mvp.journal.AgentJournal") as cls:
         cls.for_session.return_value = mock_j
         yield mock_j
 
 
 @pytest.fixture()
 def mock_stoichio():
-    with patch("real_proj.mvp.nodes.stoichiometry_node.stoichiometry_calc",
+    with patch("mvp.nodes.stoichiometry_node.stoichiometry_calc",
                return_value=_mock_calc_result()) as m:
         yield m
 
@@ -221,7 +221,8 @@ class TestCalcSingleStep:
         pathway = {
             "reaction_smiles": "CCO.CC(=O)O>>CC(=O)OCC",
         }
-        with patch("real_proj.mvp.nodes.stoichiometry_node.stoichiometry_calc",
+        with patch("mvp.nodes.stoichiometry_node.stoichiometry_calc",
                    side_effect=Exception("calc failed")):
             result = _calc_single_step(pathway, 1.0, "CC(=O)OCC")
         assert "error" in result["calculations"]
+

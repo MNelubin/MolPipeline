@@ -19,7 +19,7 @@ from ..nodes.reagent_node import (
 
 def _patch_buyable(buyable_smiles: set):
     return patch(
-        "real_proj.mvp.nodes.reagent_node._is_buyable",
+        "mvp.nodes.reagent_node._is_buyable",
         side_effect=lambda smi: smi in buyable_smiles,
     )
 
@@ -208,3 +208,4 @@ class TestReagentNode:
         result = reagent_node({"retro_result": {"routes": routes}})
         unavail = result["reagent_report"]["unavailable_reagents"]
         assert unavail.count("EVIL") == 1
+

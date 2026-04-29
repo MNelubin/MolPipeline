@@ -60,22 +60,22 @@ class TestCanonicalize:
 
 class TestResolveName:
     def test_returns_none_on_exception(self):
-        with patch("real_proj.mvp.tree_expansion.get_compound_properties",
+        with patch("mvp.tree_expansion.get_compound_properties",
                    side_effect=Exception("fail")):
             assert _resolve_name("CCO") is None
 
     def test_returns_iupac_name(self):
-        with patch("real_proj.mvp.tree_expansion.get_compound_properties",
+        with patch("mvp.tree_expansion.get_compound_properties",
                    return_value={"IUPACName": "ethanol", "Title": "Ethanol"}):
             assert _resolve_name("CCO") == "ethanol"
 
     def test_returns_title_if_no_iupac(self):
-        with patch("real_proj.mvp.tree_expansion.get_compound_properties",
+        with patch("mvp.tree_expansion.get_compound_properties",
                    return_value={"IUPACName": None, "Title": "Ethanol"}):
             assert _resolve_name("CCO") == "Ethanol"
 
     def test_returns_none_if_no_props(self):
-        with patch("real_proj.mvp.tree_expansion.get_compound_properties",
+        with patch("mvp.tree_expansion.get_compound_properties",
                    return_value={}):
             assert _resolve_name("CCO") is None
 
@@ -93,38 +93,38 @@ class TestFindTopRoutes:
 
     def test_ord_hit_returns_routes(self):
         routes = self._ord_routes(2)
-        with patch("real_proj.mvp.tree_expansion._ord_search_via_api", return_value=routes), \
-             patch("real_proj.mvp.tree_expansion.score_route", side_effect=lambda r: r):
+        with patch("mvp.tree_expansion._ord_search_via_api", return_value=routes), \
+             patch("mvp.tree_expansion.score_route", side_effect=lambda r: r):
             result = _find_top_routes("CCO")
             assert len(result) >= 1
 
     def test_ord_empty_falls_back_to_model(self):
         model_routes = [{"reactants": "X.Y", "source": "retro_model", "final_score": 0.7}]
-        with patch("real_proj.mvp.tree_expansion._ord_search_via_api", return_value=[]), \
-             patch("real_proj.mvp.tree_expansion._get_predict_retro",
+        with patch("mvp.tree_expansion._ord_search_via_api", return_value=[]), \
+             patch("mvp.tree_expansion._get_predict_retro",
                    return_value=lambda s, top_n: model_routes), \
-             patch("real_proj.mvp.tree_expansion.score_route", side_effect=lambda r: r):
+             patch("mvp.tree_expansion.score_route", side_effect=lambda r: r):
             result = _find_top_routes("CCO")
             assert len(result) >= 1
 
     def test_no_routes_returns_empty_list(self):
-        with patch("real_proj.mvp.tree_expansion._ord_search_via_api", return_value=[]), \
-             patch("real_proj.mvp.tree_expansion._get_predict_retro",
+        with patch("mvp.tree_expansion._ord_search_via_api", return_value=[]), \
+             patch("mvp.tree_expansion._get_predict_retro",
                    return_value=lambda s, top_n: []):
             result = _find_top_routes("CCO")
             assert result == []
 
     def test_model_exception_returns_empty(self):
-        with patch("real_proj.mvp.tree_expansion._ord_search_via_api", return_value=[]), \
-             patch("real_proj.mvp.tree_expansion._get_predict_retro",
+        with patch("mvp.tree_expansion._ord_search_via_api", return_value=[]), \
+             patch("mvp.tree_expansion._get_predict_retro",
                    side_effect=Exception("model error")):
             result = _find_top_routes("CCO")
             assert isinstance(result, list)
 
     def test_respects_top_n(self):
         routes = self._ord_routes(10)
-        with patch("real_proj.mvp.tree_expansion._ord_search_via_api", return_value=routes), \
-             patch("real_proj.mvp.tree_expansion.score_route", side_effect=lambda r: r):
+        with patch("mvp.tree_expansion._ord_search_via_api", return_value=routes), \
+             patch("mvp.tree_expansion.score_route", side_effect=lambda r: r):
             result = _find_top_routes("CCO", top_n=3)
             assert len(result) <= 3
 
@@ -148,36 +148,36 @@ class TestBuildNode:
         assert node["status"] == "timeout"
 
     def test_banned_molecule(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "banned", "name": "Bad", "reason": "controlled"}), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="Bad"):
+             patch("mvp.tree_expansion._resolve_name", return_value="Bad"):
             node = _build_node("CCO", 0, 6, set(), time.time(), 120)
         assert node["status"] == "banned"
         assert node["is_buyable"] is False
 
     def test_buyable_molecule(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="ethanol"):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value="ethanol"):
             node = _build_node("CCO", 0, 6, set(), time.time(), 120)
         assert node["status"] == "buyable"
         assert node["is_buyable"] is True
 
     def test_depth_limit(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=False), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value=None):
+             patch("mvp.tree_expansion._is_buyable", return_value=False), \
+             patch("mvp.tree_expansion._resolve_name", return_value=None):
             node = _build_node("CCO", 6, 6, set(), time.time(), 120)
         assert node["status"] == "depth_limit"
 
     def test_unresolved_when_no_routes(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=False), \
-             patch("real_proj.mvp.tree_expansion._find_top_routes", return_value=[]), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value=None):
+             patch("mvp.tree_expansion._is_buyable", return_value=False), \
+             patch("mvp.tree_expansion._find_top_routes", return_value=[]), \
+             patch("mvp.tree_expansion._resolve_name", return_value=None):
             node = _build_node("CCO", 0, 6, set(), time.time(), 120)
         assert node["status"] == "unresolved"
 
@@ -189,22 +189,22 @@ class TestBuildNode:
             "final_score": 0.8,
             "template": "should_be_stripped",
         }
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable",
+             patch("mvp.tree_expansion._is_buyable",
                    side_effect=lambda s: s in ("C", "O")), \
-             patch("real_proj.mvp.tree_expansion._find_top_routes", return_value=[route]), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="methanol"):
+             patch("mvp.tree_expansion._find_top_routes", return_value=[route]), \
+             patch("mvp.tree_expansion._resolve_name", return_value="methanol"):
             node = _build_node("CO", 0, 6, set(), time.time(), 120)
         assert node["status"] == "intermediate"
         assert len(node["children"]) == 2
         assert "template" not in node["route"]
 
     def test_node_has_all_required_keys(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="ethanol"):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value="ethanol"):
             node = _build_node("CCO", 0, 6, set(), time.time(), 120)
         for key in ("smiles", "name", "status", "depth", "is_buyable", "guard", "route", "children"):
             assert key in node, f"Missing key: {key}"
@@ -220,18 +220,18 @@ class TestBuildNode:
             call_order.append("buyable")
             return True
 
-        with patch("real_proj.mvp.tree_expansion.banlist_check", side_effect=mock_banlist), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", side_effect=mock_buyable), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value=None):
+        with patch("mvp.tree_expansion.banlist_check", side_effect=mock_banlist), \
+             patch("mvp.tree_expansion._is_buyable", side_effect=mock_buyable), \
+             patch("mvp.tree_expansion._resolve_name", return_value=None):
             node = _build_node("CCO", 0, 6, set(), time.time(), 120)
         assert node["status"] == "banned"
         assert "buyable" not in call_order
 
     def test_depth_stored_in_node(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value=None):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value=None):
             node = _build_node("CCO", 3, 6, set(), time.time(), 120)
         assert node["depth"] == 3
 
@@ -248,10 +248,10 @@ class TestExpandTree:
         assert result["stats"]["unresolved_count"] == 1
 
     def test_basic_expansion_with_buyable_leaves(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="test"):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value="test"):
             result = expand_tree("CC(=O)Oc1ccccc1C(=O)O", "CCO.CC(=O)O")
         tree = result["tree"]
         assert tree["status"] == "intermediate"
@@ -261,10 +261,10 @@ class TestExpandTree:
             assert child["status"] == "buyable"
 
     def test_stats_total_nodes(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="test"):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value="test"):
             result = expand_tree("CC(=O)Oc1ccccc1C(=O)O", "CCO.CC(=O)O")
         stats = result["stats"]
         assert stats["total_nodes"] == 3
@@ -273,30 +273,30 @@ class TestExpandTree:
         assert stats["elapsed_sec"] >= 0
 
     def test_root_has_selected_route(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value="test"):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value="test"):
             result = expand_tree("CC(=O)Oc1ccccc1C(=O)O", "CCO.CC(=O)O")
         root = result["tree"]
         assert root["route"]["source"] == "selected"
         assert "CCO" in root["route"]["reactants"]
 
     def test_max_depth_stops_recursion(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=False), \
-             patch("real_proj.mvp.tree_expansion._find_top_routes", return_value=[]), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value=None):
+             patch("mvp.tree_expansion._is_buyable", return_value=False), \
+             patch("mvp.tree_expansion._find_top_routes", return_value=[]), \
+             patch("mvp.tree_expansion._resolve_name", return_value=None):
             result = expand_tree("CC(=O)Oc1ccccc1C(=O)O", "CCO", max_depth=1)
         child = result["tree"]["children"][0]
         assert child["status"] in ("depth_limit", "unresolved")
 
     def test_all_stats_keys_present(self):
-        with patch("real_proj.mvp.tree_expansion.banlist_check",
+        with patch("mvp.tree_expansion.banlist_check",
                    return_value={"status": "clear"}), \
-             patch("real_proj.mvp.tree_expansion._is_buyable", return_value=True), \
-             patch("real_proj.mvp.tree_expansion._resolve_name", return_value=None):
+             patch("mvp.tree_expansion._is_buyable", return_value=True), \
+             patch("mvp.tree_expansion._resolve_name", return_value=None):
             result = expand_tree("CCO", "C.O")
         for key in ("total_nodes", "buyable_count", "banned_count", "unresolved_count",
                     "max_depth_reached", "elapsed_sec"):
@@ -362,3 +362,4 @@ class TestStats:
         counts = {"total": 0, "buyable": 0, "banned": 0, "unresolved": 0, "max_depth": 0}
         _walk(tree, counts)
         assert counts["unresolved"] == 1
+

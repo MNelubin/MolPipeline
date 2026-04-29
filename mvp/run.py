@@ -2,9 +2,9 @@
 """Точка входа для MVP пайплайна.
 
 Использование:
-    python -m real_proj.mvp.run "аспирин"
-    python -m real_proj.mvp.run "CC(=O)Oc1ccccc1C(O)=O"
-    python -m real_proj.mvp.run  # интерактивный режим
+    python -m mvp.run "аспирин"
+    python -m mvp.run "CC(=O)Oc1ccccc1C(O)=O"
+    python -m mvp.run  # интерактивный режим
 """
 
 from __future__ import annotations
@@ -78,3 +78,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -235,7 +235,7 @@ class TestOrdSearchByProduct:
         assert isinstance(results, list)
 
     def test_returns_empty_when_no_db(self):
-        with patch("real_proj.mvp.retro_tools.ORD_DB_PATH") as mock_path:
+        with patch("mvp.retro_tools.ORD_DB_PATH") as mock_path:
             mock_path.exists.return_value = False
             results = ord_search_by_product("CCO")
             assert results == []
@@ -277,8 +277,8 @@ class TestSearchAndRank:
     @pytest.mark.integration
     def test_ord_priority_skips_model(self, aspirin_smiles):
         """When ORD has results, retro model should NOT be called."""
-        with patch("real_proj.mvp.retro_tools.ord_search_by_product") as mock_ord, \
-             patch("real_proj.mvp.retro_tools._deduplicate_routes",
+        with patch("mvp.retro_tools.ord_search_by_product") as mock_ord, \
+             patch("mvp.retro_tools._deduplicate_routes",
                    side_effect=lambda x: x) as _:
 
             mock_ord.return_value = [
@@ -289,7 +289,7 @@ class TestSearchAndRank:
                 }
             ]
 
-            with patch("real_proj.mvp.retro_tools.score_route",
+            with patch("mvp.retro_tools.score_route",
                        side_effect=lambda r: r) as _:
                 result = search_and_rank(aspirin_smiles, top_n=5)
 
@@ -304,8 +304,8 @@ class TestSearchAndRank:
 
     def test_no_results_returns_empty_structure(self):
         # predict_retro is imported inside the function from retro_predictor
-        with patch("real_proj.mvp.retro_tools.ord_search_by_product", return_value=[]), \
-             patch("real_proj.mvp.retro_predictor.predict_retro", return_value=[]):
+        with patch("mvp.retro_tools.ord_search_by_product", return_value=[]), \
+             patch("mvp.retro_predictor.predict_retro", return_value=[]):
             result = search_and_rank("CCO", top_n=5)
 
         assert result["routes"] == []
@@ -327,3 +327,4 @@ class TestSearchAndRank:
             key = _canonical_reactant_key(route.get("reactants", ""))
             assert key not in seen, f"Duplicate route: {key}"
             seen.add(key)
+

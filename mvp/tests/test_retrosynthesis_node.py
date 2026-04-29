@@ -130,9 +130,9 @@ class TestRetrosynthesisNode:
         state = {"smiles": aspirin_smiles, "molecule_info": mock_molecule_info}
         mock_result = self._mock_search_and_rank([mock_ord_route], ["ord"], 1)
 
-        with patch("real_proj.mvp.nodes.retrosynthesis_node.search_and_rank",
+        with patch("mvp.nodes.retrosynthesis_node.search_and_rank",
                    return_value=mock_result), \
-             patch("real_proj.mvp.nodes.retrosynthesis_node.format_procedure_russian",
+             patch("mvp.nodes.retrosynthesis_node.format_procedure_russian",
                    return_value=[]):
             result = retrosynthesis_node(state)
 
@@ -147,9 +147,9 @@ class TestRetrosynthesisNode:
         state = {"smiles": aspirin_smiles, "molecule_info": mock_molecule_info}
         mock_result = self._mock_search_and_rank([mock_ord_route], ["ord"], 1)
 
-        with patch("real_proj.mvp.nodes.retrosynthesis_node.search_and_rank",
+        with patch("mvp.nodes.retrosynthesis_node.search_and_rank",
                    return_value=mock_result), \
-             patch("real_proj.mvp.nodes.retrosynthesis_node.format_procedure_russian",
+             patch("mvp.nodes.retrosynthesis_node.format_procedure_russian",
                    return_value=[]):
             result = retrosynthesis_node(state)
 
@@ -164,9 +164,9 @@ class TestRetrosynthesisNode:
         }
         mock_result = self._mock_search_and_rank([], [], 0)
 
-        with patch("real_proj.mvp.nodes.retrosynthesis_node.search_and_rank",
+        with patch("mvp.nodes.retrosynthesis_node.search_and_rank",
                    return_value=mock_result), \
-             patch("real_proj.mvp.nodes.retrosynthesis_node.format_procedure_russian",
+             patch("mvp.nodes.retrosynthesis_node.format_procedure_russian",
                    return_value=[]):
             result = retrosynthesis_node(state)
 
@@ -182,9 +182,9 @@ class TestRetrosynthesisNode:
         mock_result = self._mock_search_and_rank([mock_ord_route], ["ord"], 1)
         mock_steps = [{"step": "1", "description": "Тест", "reason": "ORD"}]
 
-        with patch("real_proj.mvp.nodes.retrosynthesis_node.search_and_rank",
+        with patch("mvp.nodes.retrosynthesis_node.search_and_rank",
                    return_value=mock_result), \
-             patch("real_proj.mvp.nodes.retrosynthesis_node.format_procedure_russian",
+             patch("mvp.nodes.retrosynthesis_node.format_procedure_russian",
                    return_value=mock_steps) as mock_fmt:
             result = retrosynthesis_node(state)
 
@@ -196,9 +196,9 @@ class TestRetrosynthesisNode:
         state = {"smiles": aspirin_smiles, "molecule_info": mock_molecule_info}
         mock_result = self._mock_search_and_rank([], [], 0)
 
-        with patch("real_proj.mvp.nodes.retrosynthesis_node.search_and_rank",
+        with patch("mvp.nodes.retrosynthesis_node.search_and_rank",
                    return_value=mock_result), \
-             patch("real_proj.mvp.nodes.retrosynthesis_node.format_procedure_russian",
+             patch("mvp.nodes.retrosynthesis_node.format_procedure_russian",
                    return_value=[]):
             result = retrosynthesis_node(state)
 
@@ -208,9 +208,9 @@ class TestRetrosynthesisNode:
         state = {"smiles": aspirin_smiles, "molecule_info": mock_molecule_info}
         mock_result = self._mock_search_and_rank([], ["ord"], 0)
 
-        with patch("real_proj.mvp.nodes.retrosynthesis_node.search_and_rank",
+        with patch("mvp.nodes.retrosynthesis_node.search_and_rank",
                    return_value=mock_result), \
-             patch("real_proj.mvp.nodes.retrosynthesis_node.format_procedure_russian",
+             patch("mvp.nodes.retrosynthesis_node.format_procedure_russian",
                    return_value=[]):
             result = retrosynthesis_node(state)
 
@@ -225,3 +225,4 @@ class TestRetrosynthesisNode:
         routes = result["retro_result"]["routes"]
         assert len(routes) > 0
         assert routes[0]["final_score"] > 0
+

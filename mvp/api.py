@@ -576,7 +576,7 @@ async def run_tests():
         import sys
         python = sys.executable  # use same interpreter that runs the server
         result = subprocess.run(
-            [python, "-m", "pytest", "real_proj/mvp/tests/", "-v", "--tb=short", "--no-header", "-q"],
+            [python, "-m", "pytest", "mvp/tests/", "-v", "--tb=short", "--no-header", "-q"],
             capture_output=True,
             text=True,
             cwd="/opt/projects/chemist-agent",

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-_PROJECT_ROOT = Path(__file__).parent.parent.parent
+_PROJECT_ROOT = Path(__file__).parent.parent
 ORD_DB_PATH = _PROJECT_ROOT / "data" / "ord_reactions.db"
 
 # RDKit

@@ -111,12 +111,12 @@ final_score = 0.25 * model_confidence
 
 ```bash
 # With argument
-python -m real_proj.mvp "aspirin"
-python -m real_proj.mvp "CC(=O)Oc1ccccc1C(O)=O"
-python -m real_proj.mvp "этанол"
+python -m mvp "aspirin"
+python -m mvp "CC(=O)Oc1ccccc1C(O)=O"
+python -m mvp "этанол"
 
 # Interactive
-python -m real_proj.mvp
+python -m mvp
 ```
 
 ## Configuration

@@ -1,6 +1,6 @@
 """Self-contained tools for the MVP pipeline.
 
-No imports from outside real_proj/mvp/.  All data files live in ./data/.
+No imports from outside mvp/. All local package data files live in ./data/.
 """
 
 from __future__ import annotations

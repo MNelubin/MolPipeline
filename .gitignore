@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 .eggs/
+*.7z
 venv/
 .venv/
 .env
@@ -13,21 +14,21 @@ venv/
 
 # Frontend
 node_modules/
-real_proj/frontend/dist/
+frontend/dist/
 
 # Data - гигантские файлы (GitHub не пропустит >100MB)
 data/retro_model/templates.jsonl
 
 # Logs
-real_proj/logs/
+logs/
 *.log
 
 # Корневой мусор (старый код)
 /langgraph.json
 /pytest.ini
-/requirements.txt
 /.claude/
 
-# Внутри real_proj
-real_proj/src/
-real_proj/public/
+# Старые каталоги вне рабочего проекта
+real_proj/
+src/
+public/

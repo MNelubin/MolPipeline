@@ -67,7 +67,7 @@ from pathlib import Path
 # DBs are at <project_root>/data/
 # ord_reactions.db  — ORD reactions index
 # buyables.db       — vendor catalogs (eMolecules, Mcule, ChemBridge, ChemSpace, SA)
-_ORD_DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "ord_reactions.db"
+_ORD_DB_PATH = Path(__file__).parent.parent.parent / "data" / "ord_reactions.db"
 
 
 def _ord_search_via_api(smiles: str, limit: int = 15) -> list[dict]:
@@ -195,7 +195,7 @@ def _get_cheap_canonical() -> set[str]:
     return canonical
 
 
-_BUYABLES_DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "buyables.db"
+_BUYABLES_DB_PATH = Path(__file__).parent.parent.parent / "data" / "buyables.db"
 
 
 def _buyables_lookup(smiles: str) -> dict | None:

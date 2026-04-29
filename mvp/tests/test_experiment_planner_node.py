@@ -30,7 +30,7 @@ def mock_journal():
     mock_j.step.return_value.__enter__ = lambda s: None
     mock_j.step.return_value.__exit__ = MagicMock(return_value=False)
     mock_j.export_markdown.return_value = None
-    with patch("real_proj.mvp.journal.AgentJournal") as cls:
+    with patch("mvp.journal.AgentJournal") as cls:
         cls.for_session.return_value = mock_j
         yield mock_j
 
@@ -98,33 +98,33 @@ class TestExperimentPlannerErrors:
 
 class TestExperimentPlannerSingleStep:
     def test_returns_experiment_protocol(self, base_state):
-        with patch("real_proj.mvp.nodes.experiment_planner_node.format_procedure_russian",
+        with patch("mvp.nodes.experiment_planner_node.format_procedure_russian",
                    return_value=[{"step": "1", "description": "Mix reagents.", "reason": "ORD процедура"}]):
             result = experiment_planner_node(base_state)
         assert "experiment_protocol" in result
         assert "error" not in result["experiment_protocol"]
 
     def test_protocol_has_reaction_sections(self, base_state):
-        with patch("real_proj.mvp.nodes.experiment_planner_node.format_procedure_russian",
+        with patch("mvp.nodes.experiment_planner_node.format_procedure_russian",
                    return_value=[{"step": "1", "description": "Mix.", "reason": "ORD процедура"}]):
             result = experiment_planner_node(base_state)
         sections = result["experiment_protocol"]["reaction_sections"]
         assert len(sections) == 1
 
     def test_protocol_title_contains_molecule(self, base_state):
-        with patch("real_proj.mvp.nodes.experiment_planner_node.format_procedure_russian",
+        with patch("mvp.nodes.experiment_planner_node.format_procedure_russian",
                    return_value=[]):
             result = experiment_planner_node(base_state)
         assert "Aspirin" in result["experiment_protocol"]["title"]
 
     def test_sets_current_phase_experiment(self, base_state):
-        with patch("real_proj.mvp.nodes.experiment_planner_node.format_procedure_russian",
+        with patch("mvp.nodes.experiment_planner_node.format_procedure_russian",
                    return_value=[]):
             result = experiment_planner_node(base_state)
         assert result["current_phase"] == "experiment"
 
     def test_final_answer_contains_protocol_marker(self, base_state):
-        with patch("real_proj.mvp.nodes.experiment_planner_node.format_procedure_russian",
+        with patch("mvp.nodes.experiment_planner_node.format_procedure_russian",
                    return_value=[{"step": "1", "description": "Mix.", "reason": "ORD процедура"}]):
             result = experiment_planner_node(base_state)
         assert "ПРОТОКОЛ" in result["final_answer"]
@@ -294,3 +294,4 @@ class TestFormatProtocolText:
         })
         text = _format_protocol_text(protocol, "aspirin")
         assert "СТАДИЯ" in text
+

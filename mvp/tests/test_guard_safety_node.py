@@ -23,7 +23,7 @@ def _restricted(smiles="", reason="Class 3"):
 
 
 def _patch_banlist(side_effect):
-    return patch("real_proj.mvp.nodes.guard_safety_node.banlist_check", side_effect=side_effect)
+    return patch("mvp.nodes.guard_safety_node.banlist_check", side_effect=side_effect)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -182,3 +182,4 @@ class TestGuardSafetyFallback:
         with _patch_banlist(banlist):
             result = guard_safety_node({"retro_result": {"routes": [route]}})
         assert result["safety_report"]["has_critical"] is True
+

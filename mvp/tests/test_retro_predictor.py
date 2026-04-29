@@ -140,14 +140,14 @@ class TestEnsureLoaded:
         assert isinstance(result, bool)
 
     def test_returns_false_when_model_missing(self):
-        import real_proj.mvp.retro_predictor as predictor
+        import mvp.retro_predictor as predictor
         # Reset loaded state
         original_loaded = predictor._loaded
         original_model = predictor._model
         predictor._loaded = False
         predictor._model = None
 
-        with patch("real_proj.mvp.retro_predictor.MODEL_DIR") as mock_dir:
+        with patch("mvp.retro_predictor.MODEL_DIR") as mock_dir:
             mock_path = MagicMock()
             mock_path.exists.return_value = False
             mock_dir.__truediv__ = lambda self, other: mock_path
@@ -229,7 +229,7 @@ class TestPredictRetro:
         # May return 0 if no templates apply, but should not crash
 
     def test_returns_empty_when_model_not_loaded(self, aspirin_smiles):
-        with patch("real_proj.mvp.retro_predictor._ensure_loaded", return_value=False):
+        with patch("mvp.retro_predictor._ensure_loaded", return_value=False):
             results = predict_retro(aspirin_smiles)
             assert results == []
 
@@ -249,3 +249,4 @@ class TestPredictRetro:
         results = predict_retro(aspirin_smiles, top_n=5)
         for r in results:
             assert 0.0 <= r["plausibility"] <= 1.0
+

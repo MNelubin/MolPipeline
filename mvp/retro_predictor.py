@@ -18,8 +18,8 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Model directory
-MODEL_DIR = Path(__file__).parent.parent.parent / "data" / "retro_model"
+# Model directory at <repo_root>/data/retro_model
+MODEL_DIR = Path(__file__).parent.parent / "data" / "retro_model"
 
 # Lazy-loaded globals
 _model = None

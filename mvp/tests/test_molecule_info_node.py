@@ -88,7 +88,7 @@ def _make_mock_llm(content: dict | None = None):
 class TestMoleculeInfoNode:
     def _run_with_mock_llm(self, state, llm_content=None):
         mock_llm = _make_mock_llm(llm_content)
-        with patch("real_proj.mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
+        with patch("mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
             return molecule_info_node(state)
 
     def test_output_has_molecule_info_key(self, aspirin_guarded_state):
@@ -150,7 +150,7 @@ class TestMoleculeInfoNode:
         mock_resp.content = "NOT JSON AT ALL"
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = mock_resp
-        with patch("real_proj.mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
+        with patch("mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
             result = molecule_info_node(aspirin_guarded_state)
         assert "molecule_info" in result
         assert "final_answer" in result
@@ -161,14 +161,14 @@ class TestMoleculeInfoNode:
         mock_resp.content = f"```json\n{json.dumps(MOCK_LLM_RESPONSE)}\n```"
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = mock_resp
-        with patch("real_proj.mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
+        with patch("mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
             result = molecule_info_node(aspirin_guarded_state)
         assert result["molecule_info"]["pubchem_cid"] == 2244
 
     def test_llm_exception_handled_gracefully(self, aspirin_guarded_state):
         mock_llm = MagicMock()
         mock_llm.invoke.side_effect = Exception("LLM API down")
-        with patch("real_proj.mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
+        with patch("mvp.nodes.molecule_info_node._get_llm", return_value=mock_llm):
             result = molecule_info_node(aspirin_guarded_state)
         assert "molecule_info" in result
 
@@ -191,3 +191,4 @@ class TestMoleculeInfoNode:
         state = {**aspirin_guarded_state, "smiles": ""}
         result = self._run_with_mock_llm(state)
         assert "molecule_info" in result
+

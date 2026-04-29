@@ -24,7 +24,7 @@ def mock_journal():
     mock_j = MagicMock()
     mock_j.step.return_value.__enter__ = lambda s: None
     mock_j.step.return_value.__exit__ = MagicMock(return_value=False)
-    with patch("real_proj.mvp.journal.AgentJournal") as cls:
+    with patch("mvp.journal.AgentJournal") as cls:
         cls.for_session.return_value = mock_j
         yield mock_j
 
@@ -134,32 +134,32 @@ def _mock_safety(overall="SAFE"):
 
 class TestValidateAndGuardNode:
     def test_found_and_safe_sets_smiles(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_found("CCO", 702)), \
-             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("SAFE")):
             result = validate_and_guard_node({"query": "ethanol"})
         assert result["smiles"] == "CCO"
         assert result["pubchem_cid"] == 702
 
     def test_found_and_safe_sets_guard_result(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_found()), \
-             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("SAFE")):
             result = validate_and_guard_node({"query": "ethanol"})
         assert result["guard_result"]["overall_status"] == "SAFE"
 
     def test_found_sets_resolve_status_found(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_found()), \
-             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("SAFE")):
             result = validate_and_guard_node({"query": "ethanol"})
         assert result["validation"]["resolve_status"] == "found"
 
     def test_not_found_returns_not_found_status(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_not_found()):
             result = validate_and_guard_node({"query": "xyzunknownmolecule"})
         validation = result.get("validation", {})
@@ -167,26 +167,26 @@ class TestValidateAndGuardNode:
 
     def test_critical_stop_sets_resolve_banned(self, mock_journal):
         """CRITICAL_STOP from guard → validation.resolve_status == 'banned'."""
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_found("FENTANYL", 3345)), \
-             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("CRITICAL_STOP")):
             result = validate_and_guard_node({"query": "fentanyl"})
         assert result["guard_result"]["overall_status"] == "CRITICAL_STOP"
         assert result["validation"]["resolve_status"] == "banned"
 
     def test_critical_stop_sets_error_key(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_found()), \
-             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("CRITICAL_STOP")):
             result = validate_and_guard_node({"query": "fentanyl"})
         assert "error" in result
 
     def test_warning_status_preserved(self, mock_journal):
-        with patch("real_proj.mvp.nodes.validate_and_guard_node._resolve_molecule",
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule",
                    return_value=_mock_resolve_found()), \
-             patch("real_proj.mvp.nodes.validate_and_guard_node._run_safety_checks",
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks",
                    return_value=_mock_safety("WARNING")):
             result = validate_and_guard_node({"query": "something"})
         assert result["guard_result"]["overall_status"] == "WARNING"
@@ -194,3 +194,4 @@ class TestValidateAndGuardNode:
     def test_empty_query_returns_error(self, mock_journal):
         result = validate_and_guard_node({"query": ""})
         assert "error" in result or "validation" in result
+
