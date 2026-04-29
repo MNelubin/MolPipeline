@@ -122,6 +122,12 @@ class TestFindTopRoutes:
             result = _find_top_routes("CCO", top_n=3)
             assert len(result) <= 3
 
+    def test_uses_tree_experimental_flag(self):
+        with patch("mvp.tree_expansion.RETRO_TREE_INCLUDE_EXPERIMENTAL", False), \
+             patch("mvp.tree_expansion.collect_candidate_routes", return_value=([], [])) as mock_collect:
+            _find_top_routes("CCO")
+        assert mock_collect.call_args.kwargs["include_experimental"] is False
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # _build_node

@@ -53,6 +53,7 @@ RETRO_ENABLE_RETRO_MODEL = _get_bool_env("RETRO_ENABLE_RETRO_MODEL", True)
 RETRO_ENABLE_AIZYNTH = _get_bool_env("RETRO_ENABLE_AIZYNTH", False)
 RETRO_ENABLE_RETROCAST = _get_bool_env("RETRO_ENABLE_RETROCAST", False)
 RETRO_ORD_AUTHORITATIVE = _get_bool_env("RETRO_ORD_AUTHORITATIVE", True)
+RETRO_TREE_INCLUDE_EXPERIMENTAL = _get_bool_env("RETRO_TREE_INCLUDE_EXPERIMENTAL", False)
 
 # Optional future endpoints for additive retrosynthesis sources
 AIZYNTH_BASE_URL = os.getenv("AIZYNTH_BASE_URL", "")

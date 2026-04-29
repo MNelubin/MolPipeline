@@ -103,6 +103,38 @@ class TestFormatRetroText:
 # retrosynthesis_node
 # ═════════════════════════════════════════════════════════════════════════════
 
+class TestFormatRetroTextExtra:
+    def test_source_counts_and_provenance_displayed(self):
+        route = {
+            "reactants": "CC=O.O",
+            "reaction_smiles": "CC=O.O>>CCO",
+            "source": "aizynthfinder",
+            "num_steps": 4,
+            "final_score": 0.81,
+            "scoring": {
+                "model_score": 0.70,
+                "plausibility": 0.75,
+                "buyability": 0.8,
+                "simplicity": 0.6,
+            },
+            "provenance": {
+                "provider": "aizynthfinder",
+                "retrieval_mode": "service_tree_search",
+            },
+            "procedure_steps_ru": [],
+        }
+        text = _format_retro_text(
+            "Test",
+            [route],
+            ["ord", "aizynthfinder"],
+            2,
+            source_counts={"ord": 1, "aizynthfinder": 1},
+        )
+        assert "AiZynthFinder=1" in text
+        assert "Шагов в маршруте: 4" in text
+        assert "service_tree_search" in text
+
+
 class TestRetrosynthesisNode:
     def _mock_search_and_rank(self, routes=None, sources=None, total=0):
         return {

@@ -74,6 +74,15 @@ def _deduplicate_routes(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return list(seen.values())
 
 
+def _count_routes_by_source(routes: list[dict[str, Any]]) -> dict[str, int]:
+    """Summarize how many route candidates each source contributed."""
+    counts: dict[str, int] = {}
+    for route in routes:
+        source = str(route.get("source") or "unknown")
+        counts[source] = counts.get(source, 0) + 1
+    return counts
+
+
 def _merge_provenance(route: dict[str, Any], source: str, retrieval_mode: str) -> dict[str, Any]:
     """Attach a stable source/provenance block to a route dict."""
     result = dict(route)
@@ -682,6 +691,7 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
         include_experimental=True,
     )
     total_found = len(all_routes)
+    source_counts = _count_routes_by_source(all_routes)
 
     if not all_routes:
         return {
@@ -689,12 +699,17 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
             "best_route": None,
             "sources_used": [],
             "total_found": 0,
+            "total_unique": 0,
+            "source_counts": {},
+            "source_counts_deduped": {},
         }
 
     for route in all_routes:
         score_route(route)
 
     all_routes = _deduplicate_routes(all_routes)
+    total_unique = len(all_routes)
+    source_counts_deduped = _count_routes_by_source(all_routes)
     logger.info("After dedup: %d routes (from %d)", len(all_routes), total_found)
 
     all_routes.sort(key=lambda r: r.get("final_score", 0), reverse=True)
@@ -705,4 +720,7 @@ def search_and_rank(smiles: str, top_n: int = 5) -> dict[str, Any]:
         "best_route": top_routes[0] if top_routes else None,
         "sources_used": sources_used,
         "total_found": total_found,
+        "total_unique": total_unique,
+        "source_counts": source_counts,
+        "source_counts_deduped": source_counts_deduped,
     }

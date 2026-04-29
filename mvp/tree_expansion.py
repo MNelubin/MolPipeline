@@ -16,6 +16,7 @@ from typing import Any
 
 from rdkit import Chem
 
+from .config import RETRO_TREE_INCLUDE_EXPERIMENTAL
 from .tools.retro_tools import (
     _is_buyable,
     collect_candidate_routes,
@@ -62,7 +63,7 @@ def _find_top_routes(smiles: str, top_n: int = 5) -> list[dict[str, Any]]:
             ord_limit=top_n * 3,
             model_top_n=top_n + 2,
             use_web=False,
-            include_experimental=True,
+            include_experimental=RETRO_TREE_INCLUDE_EXPERIMENTAL,
         )
     except Exception as e:
         logger.warning("[tree] route collection failed for %s: %s", smiles[:30], e)

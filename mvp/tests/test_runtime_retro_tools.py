@@ -82,5 +82,8 @@ class TestSearchAndRankRuntime:
 
         assert result["sources_used"] == ["ord", "web"]
         assert result["total_found"] == 2
+        assert result["total_unique"] == 1
+        assert result["source_counts"] == {"ord": 1, "web": 1}
+        assert result["source_counts_deduped"] == {"web": 1}
         assert len(result["routes"]) == 1
         assert result["routes"][0]["source"] == "web"

@@ -3,8 +3,10 @@
 POST /analyze      — run pipeline (mode=auto end-to-end, or mode=interactive with pauses)
 POST /resume       — resume an interactive session at the next interrupt point
 POST /ord/search   — search ORD by molecule name or SMILES, return ranked reactions
+POST /retro/search — run additive retrosynthesis search across enabled sources
 POST /tree/expand  — recursively expand a synthesis route into a full tree
 GET  /health       — liveness check
+GET  /retro/sources — inspect enabled retrosynthesis sources and AiZynth service reachability
 
 Run:
     uvicorn mvp.api:app --host 0.0.0.0 --port 8765
@@ -26,7 +28,8 @@ from pydantic import BaseModel, Field
 from . import config as _cfg  # noqa: F401
 from .config import DATA_DIR
 from .graph import build_graph
-from .tools.retro_tools import _ord_search_via_api, score_route, _deduplicate_routes
+from .services.aizynth_client import get_aizynth_resources
+from .tools.retro_tools import _ord_search_via_api, score_route, _deduplicate_routes, search_and_rank
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,6 +153,30 @@ class OrdSearchResponse(BaseModel):
     total_found: int
     returned: int
     reactions: list[dict[str, Any]]
+
+
+class RetroSearchRequest(BaseModel):
+    query: str = Field(..., description="Molecule name (any language) or SMILES string")
+    top_n: int = Field(default=5, ge=1, le=25)
+
+
+class RetroSearchResponse(BaseModel):
+    query: str
+    smiles: str
+    resolution: str
+    total_found: int
+    total_unique: int
+    returned: int
+    sources_used: list[str]
+    source_counts: dict[str, int]
+    source_counts_deduped: dict[str, int]
+    routes: list[dict[str, Any]]
+
+
+class RetroSourcesResponse(BaseModel):
+    ord_authoritative: bool
+    tree_include_experimental: bool
+    sources: dict[str, dict[str, Any]]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -359,11 +386,92 @@ def _run_ord_search(query: str, limit: int, top_n: int, scored: bool) -> dict[st
     }
 
 
+def _run_retro_search(query: str, top_n: int) -> dict[str, Any]:
+    """Resolve query -> SMILES, then run additive retrosynthesis search."""
+    smiles, resolution = _resolve_to_smiles(query)
+    result = search_and_rank(smiles, top_n=top_n)
+    return {
+        "smiles": smiles,
+        "resolution": resolution,
+        "total_found": result.get("total_found", 0),
+        "total_unique": result.get("total_unique", 0),
+        "sources_used": result.get("sources_used", []),
+        "source_counts": result.get("source_counts", {}),
+        "source_counts_deduped": result.get("source_counts_deduped", {}),
+        "routes": result.get("routes", []),
+    }
+
+
+def _retro_sources_snapshot() -> dict[str, Any]:
+    """Build a diagnostic snapshot of enabled retrosynthesis sources."""
+    sources: dict[str, dict[str, Any]] = {
+        "ord": {
+            "enabled": _cfg.RETRO_ENABLE_ORD,
+            "configured": True,
+            "mode": "sqlite",
+        },
+        "web": {
+            "enabled": _cfg.RETRO_ENABLE_WEB,
+            "configured": True,
+            "mode": "web_search",
+        },
+        "retro_model": {
+            "enabled": _cfg.RETRO_ENABLE_RETRO_MODEL,
+            "configured": True,
+            "mode": "local_model",
+        },
+        "aizynthfinder": {
+            "enabled": _cfg.RETRO_ENABLE_AIZYNTH,
+            "configured": bool(_cfg.AIZYNTH_BASE_URL),
+            "base_url": _cfg.AIZYNTH_BASE_URL or None,
+            "reachable": None,
+            "mode": "service_tree_search",
+        },
+        "retrocast": {
+            "enabled": _cfg.RETRO_ENABLE_RETROCAST,
+            "configured": bool(_cfg.RETROCAST_BASE_URL),
+            "base_url": _cfg.RETROCAST_BASE_URL or None,
+            "reachable": None,
+            "mode": "service_placeholder",
+            "implemented": False,
+        },
+    }
+
+    aizynth = sources["aizynthfinder"]
+    if aizynth["enabled"] and aizynth["configured"]:
+        try:
+            resources = get_aizynth_resources(
+                _cfg.AIZYNTH_BASE_URL,
+                timeout=max(5, int(_cfg.AIZYNTH_TIMEOUT_SEC)),
+            )
+            aizynth["reachable"] = True
+            aizynth["details"] = {
+                "stocks": resources.get("stocks", []),
+                "expansion_models": resources.get("expansion_models", []),
+                "filter_models": resources.get("filter_models", []),
+            }
+        except Exception as exc:
+            aizynth["reachable"] = False
+            aizynth["error"] = str(exc)
+
+    return {
+        "ord_authoritative": _cfg.RETRO_ORD_AUTHORITATIVE,
+        "tree_include_experimental": _cfg.RETRO_TREE_INCLUDE_EXPERIMENTAL,
+        "sources": sources,
+    }
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "graph_ready": _graph is not None}
+
+
+@app.get("/retro/sources", response_model=RetroSourcesResponse)
+async def retro_sources():
+    """Inspect currently enabled retrosynthesis sources and service availability."""
+    return RetroSourcesResponse(**_sanitize(_retro_sources_snapshot()))
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -486,6 +594,53 @@ async def ord_search(req: OrdSearchRequest):
         total_found=result["total_found"],
         returned=len(clean_reactions),
         reactions=clean_reactions,
+    )
+
+
+@app.post("/retro/search", response_model=RetroSearchResponse)
+async def retro_search(req: RetroSearchRequest):
+    """Run additive retrosynthesis search across all enabled sources."""
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query must not be empty")
+
+    logger.info("[retro/search] query=%r top_n=%d", query, req.top_n)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: _run_retro_search(query, req.top_n),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[retro/search] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    clean_routes = _sanitize(result["routes"])
+    logger.info(
+        "[retro/search] %r -> smiles=%s total=%d unique=%d returning=%d from %s",
+        query,
+        result["smiles"][:30],
+        result["total_found"],
+        result["total_unique"],
+        len(clean_routes),
+        ", ".join(result["sources_used"]) or "none",
+    )
+
+    return RetroSearchResponse(
+        query=query,
+        smiles=result["smiles"],
+        resolution=result["resolution"],
+        total_found=result["total_found"],
+        total_unique=result["total_unique"],
+        returned=len(clean_routes),
+        sources_used=result["sources_used"],
+        source_counts=result["source_counts"],
+        source_counts_deduped=result["source_counts_deduped"],
+        routes=clean_routes,
     )
 
 
