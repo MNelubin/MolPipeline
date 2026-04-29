@@ -1658,6 +1658,102 @@ a.ext-link:hover { color: var(--cyan); }
   padding: var(--sp-sm) 0;
 }
 
+.retro-topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.retro-source-select {
+  min-width: 210px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+}
+
+.retro-empty-state {
+  max-width: 920px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.retro-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.retro-source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  background: linear-gradient(180deg, rgba(18,29,46,0.95), rgba(13,21,32,0.95));
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.retro-source-card:hover:not(:disabled) {
+  border-color: var(--border-hi);
+  transform: translateY(-1px);
+}
+
+.retro-source-card.active {
+  border-color: var(--cyan);
+  box-shadow: 0 0 18px rgba(6,214,240,0.12);
+}
+
+.retro-source-card.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.retro-source-card-title {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.retro-source-card-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.retro-result-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.retro-result-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--cyan-border);
+  background: var(--cyan-bg);
+  color: var(--cyan);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.retro-result-pill.warning {
+  border-color: var(--amber-border);
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
 /* ─── Calculator card ───────────────────────────────────────────────────── */
 .calc-mode-switcher {
   display: flex;
@@ -2170,6 +2266,8 @@ a.ext-link:hover { color: var(--cyan); }
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .topbar { padding: 0 12px; }
+  .retro-topbar-controls { gap: 8px; }
+  .retro-source-select { min-width: 140px; max-width: 160px; }
   .messages { padding: 16px 12px; }
   .message-row { padding: 0 8px; }
   .props-grid { grid-template-columns: 1fr; }
@@ -2178,4 +2276,5 @@ a.ext-link:hover { color: var(--cyan); }
   .score-grid { grid-template-columns: 1fr; }
   .synth-detail-panel { width: 280px; }
   .empty-examples { max-width: 300px; }
+  .retro-source-grid { grid-template-columns: 1fr; }
 }

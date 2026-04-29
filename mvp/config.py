@@ -9,6 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _get_bool_env(name: str, default: bool) -> bool:
+    """Parse a boolean environment variable with a sane default."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
 # Paths
 MVP_DIR = Path(__file__).parent
 DATA_DIR = MVP_DIR / "data"
@@ -37,6 +45,25 @@ PUBCHEM_VIEW_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view"
 
 # ASKCOS (self-hosted retrosynthesis)
 ASKCOS_BASE_URL = os.getenv("ASKCOS_BASE_URL", "http://localhost:9100")
+
+# Retrosynthesis source flags
+RETRO_ENABLE_ORD = _get_bool_env("RETRO_ENABLE_ORD", True)
+RETRO_ENABLE_WEB = _get_bool_env("RETRO_ENABLE_WEB", True)
+RETRO_ENABLE_RETRO_MODEL = _get_bool_env("RETRO_ENABLE_RETRO_MODEL", True)
+RETRO_ENABLE_AIZYNTH = _get_bool_env("RETRO_ENABLE_AIZYNTH", False)
+RETRO_ENABLE_RETROCAST = _get_bool_env("RETRO_ENABLE_RETROCAST", False)
+RETRO_ORD_AUTHORITATIVE = _get_bool_env("RETRO_ORD_AUTHORITATIVE", True)
+RETRO_TREE_INCLUDE_EXPERIMENTAL = _get_bool_env("RETRO_TREE_INCLUDE_EXPERIMENTAL", False)
+
+# Optional future endpoints for additive retrosynthesis sources
+AIZYNTH_BASE_URL = os.getenv("AIZYNTH_BASE_URL", "")
+RETROCAST_BASE_URL = os.getenv("RETROCAST_BASE_URL", "")
+AIZYNTH_TIMEOUT_SEC = float(os.getenv("AIZYNTH_TIMEOUT_SEC", "120"))
+AIZYNTH_MAX_TRANSFORMS = int(os.getenv("AIZYNTH_MAX_TRANSFORMS", "12"))
+AIZYNTH_TIME_LIMIT = int(os.getenv("AIZYNTH_TIME_LIMIT", "10"))
+AIZYNTH_ITERATIONS = int(os.getenv("AIZYNTH_ITERATIONS", "100"))
+AIZYNTH_EXPANSION_MODEL = os.getenv("AIZYNTH_EXPANSION_MODEL", "uspto")
+AIZYNTH_STOCK = os.getenv("AIZYNTH_STOCK", "zinc")
 
 
 def _make_httpx_client(timeout: float = 120.0):

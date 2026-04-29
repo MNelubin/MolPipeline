@@ -3,8 +3,10 @@
 POST /analyze      — run pipeline (mode=auto end-to-end, or mode=interactive with pauses)
 POST /resume       — resume an interactive session at the next interrupt point
 POST /ord/search   — search ORD by molecule name or SMILES, return ranked reactions
+POST /retro/search — run additive retrosynthesis search across enabled sources
 POST /tree/expand  — recursively expand a synthesis route into a full tree
 GET  /health       — liveness check
+GET  /retro/sources — inspect enabled retrosynthesis sources and AiZynth service reachability
 
 Run:
     uvicorn mvp.api:app --host 0.0.0.0 --port 8765
@@ -26,7 +28,14 @@ from pydantic import BaseModel, Field
 from . import config as _cfg  # noqa: F401
 from .config import DATA_DIR
 from .graph import build_graph
-from .tools.retro_tools import _ord_search_via_api, score_route, _deduplicate_routes
+from .services.aizynth_client import get_aizynth_resources
+from .services.retrocast_bridge import get_retrocast_runtime_info
+from .tools.retro_tools import (
+    _ord_search_via_api,
+    _deduplicate_routes,
+    score_route,
+    search_and_rank,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,6 +159,61 @@ class OrdSearchResponse(BaseModel):
     total_found: int
     returned: int
     reactions: list[dict[str, Any]]
+
+
+class RetroSearchRequest(BaseModel):
+    query: str = Field(..., description="Molecule name (any language) or SMILES string")
+    top_n: int = Field(default=5, ge=1, le=25)
+    source_mode: Literal["auto", "ord", "web", "retro_model", "aizynthfinder", "all"] = Field(
+        default="auto",
+        description="Retrosynthesis source selection mode for ranking routes.",
+    )
+
+
+class RetroSearchResponse(BaseModel):
+    query: str
+    smiles: str
+    resolution: str
+    source_mode: str
+    total_found: int
+    total_unique: int
+    returned: int
+    sources_used: list[str]
+    source_counts: dict[str, int]
+    source_counts_deduped: dict[str, int]
+    routes: list[dict[str, Any]]
+
+
+class RetroAnalyzeRequest(BaseModel):
+    query: str = Field(..., description="Molecule name (any language) or SMILES string")
+    top_n: int = Field(default=5, ge=1, le=25)
+    source_mode: Literal["auto", "ord", "web", "retro_model", "aizynthfinder", "all"] = Field(
+        default="auto",
+        description="Retrosynthesis source selection mode for the dedicated UI tab.",
+    )
+    model: str | None = Field(
+        default=None,
+        description="Optional LLM model override for molecule card generation.",
+    )
+
+
+class RetroAnalyzeResponse(BaseModel):
+    status: Literal["ok", "blocked"]
+    query: str
+    smiles: str
+    resolution: str
+    source_mode: str
+    molecule_info: dict[str, Any]
+    guard_result: dict[str, Any]
+    retro_result: dict[str, Any]
+    error: str | None = None
+
+
+class RetroSourcesResponse(BaseModel):
+    ord_authoritative: bool
+    tree_include_experimental: bool
+    source_modes: list[dict[str, Any]]
+    sources: dict[str, dict[str, Any]]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -359,11 +423,222 @@ def _run_ord_search(query: str, limit: int, top_n: int, scored: bool) -> dict[st
     }
 
 
+def _attach_procedure_steps(routes: list[dict[str, Any]]) -> None:
+    """Decorate retrosynthesis routes with structured Russian procedure steps."""
+    from .procedure_inference import format_procedure_russian
+
+    for route in routes:
+        route["procedure_steps_ru"] = format_procedure_russian(route)
+
+
+def _run_retro_search(query: str, top_n: int, source_mode: str = "auto") -> dict[str, Any]:
+    """Resolve query -> SMILES, then run additive retrosynthesis search."""
+    smiles, resolution = _resolve_to_smiles(query)
+    result = search_and_rank(smiles, top_n=top_n, source_mode=source_mode)
+    _attach_procedure_steps(result.get("routes", []))
+    return {
+        "smiles": smiles,
+        "resolution": resolution,
+        "source_mode": result.get("source_mode", source_mode),
+        "total_found": result.get("total_found", 0),
+        "total_unique": result.get("total_unique", 0),
+        "sources_used": result.get("sources_used", []),
+        "source_counts": result.get("source_counts", {}),
+        "source_counts_deduped": result.get("source_counts_deduped", {}),
+        "routes": result.get("routes", []),
+    }
+
+
+def _run_retro_analyze(
+    query: str,
+    top_n: int,
+    source_mode: str = "auto",
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Resolve molecule, build card context, then run source-aware retrosynthesis."""
+    from .nodes.molecule_info_node import molecule_info_node
+    from .nodes.validate_and_guard_node import _resolve_molecule, _run_safety_checks
+
+    resolved = _resolve_molecule(query)
+    validation = resolved.get("validation", {})
+    if not validation.get("is_valid"):
+        raise ValueError(validation.get("error") or f"Could not resolve molecule: {query}")
+
+    smiles = resolved.get("smiles", "")
+    cid = resolved.get("pubchem_cid")
+    guard_result = _run_safety_checks(smiles=smiles, cid=cid, reaction_description="")
+    molecule_state = molecule_info_node({
+        "query": query,
+        "smiles": smiles,
+        "pubchem_cid": cid,
+        "guard_result": guard_result,
+        "llm_model": model,
+    })
+    molecule_info = molecule_state.get("molecule_info", {})
+
+    error = None
+    if guard_result.get("overall_status") == "CRITICAL_STOP":
+        error = (
+            guard_result.get("molecule_check", {}).get("reason")
+            or guard_result.get("reaction_check", {}).get("reason")
+            or "Retrosynthesis blocked by safety policy."
+        )
+        retro_result = {
+            "routes": [],
+            "best_route": None,
+            "sources_used": [],
+            "total_found": 0,
+            "total_unique": 0,
+            "source_counts": {},
+            "source_counts_deduped": {},
+            "source_mode": source_mode,
+            "error": error,
+        }
+        status = "blocked"
+    else:
+        retro_result = search_and_rank(smiles, top_n=top_n, source_mode=source_mode)
+        _attach_procedure_steps(retro_result.get("routes", []))
+        status = "ok"
+
+    return {
+        "status": status,
+        "query": query,
+        "smiles": smiles,
+        "resolution": validation.get("input_type") or "resolved",
+        "source_mode": retro_result.get("source_mode", source_mode),
+        "molecule_info": molecule_info,
+        "guard_result": guard_result,
+        "retro_result": retro_result,
+        "error": error,
+    }
+
+
+def _build_source_modes(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build frontend-facing source mode metadata from the runtime snapshot."""
+    sources = snapshot["sources"]
+    source_modes: list[dict[str, Any]] = [
+        {
+            "id": "auto",
+            "label": "Авто",
+            "description": "Стандартный режим как в основном UI.",
+            "enabled": True,
+        },
+        {
+            "id": "ord",
+            "label": "ORD",
+            "description": "Только Open Reaction Database.",
+            "enabled": bool(sources["ord"]["enabled"]),
+        },
+        {
+            "id": "retro_model",
+            "label": "ASKCOS-derived model",
+            "description": "Только локальная template-relevance модель.",
+            "enabled": bool(sources["retro_model"]["enabled"]),
+        },
+        {
+            "id": "web",
+            "label": "Web Search",
+            "description": "Только web-поиск синтетических маршрутов.",
+            "enabled": bool(sources["web"]["enabled"]),
+        },
+        {
+            "id": "aizynthfinder",
+            "label": "AiZynthFinder",
+            "description": "Только внешний multi-step planner AiZynthFinder.",
+            "enabled": bool(
+                sources["aizynthfinder"]["enabled"]
+                and sources["aizynthfinder"]["configured"]
+                and sources["aizynthfinder"].get("reachable") is not False
+            ),
+        },
+    ]
+    source_modes.append({
+        "id": "all",
+        "label": "All Sources",
+        "description": "Явно собрать additive-пул из всех включённых источников.",
+        "enabled": any(mode["enabled"] for mode in source_modes[1:]),
+    })
+    return source_modes
+
+
+def _retro_sources_snapshot() -> dict[str, Any]:
+    """Build a diagnostic snapshot of enabled retrosynthesis sources."""
+    retrocast_info = get_retrocast_runtime_info()
+    sources: dict[str, dict[str, Any]] = {
+        "ord": {
+            "enabled": _cfg.RETRO_ENABLE_ORD,
+            "configured": True,
+            "mode": "sqlite",
+        },
+        "web": {
+            "enabled": _cfg.RETRO_ENABLE_WEB,
+            "configured": True,
+            "mode": "web_search",
+        },
+        "retro_model": {
+            "enabled": _cfg.RETRO_ENABLE_RETRO_MODEL,
+            "configured": True,
+            "mode": "local_model",
+        },
+        "aizynthfinder": {
+            "enabled": _cfg.RETRO_ENABLE_AIZYNTH,
+            "configured": bool(_cfg.AIZYNTH_BASE_URL),
+            "base_url": _cfg.AIZYNTH_BASE_URL or None,
+            "reachable": None,
+            "mode": "service_tree_search",
+        },
+        "retrocast": {
+            "enabled": _cfg.RETRO_ENABLE_RETROCAST,
+            "configured": retrocast_info["available"],
+            "reachable": retrocast_info["available"],
+            "mode": "canonicalization_bridge",
+            "standalone_source": False,
+            "version": retrocast_info["version"],
+            "adapters": retrocast_info["adapters"],
+        },
+    }
+
+    aizynth = sources["aizynthfinder"]
+    if aizynth["enabled"] and aizynth["configured"]:
+        try:
+            resources = get_aizynth_resources(
+                _cfg.AIZYNTH_BASE_URL,
+                timeout=max(5, int(_cfg.AIZYNTH_TIMEOUT_SEC)),
+            )
+            aizynth["reachable"] = True
+            aizynth["details"] = {
+                "stocks": resources.get("stocks", []),
+                "expansion_models": resources.get("expansion_models", []),
+                "filter_models": resources.get("filter_models", []),
+            }
+        except Exception as exc:
+            aizynth["reachable"] = False
+            aizynth["error"] = str(exc)
+
+    if retrocast_info["error"]:
+        sources["retrocast"]["error"] = retrocast_info["error"]
+
+    snapshot = {
+        "ord_authoritative": _cfg.RETRO_ORD_AUTHORITATIVE,
+        "tree_include_experimental": _cfg.RETRO_TREE_INCLUDE_EXPERIMENTAL,
+        "source_modes": [],
+        "sources": sources,
+    }
+    snapshot["source_modes"] = _build_source_modes(snapshot)
+    return snapshot
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "graph_ready": _graph is not None}
+
+
+@app.get("/retro/sources", response_model=RetroSourcesResponse)
+async def retro_sources():
+    """Inspect currently enabled retrosynthesis sources and service availability."""
+    return RetroSourcesResponse(**_sanitize(_retro_sources_snapshot()))
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -487,6 +762,85 @@ async def ord_search(req: OrdSearchRequest):
         returned=len(clean_reactions),
         reactions=clean_reactions,
     )
+
+
+@app.post("/retro/search", response_model=RetroSearchResponse)
+async def retro_search(req: RetroSearchRequest):
+    """Run source-aware retrosynthesis search across enabled sources."""
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query must not be empty")
+
+    logger.info("[retro/search] query=%r top_n=%d source_mode=%s", query, req.top_n, req.source_mode)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: _run_retro_search(query, req.top_n, req.source_mode),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[retro/search] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    clean_routes = _sanitize(result["routes"])
+    logger.info(
+        "[retro/search] %r -> smiles=%s total=%d unique=%d returning=%d from %s",
+        query,
+        result["smiles"][:30],
+        result["total_found"],
+        result["total_unique"],
+        len(clean_routes),
+        ", ".join(result["sources_used"]) or "none",
+    )
+
+    return RetroSearchResponse(
+        query=query,
+        smiles=result["smiles"],
+        resolution=result["resolution"],
+        source_mode=result["source_mode"],
+        total_found=result["total_found"],
+        total_unique=result["total_unique"],
+        returned=len(clean_routes),
+        sources_used=result["sources_used"],
+        source_counts=result["source_counts"],
+        source_counts_deduped=result["source_counts_deduped"],
+        routes=clean_routes,
+    )
+
+
+@app.post("/retro/analyze", response_model=RetroAnalyzeResponse)
+async def retro_analyze(req: RetroAnalyzeRequest):
+    """Build molecule card context and run source-aware retrosynthesis for the dedicated UI tab."""
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query must not be empty")
+
+    logger.info(
+        "[retro/analyze] query=%r top_n=%d source_mode=%s model=%s",
+        query,
+        req.top_n,
+        req.source_mode,
+        req.model or "default",
+    )
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: _run_retro_analyze(query, req.top_n, req.source_mode, req.model),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[retro/analyze] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return RetroAnalyzeResponse(**_sanitize(result))
 
 
 @app.post("/tree/expand", response_model=TreeExpandResponse)

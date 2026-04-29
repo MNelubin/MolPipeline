@@ -22,6 +22,23 @@ const SOURCE_LABEL = {
   ord:          { text: 'ORD',   color: 'var(--green)' },
   retro_model:  { text: 'MODEL', color: 'var(--purple)' },
   web:          { text: 'WEB',   color: 'var(--cyan)' },
+  aizynthfinder:{ text: 'AIZYNTH', color: 'var(--amber)' },
+}
+
+const SOURCE_LABEL_FULL = {
+  ord: 'Open Reaction Database',
+  retro_model: 'Template-relevance model',
+  web: 'Web Search (PubMed + DuckDuckGo)',
+  aizynthfinder: 'AiZynthFinder',
+}
+
+const SEARCH_MODE_LABEL = {
+  auto: 'Auto',
+  ord: 'ORD only',
+  retro_model: 'ASKCOS-derived model only',
+  web: 'Web only',
+  aizynthfinder: 'AiZynthFinder only',
+  all: 'All enabled sources',
 }
 
 function ScoreBar({ value, max = 1 }) {
@@ -184,11 +201,8 @@ export default function RetroCard({ retroResult }) {
   const sources = retroResult.sources_used || []
   const total = retroResult.total_found || 0
 
-  const SOURCE_LABEL_FULL = {
-    ord:         'Open Reaction Database',
-    retro_model: 'Template-relevance модель',
-    web:         'Web Search (PubMed + DuckDuckGo)',
-  }
+  const totalUnique = retroResult.total_unique || routes.length
+  const searchMode = retroResult.source_mode || 'auto'
 
   return (
     <div>
@@ -197,6 +211,16 @@ export default function RetroCard({ retroResult }) {
         <div className="prop-item" style={{ minWidth: 120 }}>
           <div className="prop-label">Найдено маршрутов</div>
           <div className="prop-value">{total}</div>
+        </div>
+        <div className="prop-item" style={{ minWidth: 120 }}>
+          <div className="prop-label">Unique routes</div>
+          <div className="prop-value">{totalUnique}</div>
+        </div>
+        <div className="prop-item" style={{ minWidth: 160 }}>
+          <div className="prop-label">Search mode</div>
+          <div className="prop-value" style={{ fontSize: 12 }}>
+            {SEARCH_MODE_LABEL[searchMode] || searchMode}
+          </div>
         </div>
         <div className="prop-item" style={{ flex: 1, minWidth: 180 }}>
           <div className="prop-label">Источники</div>

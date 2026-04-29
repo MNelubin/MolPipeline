@@ -1,6 +1,6 @@
 """Retrosynthesis node: find synthesis routes and expand into full trees.
 
-1. Searches ORD for published reactions + retro model for predictions
+1. Queries all enabled retrosynthesis sources via the shared runtime collector
 2. For each top route, recursively expands non-buyable reactants via tree_expansion
 3. Formats procedure details as step-by-step Russian instructions
 """
@@ -50,6 +50,7 @@ def retrosynthesis_node(state: dict[str, Any]) -> dict[str, Any]:
         routes = result.get("routes", [])
         sources = result.get("sources_used", [])
         total = result.get("total_found", 0)
+        source_counts = result.get("source_counts_deduped", {})
 
         j.tool_call(
             "retrosynthesis", "search_and_rank",
@@ -97,7 +98,7 @@ def retrosynthesis_node(state: dict[str, Any]) -> dict[str, Any]:
              "best_score": routes[0].get("final_score") if routes else None},
         )
 
-    retro_text = _format_retro_text(mol_name, routes, sources, total)
+    retro_text = _format_retro_text(mol_name, routes, sources, total, source_counts=source_counts)
 
     existing_answer = state.get("final_answer", "")
     retro_marker = "=" * 60 + "\n  РЕТРОСИНТЕЗ:"
@@ -115,13 +116,23 @@ def _format_retro_text(
     routes: list[dict[str, Any]],
     sources: list[str],
     total: int,
+    *,
+    source_counts: dict[str, int] | None = None,
 ) -> str:
     """Format retrosynthesis results as Russian text with tree details."""
     source_labels = {
         "ord": "Open Reaction Database",
+        "web": "Веб-поиск синтеза",
         "retro_model": "Ретросинтез-модель (template-relevance)",
+        "aizynthfinder": "AiZynthFinder",
+        "retrocast": "RetroCast",
     }
     source_str = ", ".join(source_labels.get(s, s) for s in sources)
+    source_counts = source_counts or {}
+    source_counts_str = ", ".join(
+        f"{source_labels.get(source, source)}={count}"
+        for source, count in source_counts.items()
+    )
 
     lines = [
         f"{'='*60}",
@@ -132,6 +143,8 @@ def _format_retro_text(
         f"  Показано лучших: {len(routes)}",
         "",
     ]
+    if source_counts_str:
+        lines.insert(-1, f"  Вклад источников: {source_counts_str}")
 
     if not routes:
         lines.append("  Пути синтеза не найдены.")
@@ -143,7 +156,10 @@ def _format_retro_text(
         source = route.get("source", "?")
         source_label = {
             "ord": "ORD",
+            "web": "WEB",
             "retro_model": "МОДЕЛЬ",
+            "aizynthfinder": "AIZYNTH",
+            "retrocast": "RETROCAST",
         }.get(source, source.upper())
 
         lines.append(f"  ── Путь #{i} [{source_label}] " + "─" * 40)
@@ -167,6 +183,8 @@ def _format_retro_text(
             lines.append(f"  Катализатор:    {route['catalyst']}")
         if route.get("expected_yield") is not None:
             lines.append(f"  Выход:          {route['expected_yield']:.0%}")
+        if route.get("num_steps"):
+            lines.append(f"  Шагов в маршруте: {route['num_steps']}")
 
         lines.append(f"  Оценка:         {route.get('final_score', 0):.3f}/1.00")
         lines.append(
@@ -180,6 +198,12 @@ def _format_retro_text(
             lines.append(f"  Примеров в базе: {route['num_examples']}")
         if route.get("reaction_id"):
             lines.append(f"  ORD ID:         {route['reaction_id']}")
+        provenance = route.get("provenance") or {}
+        provider = provenance.get("provider")
+        retrieval_mode = provenance.get("retrieval_mode")
+        if provider or retrieval_mode:
+            mode_suffix = f" ({retrieval_mode})" if retrieval_mode else ""
+            lines.append(f"  Провайдер:      {provider or source}{mode_suffix}")
 
         procedure_steps = route.get("procedure_steps_ru", [])
         if procedure_steps:

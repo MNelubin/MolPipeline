@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Viewer3D from './Viewer3D'
 import RetroCard from './RetroCard'
 const TABS = ['overview', 'properties', 'structure', 'safety', 'synthesis']
@@ -20,10 +20,14 @@ function PropItem({ label, value }) {
   )
 }
 
-export default function MoleculeCard({ moleculeInfo, guardResult, retroResult }) {
-  const [tab, setTab] = useState('overview')
+export default function MoleculeCard({ moleculeInfo, guardResult, retroResult, defaultTab = 'overview' }) {
+  const [tab, setTab] = useState(defaultTab)
   const [viewMode, setViewMode] = useState('2d')
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    setTab(defaultTab)
+  }, [defaultTab, moleculeInfo?.smiles])
 
   if (!moleculeInfo) return null
 

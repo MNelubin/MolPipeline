@@ -16,9 +16,10 @@ from typing import Any
 
 from rdkit import Chem
 
+from .config import RETRO_TREE_INCLUDE_EXPERIMENTAL
 from .tools.retro_tools import (
     _is_buyable,
-    _ord_search_via_api,
+    collect_candidate_routes,
     score_route,
 )
 from .tools import banlist_check, get_compound_properties
@@ -55,33 +56,22 @@ def _resolve_name(smiles: str) -> str | None:
 
 
 def _find_top_routes(smiles: str, top_n: int = 5) -> list[dict[str, Any]]:
-    """Find up to top_n ranked routes: ORD first, then model fallback."""
-    results: list[dict[str, Any]] = []
-
-    # 1. ORD search — fetch extra to have room after dedup/sort
-    ord_results = _ord_search_via_api(smiles, limit=top_n * 3)
-    if ord_results:
-        for r in ord_results:
-            score_route(r)
-        ord_results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
-        results.extend(ord_results[:top_n])
-        logger.debug("[tree] ORD: %d results for %s", len(results), smiles[:30])
-
-    # 2. ASKCOS model — fill remaining slots
-    if len(results) < top_n:
-        try:
-            predict = _get_predict_retro()
-            need = top_n - len(results)
-            model_results = predict(smiles, top_n=need + 2)
-            if model_results:
-                for r in model_results:
-                    score_route(r)
-                model_results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
-                results.extend(model_results[:need])
-                logger.debug("[tree] Model: +%d results for %s", need, smiles[:30])
-        except Exception as e:
-            logger.warning("[tree] Model failed for %s: %s", smiles[:30], e)
-
+    """Find up to top_n ranked routes using the shared retrosynthesis collectors."""
+    try:
+        results, _sources = collect_candidate_routes(
+            smiles,
+            ord_limit=top_n * 3,
+            model_top_n=top_n + 2,
+            use_web=False,
+            include_experimental=RETRO_TREE_INCLUDE_EXPERIMENTAL,
+        )
+    except Exception as e:
+        logger.warning("[tree] route collection failed for %s: %s", smiles[:30], e)
+        return []
+    for route in results:
+        score_route(route)
+    results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
+    logger.debug("[tree] %d ranked results for %s", len(results[:top_n]), smiles[:30])
     return results[:top_n]
 
 

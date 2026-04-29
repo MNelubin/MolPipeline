@@ -7,6 +7,7 @@ import PathwaySelector from './components/PathwaySelector'
 import ExperimentProtocol from './components/ExperimentProtocol'
 import ProtocolGraph from './components/ProtocolGraph'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
+import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
 
@@ -32,11 +33,29 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'retrosynthesis',
+    label: 'Retrosynthesis',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 4.5h5" />
+        <path d="M8 4.5 6.2 2.8" />
+        <path d="M8 4.5 6.2 6.2" />
+        <path d="M13 10.5H8" />
+        <path d="M7 10.5 8.8 8.8" />
+        <path d="M7 10.5 8.8 12.2" />
+        <circle cx="3" cy="10.5" r="1.2" />
+        <circle cx="12" cy="4.5" r="1.2" />
+      </svg>
+    ),
+  },
 ]
 
 export default function App() {
   const [page, setPage] = useState('chat')
   const [input, setInput] = useState('')
+  const [retroInput, setRetroInput] = useState('')
+  const [retroSourceMode, setRetroSourceMode] = useState('auto')
   const [model, setModel] = useState('openai/gpt-4o')
   const [history, setHistory] = useState(() => {
     try {
@@ -45,6 +64,7 @@ export default function App() {
   })
 
   const textareaRef = useRef(null)
+  const retroTextareaRef = useRef(null)
   const currentQueryRef = useRef('')
 
   const {
@@ -59,8 +79,17 @@ export default function App() {
     reset,
     restore,
   } = useInteractivePipeline()
+  const {
+    status: retroStatus,
+    result: retroAnalysis,
+    error: retroError,
+    sourceModes,
+    searchRetrosynthesis,
+    reset: resetRetro,
+  } = useRetrosynthesisSearch()
 
   const isRunning = status === 'running'
+  const isRetroRunning = retroStatus === 'running'
 
   // Save session to localStorage whenever pipeline state updates
   useEffect(() => {
@@ -114,10 +143,26 @@ export default function App() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
   }
 
+  const handleRetroSubmit = useCallback(async () => {
+    const query = retroInput.trim()
+    if (!query || isRetroRunning) return
+
+    setRetroInput('')
+    retroTextareaRef.current?.focus()
+    await searchRetrosynthesis(query, retroSourceMode, model)
+  }, [isRetroRunning, model, retroInput, retroSourceMode, searchRetrosynthesis])
+
+  const handleRetroKeyDown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleRetroSubmit() }
+  }
+
   const moleculeInfo = pipelineState?.molecule_info || null
   const guardResult = pipelineState?.guard_result || null
   const synthesisPaths = pipelineState?.synthesis_pathways || []
   const experimentProtocol = pipelineState?.experiment_protocol || null
+  const retroMoleculeInfo = retroAnalysis?.molecule_info || null
+  const retroGuardResult = retroAnalysis?.guard_result || null
+  const retroResult = retroAnalysis?.retro_result || null
 
   return (
     <div className="app">
@@ -328,6 +373,135 @@ export default function App() {
                   </div>
                 </div>
                 <CalculatorCard smiles="" />
+              </div>
+            </div>
+          </>
+        )}
+
+        {page === 'retrosynthesis' && (
+          <>
+            <div className="topbar">
+              <span className="topbar-title">
+                {isRetroRunning ? (
+                  <span className="topbar-status">
+                    <div className="spinner spinner-sm" />
+                    Running retrosynthesis...
+                  </span>
+                ) : 'Dedicated retrosynthesis workspace'}
+              </span>
+              <div className="retro-topbar-controls">
+                <select
+                  className="retro-source-select"
+                  value={retroSourceMode}
+                  onChange={e => setRetroSourceMode(e.target.value)}
+                  disabled={isRetroRunning}
+                >
+                  {sourceModes.map(mode => (
+                    <option key={mode.id} value={mode.id} disabled={!mode.enabled}>
+                      {mode.label}{mode.enabled ? '' : ' (offline)'}
+                    </option>
+                  ))}
+                </select>
+                <ModelSelector value={model} onChange={setModel} disabled={isRetroRunning} />
+              </div>
+            </div>
+
+            <div className="messages">
+              {retroStatus === 'idle' && (
+                <div className="retro-empty-state">
+                  <div className="empty-title">Retrosynthesis</div>
+                  <div className="empty-sub">Run the same molecule card workflow with an explicit retrosynthesis source selection.</div>
+                  <div className="empty-examples">
+                    {EXAMPLES.map(ex => (
+                      <button key={ex} className="example-chip" onClick={() => setRetroInput(ex)}>{ex}</button>
+                    ))}
+                  </div>
+                  <div className="retro-source-grid">
+                    {sourceModes.map(mode => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        className={`retro-source-card${retroSourceMode === mode.id ? ' active' : ''}${mode.enabled ? '' : ' disabled'}`}
+                        onClick={() => mode.enabled && setRetroSourceMode(mode.id)}
+                        disabled={!mode.enabled}
+                      >
+                        <span className="retro-source-card-title">{mode.label}</span>
+                        <span className="retro-source-card-desc">{mode.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isRetroRunning && (
+                <div className="loading-row">
+                  <div className="spinner spinner-md" />
+                  Searching retrosynthesis routes...
+                </div>
+              )}
+
+              {retroStatus === 'error' && (
+                <div className="error-block">
+                  {retroError || 'Retrosynthesis request failed'}
+                  <button className="reset-link" onClick={resetRetro}>
+                    Reset
+                  </button>
+                </div>
+              )}
+
+              {!isRetroRunning && retroMoleculeInfo && (
+                <div style={{ marginBottom: 16 }}>
+                  <div className="retro-result-meta">
+                    <div className="retro-result-pill">
+                      Source mode: {sourceModes.find(mode => mode.id === (retroAnalysis?.source_mode || retroSourceMode))?.label || retroAnalysis?.source_mode || retroSourceMode}
+                    </div>
+                    {retroAnalysis?.status === 'blocked' && <div className="retro-result-pill warning">Safety block</div>}
+                  </div>
+                  <MoleculeCard
+                    moleculeInfo={retroMoleculeInfo}
+                    guardResult={retroGuardResult}
+                    retroResult={retroResult}
+                    defaultTab="synthesis"
+                  />
+                  {retroAnalysis?.error && (
+                    <div className="error-block" style={{ marginTop: 16 }}>
+                      {retroAnalysis.error}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="input-area">
+              <div className="input-row">
+                <textarea
+                  ref={retroTextareaRef}
+                  className="input-box"
+                  rows={1}
+                  placeholder="aspirin, caffeine, CC(=O)O, ..."
+                  value={retroInput}
+                  onChange={e => setRetroInput(e.target.value)}
+                  onKeyDown={handleRetroKeyDown}
+                  disabled={isRetroRunning}
+                  style={{ height: 44 }}
+                  onInput={e => {
+                    e.target.style.height = '44px'
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                  }}
+                />
+                <button
+                  className="send-btn"
+                  onClick={handleRetroSubmit}
+                  disabled={!retroInput.trim() || isRetroRunning}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="13" x2="8" y2="3" />
+                    <polyline points="4 7 8 3 12 7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="input-hint">
+                Enter - run retrosynthesis · Shift+Enter - newline
               </div>
             </div>
           </>

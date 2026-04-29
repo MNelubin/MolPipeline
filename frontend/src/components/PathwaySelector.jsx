@@ -12,6 +12,8 @@ import { useState } from 'react'
 const SOURCE_LABEL = {
   ord:         { text: 'ORD',   color: 'var(--green)' },
   retro_model: { text: 'MODEL', color: 'var(--purple)' },
+  web:         { text: 'WEB', color: 'var(--cyan)' },
+  aizynthfinder: { text: 'AIZYNTH', color: 'var(--amber)' },
 }
 
 function ScoreBar({ value, max = 1 }) {
