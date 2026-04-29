@@ -272,9 +272,14 @@ async def calculate(request: dict):
 
 # ── Frontend SPA static files ───────────────────────────────────────────────
 
-FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+_PROJECT_ROOT = Path(__file__).parent.parent
+_FRONTEND_DIST_CANDIDATES = [
+    _PROJECT_ROOT / "frontend" / "dist",
+    _PROJECT_ROOT / "real_proj" / "frontend" / "dist",
+]
+FRONTEND_DIST = next((path for path in _FRONTEND_DIST_CANDIDATES if path.is_dir()), None)
 
-if FRONTEND_DIST.is_dir():
+if FRONTEND_DIST is not None:
     from fastapi.responses import FileResponse
 
     @app.get("/{full_path:path}")
