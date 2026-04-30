@@ -12,7 +12,7 @@ ExecStart=/usr/bin/docker run --rm --name chemist-aizynth \
   --env-file /opt/projects/chemist-agent/.env \
   --env-file /opt/projects/chemist-agent/.env.aizynth \
   -p 127.0.0.1:8052:8052 \
-  -v /opt/projects/chemist-agent/data/aizynth:/app/data/aizynth \
+  -v /opt/projects/chemist-agent/data/aizynth:/data \
   chemist-aizynth:latest
 ExecStop=/usr/bin/docker stop chemist-aizynth
 Restart=always

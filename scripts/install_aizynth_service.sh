@@ -28,7 +28,7 @@ if [[ ! -f "${AIZYNTH_DATA_DIR}/config.yml" ]]; then
 fi
 
 cat > "${AIZYNTH_ENV}" <<EOF
-AIZYNTH_CONFIG_PATH=/app/data/aizynth/config.yml
+AIZYNTH_CONFIG_PATH=/data/config.yml
 AIZYNTH_DEFAULT_EXPANSION_MODEL=uspto
 AIZYNTH_DEFAULT_FILTER_MODEL=uspto
 AIZYNTH_DEFAULT_STOCK=zinc
