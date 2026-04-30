@@ -4,12 +4,17 @@ After=network.target
 
 [Service]
 Type=simple
-User=max
-Group=max
+User=root
+Group=root
 WorkingDirectory=/opt/projects/chemist-agent
-EnvironmentFile=/opt/projects/chemist-agent/.env
-EnvironmentFile=-/opt/projects/chemist-agent/.env.aizynth
-ExecStart=/opt/projects/chemist-agent/venv-aizynth/bin/uvicorn mvp.aizynth_service:app --host 127.0.0.1 --port 8052
+ExecStartPre=-/usr/bin/docker rm -f chemist-aizynth
+ExecStart=/usr/bin/docker run --rm --name chemist-aizynth \
+  --env-file /opt/projects/chemist-agent/.env \
+  --env-file /opt/projects/chemist-agent/.env.aizynth \
+  -p 127.0.0.1:8052:8052 \
+  -v /opt/projects/chemist-agent/data/aizynth:/app/data/aizynth \
+  chemist-aizynth:latest
+ExecStop=/usr/bin/docker stop chemist-aizynth
 Restart=always
 RestartSec=5
 

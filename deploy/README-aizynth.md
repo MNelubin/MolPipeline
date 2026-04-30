@@ -21,14 +21,13 @@ bash scripts/install_aizynth_service.sh
 
 What it does:
 
-1. Creates `/opt/projects/chemist-agent/venv-aizynth`
-2. Installs `requirements-aizynth.txt`
-3. Downloads public AiZynthFinder data into `/opt/projects/chemist-agent/data/aizynth`
-4. Writes `/opt/projects/chemist-agent/.env.aizynth`
-5. Updates the main `.env` with:
+1. Builds Docker image `chemist-aizynth:latest`
+2. Downloads public AiZynthFinder data into `/opt/projects/chemist-agent/data/aizynth`
+3. Writes `/opt/projects/chemist-agent/.env.aizynth`
+4. Updates the main `.env` with:
    - `RETRO_ENABLE_AIZYNTH=true`
    - `AIZYNTH_BASE_URL=http://127.0.0.1:8052`
-6. Installs and starts `chemist-aizynth.service`
+5. Installs and starts `chemist-aizynth.service`
 
 ## Checks
 
