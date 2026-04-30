@@ -21,10 +21,11 @@ class TestCollectCandidateRoutes:
         with patch("mvp.tools.retro_tools.get_ord_routes", return_value=ord_routes), \
              patch("mvp.tools.retro_tools.get_web_routes") as mock_web, \
              patch("mvp.tools.retro_tools.get_retro_model_routes") as mock_model:
-            routes, sources = collect_candidate_routes("CCO", ord_authoritative=True)
+            routes, sources, errors = collect_candidate_routes("CCO", ord_authoritative=True)
 
         assert routes == ord_routes
         assert sources == ["ord"]
+        assert errors == {}
         mock_web.assert_not_called()
         mock_model.assert_not_called()
 
@@ -36,15 +37,17 @@ class TestCollectCandidateRoutes:
         with patch("mvp.tools.retro_tools.get_ord_routes", return_value=ord_routes), \
              patch("mvp.tools.retro_tools.get_web_routes", return_value=web_routes), \
              patch("mvp.tools.retro_tools.get_retro_model_routes", return_value=model_routes):
-            routes, sources = collect_candidate_routes("CCO", ord_authoritative=False)
+            routes, sources, errors = collect_candidate_routes("CCO", ord_authoritative=False)
 
         assert routes == ord_routes + web_routes + model_routes
         assert sources == ["ord", "web", "retro_model"]
+        assert errors == {}
 
     def test_empty_smiles_returns_empty_collection(self):
-        routes, sources = collect_candidate_routes("")
+        routes, sources, errors = collect_candidate_routes("")
         assert routes == []
         assert sources == []
+        assert errors == {}
 
     def test_enabled_sources_limits_collection_to_requested_mode(self):
         ord_routes = [{"reactants": "A.B", "source": "ord", "score": 0.9}]
@@ -52,7 +55,7 @@ class TestCollectCandidateRoutes:
         with patch("mvp.tools.retro_tools.get_ord_routes", return_value=ord_routes), \
              patch("mvp.tools.retro_tools.get_web_routes") as mock_web, \
              patch("mvp.tools.retro_tools.get_retro_model_routes") as mock_model:
-            routes, sources = collect_candidate_routes(
+            routes, sources, errors = collect_candidate_routes(
                 "CCO",
                 enabled_sources={"ord"},
                 ord_authoritative=False,
@@ -60,8 +63,23 @@ class TestCollectCandidateRoutes:
 
         assert routes == ord_routes
         assert sources == ["ord"]
+        assert errors == {}
         mock_web.assert_not_called()
         mock_model.assert_not_called()
+
+    def test_collects_source_errors_for_failed_requested_source(self):
+        with patch("mvp.tools.retro_tools.get_ord_routes", return_value=[]), \
+             patch("mvp.tools.retro_tools.get_aizynthfinder_routes", side_effect=RuntimeError("planner down")):
+            routes, sources, errors = collect_candidate_routes(
+                "CCO",
+                enabled_sources={"aizynthfinder"},
+                ord_authoritative=False,
+                include_experimental=True,
+            )
+
+        assert routes == []
+        assert sources == []
+        assert errors == {"aizynthfinder": "planner down"}
 
 
 class TestSourceModes:
@@ -112,7 +130,7 @@ class TestSearchAndRankRuntime:
             route.setdefault("final_score", route["score"])
             return route
 
-        with patch("mvp.tools.retro_tools.collect_candidate_routes", return_value=(collected, ["ord", "web"])), \
+        with patch("mvp.tools.retro_tools.collect_candidate_routes", return_value=(collected, ["ord", "web"], {})), \
              patch("mvp.tools.retro_tools.score_route", side_effect=_score_passthrough):
             result = search_and_rank("CCO", top_n=5)
 
@@ -124,6 +142,7 @@ class TestSearchAndRankRuntime:
         assert len(result["routes"]) == 1
         assert result["routes"][0]["source"] == "web"
         assert result["source_mode"] == "auto"
+        assert result["source_errors"] == {}
 
     def test_search_and_rank_passes_source_mode_to_collector(self):
         collected = [{"reactants": "CCO.O", "source": "aizynthfinder", "score": 0.9}]
@@ -132,10 +151,17 @@ class TestSearchAndRankRuntime:
             route.setdefault("final_score", route["score"])
             return route
 
-        with patch("mvp.tools.retro_tools.collect_candidate_routes", return_value=(collected, ["aizynthfinder"])) as mock_collect, \
+        with patch("mvp.tools.retro_tools.collect_candidate_routes", return_value=(collected, ["aizynthfinder"], {})) as mock_collect, \
              patch("mvp.tools.retro_tools.score_route", side_effect=_score_passthrough):
             result = search_and_rank("CCO", top_n=5, source_mode="aizynthfinder")
 
         mock_collect.assert_called_once()
         assert mock_collect.call_args.kwargs["enabled_sources"] == {"aizynthfinder"}
         assert result["source_mode"] == "aizynthfinder"
+
+    def test_search_and_rank_returns_source_errors_when_no_routes(self):
+        with patch("mvp.tools.retro_tools.collect_candidate_routes", return_value=([], [], {"aizynthfinder": "planner down"})):
+            result = search_and_rank("CCO", top_n=5, source_mode="aizynthfinder")
+
+        assert result["routes"] == []
+        assert result["source_errors"] == {"aizynthfinder": "planner down"}

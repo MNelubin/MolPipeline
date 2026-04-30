@@ -28,6 +28,7 @@ class TestRetroSearchHelpers:
             "source_counts": {"ord": 2, "aizynthfinder": 2},
             "source_counts_deduped": {"ord": 1, "aizynthfinder": 2},
             "source_mode": "aizynthfinder",
+            "source_errors": {},
         }
         with patch("mvp.api._resolve_to_smiles", return_value=("CCO", "smiles")), \
              patch("mvp.api.search_and_rank", return_value=runtime_result), \
@@ -49,7 +50,7 @@ class TestRetroSearchHelpers:
             "pubchem_cid": 702,
         }
         guard_result = {"overall_status": "SAFE", "molecule_check": {}, "reaction_check": {}, "safety_data": {}}
-        retro_result = {"routes": [{"reactants": "CC=O.O", "source": "ord"}], "source_mode": "ord"}
+        retro_result = {"routes": [{"reactants": "CC=O.O", "source": "ord"}], "source_mode": "ord", "source_errors": {}}
         molecule_state = {"molecule_info": {"name": "ethanol", "smiles": "CCO"}}
 
         with patch("mvp.api._attach_procedure_steps") as mock_attach, \
@@ -63,7 +64,29 @@ class TestRetroSearchHelpers:
         assert result["smiles"] == "CCO"
         assert result["source_mode"] == "ord"
         assert result["molecule_info"]["name"] == "ethanol"
+        assert result["source_errors"] == {}
         mock_attach.assert_called_once_with(retro_result["routes"])
+
+    def test_run_retro_analyze_surfaces_requested_source_failure(self):
+        resolved = {
+            "validation": {"is_valid": True, "input_type": "name"},
+            "smiles": "CCO",
+            "pubchem_cid": 702,
+        }
+        guard_result = {"overall_status": "SAFE", "molecule_check": {}, "reaction_check": {}, "safety_data": {}}
+        retro_result = {"routes": [], "source_mode": "aizynthfinder", "source_errors": {"aizynthfinder": "planner down"}}
+        molecule_state = {"molecule_info": {"name": "ethanol", "smiles": "CCO"}}
+
+        with patch("mvp.api._attach_procedure_steps") as mock_attach, \
+             patch("mvp.nodes.validate_and_guard_node._resolve_molecule", return_value=resolved), \
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks", return_value=guard_result), \
+             patch("mvp.nodes.molecule_info_node.molecule_info_node", return_value=molecule_state), \
+             patch("mvp.api.search_and_rank", return_value=retro_result):
+            result = _run_retro_analyze("ethanol", top_n=5, source_mode="aizynthfinder", model="openai/gpt-4o")
+
+        assert result["error"] == "aizynthfinder failed: planner down"
+        assert result["source_errors"] == {"aizynthfinder": "planner down"}
+        mock_attach.assert_called_once_with([])
 
     def test_run_retro_analyze_skips_routes_when_blocked(self):
         resolved = {

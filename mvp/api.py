@@ -181,6 +181,7 @@ class RetroSearchResponse(BaseModel):
     sources_used: list[str]
     source_counts: dict[str, int]
     source_counts_deduped: dict[str, int]
+    source_errors: dict[str, str] = Field(default_factory=dict)
     routes: list[dict[str, Any]]
 
 
@@ -206,6 +207,7 @@ class RetroAnalyzeResponse(BaseModel):
     molecule_info: dict[str, Any]
     guard_result: dict[str, Any]
     retro_result: dict[str, Any]
+    source_errors: dict[str, str] = Field(default_factory=dict)
     error: str | None = None
 
 
@@ -445,6 +447,7 @@ def _run_retro_search(query: str, top_n: int, source_mode: str = "auto") -> dict
         "sources_used": result.get("sources_used", []),
         "source_counts": result.get("source_counts", {}),
         "source_counts_deduped": result.get("source_counts_deduped", {}),
+        "source_errors": result.get("source_errors", {}),
         "routes": result.get("routes", []),
     }
 
@@ -492,12 +495,16 @@ def _run_retro_analyze(
             "source_counts": {},
             "source_counts_deduped": {},
             "source_mode": source_mode,
+            "source_errors": {},
             "error": error,
         }
         status = "blocked"
     else:
         retro_result = search_and_rank(smiles, top_n=top_n, source_mode=source_mode)
         _attach_procedure_steps(retro_result.get("routes", []))
+        source_errors = retro_result.get("source_errors", {})
+        if not retro_result.get("routes") and source_mode != "auto" and source_errors.get(source_mode):
+            error = f"{source_mode} failed: {source_errors[source_mode]}"
         status = "ok"
 
     return {
@@ -509,6 +516,7 @@ def _run_retro_analyze(
         "molecule_info": molecule_info,
         "guard_result": guard_result,
         "retro_result": retro_result,
+        "source_errors": retro_result.get("source_errors", {}),
         "error": error,
     }
 

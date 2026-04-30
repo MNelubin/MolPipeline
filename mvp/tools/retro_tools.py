@@ -626,18 +626,19 @@ def collect_candidate_routes(
     ord_authoritative: bool | None = None,
     include_experimental: bool = False,
     enabled_sources: set[str] | None = None,
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], dict[str, str]]:
     """Collect raw route candidates from all enabled sources.
 
     The default policy preserves current behavior:
     if ORD returns routes and RETRO_ORD_AUTHORITATIVE is true, other sources are skipped.
     """
     if not smiles:
-        return [], []
+        return [], [], {}
 
     authoritative = RETRO_ORD_AUTHORITATIVE if ord_authoritative is None else ord_authoritative
     routes: list[dict[str, Any]] = []
     sources_used: list[str] = []
+    source_errors: dict[str, str] = {}
     enabled = None if enabled_sources is None else set(enabled_sources)
     want_ord = enabled is None or "ord" in enabled
     want_web = enabled is None or "web" in enabled
@@ -649,6 +650,7 @@ def collect_candidate_routes(
         ord_routes = get_ord_routes(smiles, limit=ord_limit) if want_ord else []
     except Exception as e:
         logger.warning("ORD route collection failed: %s", e)
+        source_errors["ord"] = str(e)
         ord_routes = []
 
     if ord_routes:
@@ -656,7 +658,7 @@ def collect_candidate_routes(
         sources_used.append("ord")
         if authoritative and enabled is None:
             logger.info("ORD: %d routes found — authoritative mode, skipping fallback sources", len(ord_routes))
-            return routes, sources_used
+            return routes, sources_used, source_errors
 
     if use_web and want_web:
         try:
@@ -667,6 +669,7 @@ def collect_candidate_routes(
                 logger.info("Web search: %d routes found", len(web_routes))
         except Exception as e:
             logger.warning("Web search retro failed: %s", e)
+            source_errors["web"] = str(e)
 
     if want_model:
         try:
@@ -677,6 +680,7 @@ def collect_candidate_routes(
                 logger.info("Retro model: %d routes found", len(model_routes))
         except Exception as e:
             logger.warning("Retro model failed: %s", e)
+            source_errors["retro_model"] = str(e)
 
     if include_experimental and want_aizynth:
         try:
@@ -687,6 +691,7 @@ def collect_candidate_routes(
                 logger.info("AiZynthFinder: %d routes found", len(aizynth_routes))
         except Exception as e:
             logger.warning("AiZynthFinder route collection failed: %s", e)
+            source_errors["aizynthfinder"] = str(e)
 
     if include_experimental and want_retrocast:
         try:
@@ -697,8 +702,9 @@ def collect_candidate_routes(
                 logger.info("RetroCast: %d routes found", len(retrocast_routes))
         except Exception as e:
             logger.warning("RetroCast route collection failed: %s", e)
+            source_errors["retrocast"] = str(e)
 
-    return routes, sources_used
+    return routes, sources_used, source_errors
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -715,7 +721,7 @@ def search_and_rank(
 ) -> dict[str, Any]:
     """Full retrosynthesis pipeline over enabled route sources."""
     enabled_sources = get_enabled_sources_for_mode(source_mode)
-    all_routes, sources_used = collect_candidate_routes(
+    all_routes, sources_used, source_errors = collect_candidate_routes(
         smiles,
         ord_limit=15,
         model_top_n=10,
@@ -737,6 +743,7 @@ def search_and_rank(
             "source_counts": {},
             "source_counts_deduped": {},
             "source_mode": source_mode,
+            "source_errors": source_errors,
         }
 
     for route in all_routes:
@@ -759,4 +766,5 @@ def search_and_rank(
         "source_counts": source_counts,
         "source_counts_deduped": source_counts_deduped,
         "source_mode": source_mode,
+        "source_errors": source_errors,
     }
