@@ -35,7 +35,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'retrosynthesis',
-    label: 'Retrosynthesis',
+    label: 'Ретросинтез',
     icon: (
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 4.5h5" />
@@ -385,9 +385,9 @@ export default function App() {
                 {isRetroRunning ? (
                   <span className="topbar-status">
                     <div className="spinner spinner-sm" />
-                    Running retrosynthesis...
+                    Выполняется ретросинтез...
                   </span>
-                ) : 'Dedicated retrosynthesis workspace'}
+                ) : 'Отдельное рабочее пространство ретросинтеза'}
               </span>
               <div className="retro-topbar-controls">
                 <select
@@ -409,8 +409,8 @@ export default function App() {
             <div className="messages">
               {retroStatus === 'idle' && (
                 <div className="retro-empty-state">
-                  <div className="empty-title">Retrosynthesis</div>
-                  <div className="empty-sub">Run the same molecule card workflow with an explicit retrosynthesis source selection.</div>
+                  <div className="empty-title">Ретросинтез</div>
+                  <div className="empty-sub">Тот же сценарий карточки молекулы, но с явным выбором источника ретросинтеза.</div>
                   <div className="empty-examples">
                     {EXAMPLES.map(ex => (
                       <button key={ex} className="example-chip" onClick={() => setRetroInput(ex)}>{ex}</button>
@@ -436,15 +436,15 @@ export default function App() {
               {isRetroRunning && (
                 <div className="loading-row">
                   <div className="spinner spinner-md" />
-                  Searching retrosynthesis routes...
+                  Идёт поиск ретросинтетических маршрутов...
                 </div>
               )}
 
               {retroStatus === 'error' && (
                 <div className="error-block">
-                  {retroError || 'Retrosynthesis request failed'}
+                  {retroError || 'Не удалось выполнить запрос ретросинтеза'}
                   <button className="reset-link" onClick={resetRetro}>
-                    Reset
+                    Сбросить
                   </button>
                 </div>
               )}
@@ -453,9 +453,9 @@ export default function App() {
                 <div style={{ marginBottom: 16 }}>
                   <div className="retro-result-meta">
                     <div className="retro-result-pill">
-                      Source mode: {sourceModes.find(mode => mode.id === (retroAnalysis?.source_mode || retroSourceMode))?.label || retroAnalysis?.source_mode || retroSourceMode}
+                      Источник: {sourceModes.find(mode => mode.id === (retroAnalysis?.source_mode || retroSourceMode))?.label || retroAnalysis?.source_mode || retroSourceMode}
                     </div>
-                    {retroAnalysis?.status === 'blocked' && <div className="retro-result-pill warning">Safety block</div>}
+                    {retroAnalysis?.status === 'blocked' && <div className="retro-result-pill warning">Блок по безопасности</div>}
                   </div>
                   <MoleculeCard
                     moleculeInfo={retroMoleculeInfo}
@@ -478,7 +478,7 @@ export default function App() {
                   ref={retroTextareaRef}
                   className="input-box"
                   rows={1}
-                  placeholder="aspirin, caffeine, CC(=O)O, ..."
+                  placeholder="аспирин, caffeine, CC(=O)O, ..."
                   value={retroInput}
                   onChange={e => setRetroInput(e.target.value)}
                   onKeyDown={handleRetroKeyDown}

@@ -1,0 +1,17 @@
+[Unit]
+Description=MolPipeline AiZynthFinder service
+After=network.target
+
+[Service]
+Type=simple
+User=max
+Group=max
+WorkingDirectory=/opt/projects/chemist-agent
+EnvironmentFile=/opt/projects/chemist-agent/.env
+EnvironmentFile=-/opt/projects/chemist-agent/.env.aizynth
+ExecStart=/opt/projects/chemist-agent/venv-aizynth/bin/uvicorn mvp.aizynth_service:app --host 127.0.0.1 --port 8052
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

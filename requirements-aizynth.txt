@@ -1,0 +1,2 @@
+-r requirements.txt
+aizynthfinder>=4.4,<5
