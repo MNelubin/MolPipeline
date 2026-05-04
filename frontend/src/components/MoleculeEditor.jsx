@@ -1,5 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import 'ketcher-react/dist/index.css'
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+
+const KetcherEditorHost = lazy(async () => {
+  const acorn = await import('acorn')
+  globalThis.acorn = globalThis.acorn || acorn
+
+  return import('./KetcherEditorHost.jsx')
+})
+
+class KetcherErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error) {
+    this.props.onError?.(error?.message || String(error))
+  }
+
+  render() {
+    if (this.state.error) {
+      return <div className="molecule-editor-boot">Ketcher не загрузился</div>
+    }
+
+    return this.props.children
+  }
+}
 
 export default function MoleculeEditor({
   initialSmiles = '',
@@ -8,42 +37,21 @@ export default function MoleculeEditor({
   onRunRetrosynthesis,
 }) {
   const ketcherRef = useRef(null)
-  const [editorRuntime, setEditorRuntime] = useState(null)
+  const [isEditorReady, setIsEditorReady] = useState(false)
   const [smiles, setSmiles] = useState(initialSmiles)
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    let cancelled = false
+    if (isEditorReady) return undefined
 
-    async function loadEditorRuntime() {
-      setError('')
-      try {
-        const acorn = await import('acorn')
-        globalThis.acorn = globalThis.acorn || acorn
-
-        const [{ Editor }, { StandaloneStructServiceProvider }] = await Promise.all([
-          import('ketcher-react'),
-          import('ketcher-standalone'),
-        ])
-
-        if (!cancelled) {
-          setEditorRuntime({
-            Editor,
-            structServiceProvider: new StandaloneStructServiceProvider(),
-          })
-        }
-      } catch (err) {
-        if (!cancelled) setError(err?.message || String(err))
-      }
-    }
-
-    loadEditorRuntime()
-
+    const timeoutId = window.setTimeout(() => {
+      setError((currentError) => currentError || 'Ketcher не завершил инициализацию. Проверьте консоль браузера и загрузку assets.')
+    }, 12000)
     return () => {
-      cancelled = true
+      window.clearTimeout(timeoutId)
     }
-  }, [])
+  }, [isEditorReady])
 
   const readSmiles = useCallback(async () => {
     if (!ketcherRef.current) return ''
@@ -54,6 +62,9 @@ export default function MoleculeEditor({
 
   const handleInit = useCallback(async (ketcher) => {
     ketcherRef.current = ketcher
+    globalThis.ketcher = ketcher
+    setIsEditorReady(true)
+    setError('')
     if (initialSmiles.trim()) {
       try {
         await ketcher.setMolecule(initialSmiles.trim())
@@ -137,17 +148,14 @@ export default function MoleculeEditor({
       </div>
 
       <div className="molecule-editor-shell">
-        {editorRuntime ? (
-          <editorRuntime.Editor
-            staticResourcesUrl="/"
-            disableMacromoleculesEditor
-            structServiceProvider={editorRuntime.structServiceProvider}
-            onInit={handleInit}
-            errorHandler={(message) => setError(String(message))}
-          />
-        ) : (
-          <div className="molecule-editor-boot">Загрузка Ketcher...</div>
-        )}
+        <KetcherErrorBoundary onError={(message) => setError(String(message))}>
+          <Suspense fallback={<div className="molecule-editor-boot">Загрузка Ketcher...</div>}>
+            <KetcherEditorHost
+              onInit={handleInit}
+              onError={(message) => setError(String(message))}
+            />
+          </Suspense>
+        </KetcherErrorBoundary>
       </div>
 
       {error && <div className="molecule-editor-error">{error}</div>}
