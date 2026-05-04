@@ -1697,6 +1697,17 @@ a.ext-link:hover { color: var(--cyan); }
   overflow: hidden;
 }
 
+.molecule-editor-loading {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 .molecule-editor-header {
   display: flex;
   align-items: flex-start;

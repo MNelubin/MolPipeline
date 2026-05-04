@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react'
 import ChatMessage from './components/ChatMessage'
 import ModelSelector from './components/ModelSelector'
 import CalculatorCard from './components/CalculatorCard'
@@ -6,11 +6,11 @@ import MoleculeCard from './components/MoleculeCard'
 import PathwaySelector from './components/PathwaySelector'
 import ExperimentProtocol from './components/ExperimentProtocol'
 import ProtocolGraph from './components/ProtocolGraph'
-import MoleculeEditor from './components/MoleculeEditor'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
+const MoleculeEditor = lazy(() => import('./components/MoleculeEditor'))
 
 const NAV_ITEMS = [
   {
@@ -430,12 +430,14 @@ export default function App() {
                       <button key={ex} className="example-chip" onClick={() => setRetroInput(ex)}>{ex}</button>
                     ))}
                   </div>
-                  <MoleculeEditor
-                    initialSmiles={retroInput}
-                    disabled={isRetroRunning}
-                    onUseSmiles={handleEditorSmiles}
-                    onRunRetrosynthesis={handleEditorRetrosynthesis}
-                  />
+                  <Suspense fallback={<div className="molecule-editor-loading">Загрузка редактора молекул...</div>}>
+                    <MoleculeEditor
+                      initialSmiles={retroInput}
+                      disabled={isRetroRunning}
+                      onUseSmiles={handleEditorSmiles}
+                      onRunRetrosynthesis={handleEditorRetrosynthesis}
+                    />
+                  </Suspense>
                   <div className="retro-source-grid">
                     {sourceModes.map(mode => (
                       <button
