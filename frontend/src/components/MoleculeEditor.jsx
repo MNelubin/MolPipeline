@@ -1,6 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { Editor } from 'ketcher-react'
-import { StandaloneStructServiceProvider } from 'ketcher-standalone'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import 'ketcher-react/dist/index.css'
 
 export default function MoleculeEditor({
@@ -10,10 +8,42 @@ export default function MoleculeEditor({
   onRunRetrosynthesis,
 }) {
   const ketcherRef = useRef(null)
-  const structServiceProvider = useMemo(() => new StandaloneStructServiceProvider(), [])
+  const [editorRuntime, setEditorRuntime] = useState(null)
   const [smiles, setSmiles] = useState(initialSmiles)
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadEditorRuntime() {
+      setError('')
+      try {
+        const acorn = await import('acorn')
+        globalThis.acorn = globalThis.acorn || acorn
+
+        const [{ Editor }, { StandaloneStructServiceProvider }] = await Promise.all([
+          import('ketcher-react'),
+          import('ketcher-standalone'),
+        ])
+
+        if (!cancelled) {
+          setEditorRuntime({
+            Editor,
+            structServiceProvider: new StandaloneStructServiceProvider(),
+          })
+        }
+      } catch (err) {
+        if (!cancelled) setError(err?.message || String(err))
+      }
+    }
+
+    loadEditorRuntime()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const readSmiles = useCallback(async () => {
     if (!ketcherRef.current) return ''
@@ -107,12 +137,16 @@ export default function MoleculeEditor({
       </div>
 
       <div className="molecule-editor-shell">
-        <Editor
-          staticResourcesUrl="/"
-          structServiceProvider={structServiceProvider}
-          onInit={handleInit}
-          errorHandler={(message) => setError(String(message))}
-        />
+        {editorRuntime ? (
+          <editorRuntime.Editor
+            staticResourcesUrl="/"
+            structServiceProvider={editorRuntime.structServiceProvider}
+            onInit={handleInit}
+            errorHandler={(message) => setError(String(message))}
+          />
+        ) : (
+          <div className="molecule-editor-boot">Загрузка Ketcher...</div>
+        )}
       </div>
 
       {error && <div className="molecule-editor-error">{error}</div>}
