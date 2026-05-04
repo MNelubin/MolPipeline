@@ -282,11 +282,27 @@ FRONTEND_DIST = next((path for path in _FRONTEND_DIST_CANDIDATES if path.is_dir(
 if FRONTEND_DIST is not None:
     from fastapi.responses import FileResponse
 
+    def _spa_index_response(index: Path) -> FileResponse:
+        return FileResponse(
+            index,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    def _static_asset_response(file_path: Path) -> FileResponse:
+        headers = {}
+        if "assets" in file_path.relative_to(FRONTEND_DIST).parts:
+            headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return FileResponse(file_path, headers=headers)
+
     @app.get("/")
     async def serve_spa_root():
         index = FRONTEND_DIST / "index.html"
         if index.is_file():
-            return FileResponse(index)
+            return _spa_index_response(index)
         raise HTTPException(404, "Not found")
 
     @app.get("/{full_path:path}")
@@ -294,8 +310,8 @@ if FRONTEND_DIST is not None:
         """Serve frontend SPA — try file first, fallback to index.html."""
         file_path = FRONTEND_DIST / full_path
         if file_path.is_file():
-            return FileResponse(file_path)
+            return _static_asset_response(file_path)
         index = FRONTEND_DIST / "index.html"
         if index.is_file():
-            return FileResponse(index)
+            return _spa_index_response(index)
         raise HTTPException(404, "Not found")
