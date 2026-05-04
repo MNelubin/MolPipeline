@@ -44,6 +44,7 @@ if not env_path.exists():
 
 required = {
     "RETRO_ENABLE_AIZYNTH": "true",
+    "RETRO_ENABLE_RETROCAST": "true",
     "AIZYNTH_BASE_URL": "http://127.0.0.1:8052",
 }
 

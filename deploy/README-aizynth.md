@@ -26,6 +26,7 @@ What it does:
 3. Writes `/opt/projects/chemist-agent/.env.aizynth`
 4. Updates the main `.env` with:
    - `RETRO_ENABLE_AIZYNTH=true`
+   - `RETRO_ENABLE_RETROCAST=true`
    - `AIZYNTH_BASE_URL=http://127.0.0.1:8052`
 5. Installs and starts `chemist-aizynth.service`
 
