@@ -877,6 +877,7 @@ async def retro_analyze(req: RetroAnalyzeRequest):
 
 
 @app.post("/research/analyze", response_model=ResearchAnalyzeResponse)
+@app.post("/retro/research", response_model=ResearchAnalyzeResponse)
 async def research_analyze(req: ResearchAnalyzeRequest):
     """Run standalone molecule/literature/patent research without mutating the graph."""
     query = req.query.strip()

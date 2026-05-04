@@ -12,7 +12,7 @@ export function useResearchSearch() {
     setError(null)
     setResult(null)
     try {
-      const res = await fetch(`${API_BASE}/research/analyze`, {
+      const res = await fetch(`${API_BASE}/retro/research`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
