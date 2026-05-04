@@ -1,6 +1,8 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 const KetcherEditorHost = lazy(async () => {
+  globalThis.global = globalThis.global || globalThis
+
   const acorn = await import('acorn')
   globalThis.acorn = globalThis.acorn || acorn
 
