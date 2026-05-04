@@ -1689,6 +1689,115 @@ a.ext-link:hover { color: var(--cyan); }
   margin-top: 20px;
 }
 
+.molecule-editor-panel {
+  margin-top: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.molecule-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(18,29,46,0.95), rgba(13,21,32,0.95));
+}
+
+.molecule-editor-title {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.molecule-editor-subtitle {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.molecule-editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.editor-btn {
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.editor-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+.editor-btn.primary {
+  background: var(--cyan-bg);
+  border: 1px solid var(--cyan-dim);
+  color: var(--cyan);
+}
+
+.editor-btn:hover:not(:disabled) {
+  border-color: var(--cyan-dim);
+  color: var(--text-1);
+}
+
+.editor-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.molecule-editor-input-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.molecule-editor-smiles-input {
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+}
+
+.molecule-editor-smiles-input:focus {
+  border-color: var(--cyan-dim);
+}
+
+.molecule-editor-shell {
+  height: min(58vh, 560px);
+  min-height: 430px;
+  background: #fff;
+}
+
+.molecule-editor-shell > div {
+  height: 100%;
+}
+
+.molecule-editor-error {
+  border-top: 1px solid var(--red-border);
+  background: var(--red-bg);
+  color: var(--red-light);
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 .retro-source-card {
   display: flex;
   flex-direction: column;
@@ -2277,4 +2386,7 @@ a.ext-link:hover { color: var(--cyan); }
   .synth-detail-panel { width: 280px; }
   .empty-examples { max-width: 300px; }
   .retro-source-grid { grid-template-columns: 1fr; }
+  .molecule-editor-header { flex-direction: column; }
+  .molecule-editor-actions { justify-content: flex-start; }
+  .molecule-editor-shell { min-height: 360px; height: 52vh; }
 }

@@ -6,6 +6,7 @@ import MoleculeCard from './components/MoleculeCard'
 import PathwaySelector from './components/PathwaySelector'
 import ExperimentProtocol from './components/ExperimentProtocol'
 import ProtocolGraph from './components/ProtocolGraph'
+import MoleculeEditor from './components/MoleculeEditor'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
 
@@ -151,6 +152,19 @@ export default function App() {
     retroTextareaRef.current?.focus()
     await searchRetrosynthesis(query, retroSourceMode, model)
   }, [isRetroRunning, model, retroInput, retroSourceMode, searchRetrosynthesis])
+
+  const handleEditorSmiles = useCallback((smiles) => {
+    setRetroInput(smiles)
+    retroTextareaRef.current?.focus()
+  }, [])
+
+  const handleEditorRetrosynthesis = useCallback(async (smiles) => {
+    const query = smiles.trim()
+    if (!query || isRetroRunning) return
+
+    setRetroInput(query)
+    await searchRetrosynthesis(query, retroSourceMode, model)
+  }, [isRetroRunning, model, retroSourceMode, searchRetrosynthesis])
 
   const handleRetroKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleRetroSubmit() }
@@ -416,6 +430,12 @@ export default function App() {
                       <button key={ex} className="example-chip" onClick={() => setRetroInput(ex)}>{ex}</button>
                     ))}
                   </div>
+                  <MoleculeEditor
+                    initialSmiles={retroInput}
+                    disabled={isRetroRunning}
+                    onUseSmiles={handleEditorSmiles}
+                    onRunRetrosynthesis={handleEditorRetrosynthesis}
+                  />
                   <div className="retro-source-grid">
                     {sourceModes.map(mode => (
                       <button
@@ -501,7 +521,7 @@ export default function App() {
                 </button>
               </div>
               <div className="input-hint">
-                Enter - run retrosynthesis · Shift+Enter - newline
+                Enter — запустить ретросинтез · Shift+Enter — новая строка
               </div>
             </div>
           </>
