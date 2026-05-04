@@ -22,14 +22,14 @@ export default function MoleculeEditor({
         const acorn = await import('acorn')
         globalThis.acorn = globalThis.acorn || acorn
 
-        const [{ Editor }, { StandaloneStructServiceProvider }] = await Promise.all([
+        const [{ MicromoleculesEditor }, { StandaloneStructServiceProvider }] = await Promise.all([
           import('ketcher-react'),
           import('ketcher-standalone'),
         ])
 
         if (!cancelled) {
           setEditorRuntime({
-            Editor,
+            MicromoleculesEditor,
             structServiceProvider: new StandaloneStructServiceProvider(),
           })
         }
@@ -138,7 +138,7 @@ export default function MoleculeEditor({
 
       <div className="molecule-editor-shell">
         {editorRuntime ? (
-          <editorRuntime.Editor
+          <editorRuntime.MicromoleculesEditor
             staticResourcesUrl="/"
             structServiceProvider={editorRuntime.structServiceProvider}
             onInit={handleInit}
