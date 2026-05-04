@@ -6,11 +6,13 @@ import asyncio
 from unittest.mock import patch
 
 from ..api import (
+    ResearchAnalyzeRequest,
     RetroAnalyzeRequest,
     RetroSearchRequest,
     _retro_sources_snapshot,
     _run_retro_analyze,
     _run_retro_search,
+    research_analyze,
     retro_analyze,
     retro_search,
     retro_sources,
@@ -209,3 +211,29 @@ class TestRetroSearchEndpoints:
         assert result.tree_include_experimental is True
         assert result.source_modes[0]["id"] == "auto"
         assert result.sources["aizynthfinder"]["reachable"] is True
+
+
+class TestResearchEndpoint:
+    def test_research_analyze_endpoint_returns_workspace_payload(self):
+        workspace_result = {
+            "status": "ok",
+            "query": "aspirin synthesis literature",
+            "mode": "literature",
+            "interpreted_intent": "Find aspirin synthesis literature",
+            "search_queries": ["aspirin synthesis literature PubMed"],
+            "summary": "Found literature sources.",
+            "candidates": [{"name": "aspirin", "canonical_smiles": "CC(=O)Oc1ccccc1C(=O)O"}],
+            "sources": [{"url": "https://pubmed.ncbi.nlm.nih.gov/1/", "title": "Aspirin"}],
+            "evidence": [{"url": "https://pubmed.ncbi.nlm.nih.gov/1/", "excerpt": "aspirin synthesis"}],
+            "rag_results": [],
+            "source_errors": {},
+        }
+        with patch("mvp.api.run_research_workspace", return_value=workspace_result):
+            result = asyncio.run(
+                research_analyze(ResearchAnalyzeRequest(query="aspirin synthesis literature"))
+            )
+
+        assert result.status == "ok"
+        assert result.mode == "literature"
+        assert result.candidates[0]["name"] == "aspirin"
+        assert result.evidence[0]["excerpt"] == "aspirin synthesis"

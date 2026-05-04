@@ -8,6 +8,7 @@ import ExperimentProtocol from './components/ExperimentProtocol'
 import ProtocolGraph from './components/ProtocolGraph'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
+import { useResearchSearch } from './hooks/useResearchSearch'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
 const MoleculeEditor = lazy(() => import('./components/MoleculeEditor'))
@@ -50,6 +51,18 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'research',
+    label: 'Исследования',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 2.5h6.5L12 5v7.5H3z" />
+        <path d="M9.5 2.5V5H12" />
+        <path d="M5 7h5" />
+        <path d="M5 9.5h4" />
+      </svg>
+    ),
+  },
 ]
 
 export default function App() {
@@ -57,6 +70,8 @@ export default function App() {
   const [input, setInput] = useState('')
   const [retroInput, setRetroInput] = useState('')
   const [retroSourceMode, setRetroSourceMode] = useState('auto')
+  const [researchInput, setResearchInput] = useState('')
+  const [researchMode, setResearchMode] = useState('literature')
   const [model, setModel] = useState('openai/gpt-4o')
   const [history, setHistory] = useState(() => {
     try {
@@ -66,6 +81,7 @@ export default function App() {
 
   const textareaRef = useRef(null)
   const retroTextareaRef = useRef(null)
+  const researchTextareaRef = useRef(null)
   const currentQueryRef = useRef('')
 
   const {
@@ -88,9 +104,17 @@ export default function App() {
     searchRetrosynthesis,
     reset: resetRetro,
   } = useRetrosynthesisSearch()
+  const {
+    status: researchStatus,
+    result: researchResult,
+    error: researchError,
+    searchResearch,
+    reset: resetResearch,
+  } = useResearchSearch()
 
   const isRunning = status === 'running'
   const isRetroRunning = retroStatus === 'running'
+  const isResearchRunning = researchStatus === 'running'
 
   // Save session to localStorage whenever pipeline state updates
   useEffect(() => {
@@ -168,6 +192,18 @@ export default function App() {
 
   const handleRetroKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleRetroSubmit() }
+  }
+
+  const handleResearchSubmit = useCallback(async () => {
+    const query = researchInput.trim()
+    if (!query || isResearchRunning) return
+
+    await searchResearch(query, researchMode)
+    researchTextareaRef.current?.focus()
+  }, [isResearchRunning, researchInput, researchMode, searchResearch])
+
+  const handleResearchKeyDown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleResearchSubmit() }
   }
 
   const moleculeInfo = pipelineState?.molecule_info || null
@@ -524,6 +560,169 @@ export default function App() {
               </div>
               <div className="input-hint">
                 Enter — запустить ретросинтез · Shift+Enter — новая строка
+              </div>
+            </div>
+          </>
+        )}
+
+        {page === 'research' && (
+          <>
+            <div className="topbar">
+              <span className="topbar-title">
+                {isResearchRunning ? (
+                  <span className="topbar-status">
+                    <div className="spinner spinner-sm" />
+                    Выполняется поиск...
+                  </span>
+                ) : 'Литература, патенты и подбор молекул'}
+              </span>
+              <div className="retro-topbar-controls">
+                <select
+                  className="retro-source-select"
+                  value={researchMode}
+                  onChange={e => setResearchMode(e.target.value)}
+                  disabled={isResearchRunning}
+                >
+                  <option value="literature">Литература</option>
+                  <option value="patent">Патенты</option>
+                  <option value="molecule">Подбор молекул</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="messages">
+              {researchStatus === 'idle' && (
+                <div className="research-empty-state">
+                  <div className="empty-title">Исследовательский режим</div>
+                  <div className="empty-sub">Отдельный сценарий для literature overview, patent-oriented search и подбора молекул. Основной синтез не меняется.</div>
+                  <div className="empty-examples">
+                    {[
+                      'aspirin synthesis literature',
+                      'patents for acetylsalicylic acid preparation',
+                      'найди ингибиторы EGFR',
+                    ].map(ex => (
+                      <button key={ex} className="example-chip" onClick={() => setResearchInput(ex)}>{ex}</button>
+                    ))}
+                  </div>
+                  <div className="research-mode-grid">
+                    <button type="button" className={`research-mode-card${researchMode === 'literature' ? ' active' : ''}`} onClick={() => setResearchMode('literature')}>
+                      <span>Литература</span>
+                      <small>PubMed/web/RAG evidence для обзора темы и условий.</small>
+                    </button>
+                    <button type="button" className={`research-mode-card${researchMode === 'patent' ? ' active' : ''}`} onClick={() => setResearchMode('patent')}>
+                      <span>Патенты</span>
+                      <small>Поиск preparation examples, claims и patent-oriented источников.</small>
+                    </button>
+                    <button type="button" className={`research-mode-card${researchMode === 'molecule' ? ' active' : ''}`} onClick={() => setResearchMode('molecule')}>
+                      <span>Подбор молекул</span>
+                      <small>Извлечение кандидатов и проверка через PubChem.</small>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isResearchRunning && (
+                <div className="loading-row">
+                  <div className="spinner spinner-md" />
+                  Идёт поиск и извлечение источников...
+                </div>
+              )}
+
+              {researchStatus === 'error' && (
+                <div className="error-block">
+                  {researchError || 'Не удалось выполнить исследовательский запрос'}
+                  <button className="reset-link" onClick={resetResearch}>
+                    Сбросить
+                  </button>
+                </div>
+              )}
+
+              {!isResearchRunning && researchResult && (
+                <div className="research-results">
+                  <div className="research-summary-card">
+                    <div className="research-summary-kicker">{researchResult.mode} · {researchResult.status}</div>
+                    <h2>{researchResult.interpreted_intent || researchResult.query}</h2>
+                    <p>{researchResult.summary}</p>
+                  </div>
+
+                  {researchResult.candidates?.length > 0 && (
+                    <div className="research-section">
+                      <div className="research-section-title">PubChem-кандидаты</div>
+                      <div className="research-candidate-grid">
+                        {researchResult.candidates.map(candidate => (
+                          <div key={`${candidate.pubchem_cid}-${candidate.name}`} className="research-candidate-card">
+                            <strong>{candidate.name}</strong>
+                            {candidate.pubchem_cid && <span>CID {candidate.pubchem_cid}</span>}
+                            {candidate.canonical_smiles && <code>{candidate.canonical_smiles}</code>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {researchResult.evidence?.length > 0 && (
+                    <div className="research-section">
+                      <div className="research-section-title">Источники и выдержки</div>
+                      <div className="research-source-list">
+                        {researchResult.evidence.map((source, index) => (
+                          <a key={`${source.url}-${index}`} className="research-source-card" href={source.url} target="_blank" rel="noreferrer">
+                            <span className="research-source-type">{source.source_type || 'web'}</span>
+                            <strong>{source.title || source.url}</strong>
+                            <p>{source.excerpt || source.snippet || 'Без извлечённого текста'}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {researchResult.rag_results?.length > 0 && (
+                    <div className="research-section">
+                      <div className="research-section-title">Локальный RAG</div>
+                      <div className="research-source-list">
+                        {researchResult.rag_results.map(result => (
+                          <div key={`${result.rank}-${result.title}`} className="research-source-card">
+                            <span className="research-source-type">score {result.score}</span>
+                            <strong>{result.title}</strong>
+                            <p>{result.child_text || result.parent_text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="input-area">
+              <div className="input-row">
+                <textarea
+                  ref={researchTextareaRef}
+                  className="input-box"
+                  rows={1}
+                  placeholder="например: aspirin synthesis literature или patents for ibuprofen preparation"
+                  value={researchInput}
+                  onChange={e => setResearchInput(e.target.value)}
+                  onKeyDown={handleResearchKeyDown}
+                  disabled={isResearchRunning}
+                  style={{ height: 44 }}
+                  onInput={e => {
+                    e.target.style.height = '44px'
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                  }}
+                />
+                <button
+                  className="send-btn"
+                  onClick={handleResearchSubmit}
+                  disabled={!researchInput.trim() || isResearchRunning}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="13" x2="8" y2="3" />
+                    <polyline points="4 7 8 3 12 7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="input-hint">
+                Enter — запустить поиск · Shift+Enter — новая строка
               </div>
             </div>
           </>

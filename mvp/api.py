@@ -4,6 +4,7 @@ POST /analyze      — run pipeline (mode=auto end-to-end, or mode=interactive w
 POST /resume       — resume an interactive session at the next interrupt point
 POST /ord/search   — search ORD by molecule name or SMILES, return ranked reactions
 POST /retro/search — run additive retrosynthesis search across enabled sources
+POST /research/analyze — run standalone molecule/literature/patent research
 POST /tree/expand  — recursively expand a synthesis route into a full tree
 GET  /health       — liveness check
 GET  /retro/sources — inspect enabled retrosynthesis sources and AiZynth service reachability
@@ -28,6 +29,7 @@ from pydantic import BaseModel, Field
 from . import config as _cfg  # noqa: F401
 from .config import DATA_DIR
 from .graph import build_graph
+from .research_workspace import run_research_workspace
 from .services.aizynth_client import get_aizynth_resources
 from .services.retrocast_bridge import get_retrocast_runtime_info
 from .tools.retro_tools import (
@@ -216,6 +218,29 @@ class RetroSourcesResponse(BaseModel):
     tree_include_experimental: bool
     source_modes: list[dict[str, Any]]
     sources: dict[str, dict[str, Any]]
+
+
+class ResearchAnalyzeRequest(BaseModel):
+    query: str = Field(..., description="Research question, molecule class, literature topic, or patent topic")
+    mode: Literal["molecule", "literature", "patent"] = Field(
+        default="literature",
+        description="Standalone research mode for the dedicated UI workspace.",
+    )
+    max_sources: int = Field(default=8, ge=1, le=15)
+
+
+class ResearchAnalyzeResponse(BaseModel):
+    status: Literal["ok", "empty"]
+    query: str
+    mode: str
+    interpreted_intent: str
+    search_queries: list[str]
+    summary: str
+    candidates: list[dict[str, Any]]
+    sources: list[dict[str, Any]]
+    evidence: list[dict[str, Any]]
+    rag_results: list[dict[str, Any]]
+    source_errors: dict[str, str] = Field(default_factory=dict)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -849,6 +874,34 @@ async def retro_analyze(req: RetroAnalyzeRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
     return RetroAnalyzeResponse(**_sanitize(result))
+
+
+@app.post("/research/analyze", response_model=ResearchAnalyzeResponse)
+async def research_analyze(req: ResearchAnalyzeRequest):
+    """Run standalone molecule/literature/patent research without mutating the graph."""
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query must not be empty")
+
+    logger.info(
+        "[research/analyze] query=%r mode=%s max_sources=%d",
+        query,
+        req.mode,
+        req.max_sources,
+    )
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: run_research_workspace(query, mode=req.mode, max_sources=req.max_sources),
+        )
+    except Exception as exc:
+        logger.exception("[research/analyze] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return ResearchAnalyzeResponse(**_sanitize(result))
 
 
 @app.post("/tree/expand", response_model=TreeExpandResponse)
