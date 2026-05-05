@@ -2091,6 +2091,221 @@ a.ext-link:hover { color: var(--cyan); }
   text-transform: uppercase;
 }
 
+/* ─── ADMET workspace ──────────────────────────────────────────────────── */
+.admet-empty-state,
+.admet-results {
+  width: 100%;
+  max-width: 1040px;
+  margin: auto;
+}
+
+.admet-empty-state {
+  text-align: center;
+}
+
+.admet-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(34,211,160,0.16), transparent 32%),
+    var(--bg-card);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  margin-bottom: 14px;
+}
+
+.admet-hero.risk-high {
+  border-color: var(--red-border);
+  background:
+    radial-gradient(circle at top left, rgba(240,80,80,0.15), transparent 34%),
+    var(--bg-card);
+}
+
+.admet-hero.risk-medium {
+  border-color: var(--amber-border);
+  background:
+    radial-gradient(circle at top left, rgba(244,165,34,0.14), transparent 34%),
+    var(--bg-card);
+}
+
+.admet-hero h2 {
+  font-size: 21px;
+  margin-bottom: 4px;
+}
+
+.admet-hero p {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.admet-score {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 1px solid var(--cyan-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7,11,18,0.55);
+  flex-shrink: 0;
+}
+
+.admet-score strong {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.admet-score span {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+.admet-descriptor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.admet-descriptor {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px;
+}
+
+.admet-descriptor span {
+  display: block;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.admet-descriptor strong {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.admet-section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.admet-section-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px;
+}
+
+.admet-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.admet-section-head strong {
+  color: var(--text-1);
+}
+
+.admet-section-head span {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.admet-section-card p {
+  color: var(--text-2);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.admet-flag-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admet-flag {
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  border-radius: var(--r-sm);
+  padding: 8px;
+}
+
+.admet-flag.severity-high {
+  border-color: var(--red-border);
+  background: var(--red-bg);
+}
+
+.admet-flag.severity-medium {
+  border-color: var(--amber-border);
+  background: var(--amber-bg);
+}
+
+.admet-flag strong {
+  display: block;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.admet-flag.severity-high strong {
+  color: var(--red-light);
+}
+
+.admet-flag span {
+  display: block;
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.admet-flag small {
+  display: block;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.admet-clear {
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+  font-size: 12px;
+}
+
+.admet-recommendations {
+  display: grid;
+  gap: 8px;
+}
+
+.admet-recommendations div {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  color: var(--text-2);
+}
+
 .retro-source-card {
   display: flex;
   flex-direction: column;
@@ -2681,6 +2896,7 @@ a.ext-link:hover { color: var(--cyan); }
   .retro-source-grid { grid-template-columns: 1fr; }
   .research-mode-grid { grid-template-columns: 1fr; }
   .research-agent-row { grid-template-columns: 1fr; gap: 3px; }
+  .admet-hero { flex-direction: column; align-items: flex-start; }
   .molecule-editor-header { flex-direction: column; }
   .molecule-editor-actions { justify-content: flex-start; }
   .molecule-editor-shell { min-height: 360px; height: 52vh; }

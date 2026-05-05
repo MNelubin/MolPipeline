@@ -6,6 +6,7 @@ import asyncio
 from unittest.mock import patch
 
 from ..api import (
+    AdmetAnalyzeRequest,
     ResearchAnalyzeRequest,
     RetroAnalyzeRequest,
     RetroSearchRequest,
@@ -13,6 +14,7 @@ from ..api import (
     _run_retro_analyze,
     _run_retro_search,
     research_analyze,
+    admet_analyze,
     retro_analyze,
     retro_search,
     retro_sources,
@@ -246,3 +248,22 @@ class TestResearchEndpoint:
         assert result.analysis["analysis_engine"] == "llm"
         assert result.candidates[0]["name"] == "aspirin"
         assert result.evidence[0]["excerpt"] == "aspirin synthesis"
+
+
+class TestAdmetEndpoint:
+    def test_admet_analyze_endpoint_returns_screening_payload(self):
+        admet_result = {
+            "smiles": "CCO",
+            "descriptors": {"molecular_weight": 46.07, "logp": -0.0},
+            "sections": {"absorption": {"score": 100, "flags": []}},
+            "overall": {"score": 95, "risk_level": "low"},
+            "recommendations": [],
+            "method": "rdkit_descriptor_heuristics_v1",
+        }
+        with patch("mvp.api._resolve_to_smiles", return_value=("CCO", "smiles")), \
+             patch("mvp.api.analyze_admet", return_value=admet_result):
+            result = asyncio.run(admet_analyze(AdmetAnalyzeRequest(query="ethanol")))
+
+        assert result.query == "ethanol"
+        assert result.smiles == "CCO"
+        assert result.admet["overall"]["risk_level"] == "low"

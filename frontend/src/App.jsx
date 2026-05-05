@@ -9,6 +9,7 @@ import ProtocolGraph from './components/ProtocolGraph'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
 import { useResearchSearch } from './hooks/useResearchSearch'
+import { useAdmetAnalysis } from './hooks/useAdmetAnalysis'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
 const MoleculeEditor = lazy(() => import('./components/MoleculeEditor'))
@@ -63,7 +64,26 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'admet',
+    label: 'ADMET',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5.5 2.5h4" />
+        <path d="M6.5 2.5v3.2L3.4 11a1.7 1.7 0 0 0 1.5 2.5h5.2a1.7 1.7 0 0 0 1.5-2.5L8.5 5.7V2.5" />
+        <path d="M5 9.5h5" />
+      </svg>
+    ),
+  },
 ]
+
+const ADMET_SECTION_LABELS = {
+  absorption: 'Absorption',
+  distribution: 'Distribution',
+  metabolism: 'Metabolism',
+  excretion: 'Excretion',
+  toxicity: 'Toxicity',
+}
 
 export default function App() {
   const [page, setPage] = useState('chat')
@@ -72,6 +92,7 @@ export default function App() {
   const [retroSourceMode, setRetroSourceMode] = useState('auto')
   const [researchInput, setResearchInput] = useState('')
   const [researchMode, setResearchMode] = useState('literature')
+  const [admetInput, setAdmetInput] = useState('')
   const [model, setModel] = useState('openai/gpt-4o')
   const [history, setHistory] = useState(() => {
     try {
@@ -82,6 +103,7 @@ export default function App() {
   const textareaRef = useRef(null)
   const retroTextareaRef = useRef(null)
   const researchTextareaRef = useRef(null)
+  const admetTextareaRef = useRef(null)
   const currentQueryRef = useRef('')
 
   const {
@@ -111,10 +133,18 @@ export default function App() {
     searchResearch,
     reset: resetResearch,
   } = useResearchSearch()
+  const {
+    status: admetStatus,
+    result: admetResult,
+    error: admetError,
+    analyzeAdmet,
+    reset: resetAdmet,
+  } = useAdmetAnalysis()
 
   const isRunning = status === 'running'
   const isRetroRunning = retroStatus === 'running'
   const isResearchRunning = researchStatus === 'running'
+  const isAdmetRunning = admetStatus === 'running'
 
   // Save session to localStorage whenever pipeline state updates
   useEffect(() => {
@@ -204,6 +234,18 @@ export default function App() {
 
   const handleResearchKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleResearchSubmit() }
+  }
+
+  const handleAdmetSubmit = useCallback(async () => {
+    const query = admetInput.trim()
+    if (!query || isAdmetRunning) return
+
+    await analyzeAdmet(query)
+    admetTextareaRef.current?.focus()
+  }, [admetInput, analyzeAdmet, isAdmetRunning])
+
+  const handleAdmetKeyDown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdmetSubmit() }
   }
 
   const moleculeInfo = pipelineState?.molecule_info || null
@@ -776,6 +818,145 @@ export default function App() {
               </div>
               <div className="input-hint">
                 Enter — запустить поиск · Shift+Enter — новая строка
+              </div>
+            </div>
+          </>
+        )}
+
+        {page === 'admet' && (
+          <>
+            <div className="topbar">
+              <span className="topbar-title">
+                {isAdmetRunning ? (
+                  <span className="topbar-status">
+                    <div className="spinner spinner-sm" />
+                    Выполняется ADMET screening...
+                  </span>
+                ) : 'ADMET screening'}
+              </span>
+            </div>
+
+            <div className="messages">
+              {admetStatus === 'idle' && (
+                <div className="admet-empty-state">
+                  <div className="empty-title">ADMET</div>
+                  <div className="empty-sub">Быстрая интерпретируемая оценка absorption, distribution, metabolism, excretion и toxicity по RDKit-дескрипторам.</div>
+                  <div className="empty-examples">
+                    {EXAMPLES.map(ex => (
+                      <button key={ex} className="example-chip" onClick={() => setAdmetInput(ex)}>{ex}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isAdmetRunning && (
+                <div className="loading-row">
+                  <div className="spinner spinner-md" />
+                  Считаю дескрипторы и ADMET-флаги...
+                </div>
+              )}
+
+              {admetStatus === 'error' && (
+                <div className="error-block">
+                  {admetError || 'Не удалось выполнить ADMET анализ'}
+                  <button className="reset-link" onClick={resetAdmet}>
+                    Сбросить
+                  </button>
+                </div>
+              )}
+
+              {!isAdmetRunning && admetResult && (
+                <div className="admet-results">
+                  <div className={`admet-hero risk-${admetResult.admet?.overall?.risk_level || 'medium'}`}>
+                    <div>
+                      <div className="research-summary-kicker">ADMET · {admetResult.admet?.method}</div>
+                      <h2>{admetResult.query}</h2>
+                      <p>{admetResult.smiles}</p>
+                    </div>
+                    <div className="admet-score">
+                      <strong>{admetResult.admet?.overall?.score}</strong>
+                      <span>{admetResult.admet?.overall?.risk_level}</span>
+                    </div>
+                  </div>
+
+                  <div className="admet-descriptor-grid">
+                    {Object.entries(admetResult.admet?.descriptors || {}).map(([key, value]) => (
+                      <div key={key} className="admet-descriptor">
+                        <span>{key.replaceAll('_', ' ')}</span>
+                        <strong>{String(value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="admet-section-grid">
+                    {Object.entries(admetResult.admet?.sections || {}).map(([key, section]) => (
+                      <div key={key} className="admet-section-card">
+                        <div className="admet-section-head">
+                          <strong>{ADMET_SECTION_LABELS[key] || key}</strong>
+                          <span>{section.score}/100</span>
+                        </div>
+                        <p>{section.interpretation}</p>
+                        {section.flags?.length > 0 ? (
+                          <div className="admet-flag-list">
+                            {section.flags.map((flag, index) => (
+                              <div key={`${flag.message}-${index}`} className={`admet-flag severity-${flag.severity}`}>
+                                <strong>{flag.severity}</strong>
+                                <span>{flag.message}</span>
+                                <small>{flag.evidence}</small>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="admet-clear">Критичных флагов не найдено</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {admetResult.admet?.recommendations?.length > 0 && (
+                    <div className="research-section">
+                      <div className="research-section-title">Рекомендации</div>
+                      <div className="admet-recommendations">
+                        {admetResult.admet.recommendations.map((item, index) => (
+                          <div key={`${item}-${index}`}>{item}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="input-area">
+              <div className="input-row">
+                <textarea
+                  ref={admetTextareaRef}
+                  className="input-box"
+                  rows={1}
+                  placeholder="aspirin, caffeine, CC(=O)O, ..."
+                  value={admetInput}
+                  onChange={e => setAdmetInput(e.target.value)}
+                  onKeyDown={handleAdmetKeyDown}
+                  disabled={isAdmetRunning}
+                  style={{ height: 44 }}
+                  onInput={e => {
+                    e.target.style.height = '44px'
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                  }}
+                />
+                <button
+                  className="send-btn"
+                  onClick={handleAdmetSubmit}
+                  disabled={!admetInput.trim() || isAdmetRunning}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="13" x2="8" y2="3" />
+                    <polyline points="4 7 8 3 12 7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="input-hint">
+                Enter — запустить ADMET · Shift+Enter — новая строка
               </div>
             </div>
           </>

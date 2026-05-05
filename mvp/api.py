@@ -5,6 +5,7 @@ POST /resume       — resume an interactive session at the next interrupt point
 POST /ord/search   — search ORD by molecule name or SMILES, return ranked reactions
 POST /retro/search — run additive retrosynthesis search across enabled sources
 POST /research/analyze — run standalone molecule/literature/patent research
+POST /admet/analyze    — run descriptor-based ADMET screening
 POST /tree/expand  — recursively expand a synthesis route into a full tree
 GET  /health       — liveness check
 GET  /retro/sources — inspect enabled retrosynthesis sources and AiZynth service reachability
@@ -27,6 +28,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from . import config as _cfg  # noqa: F401
+from .admet import analyze_admet
 from .config import DATA_DIR
 from .graph import build_graph
 from .research_workspace import run_research_workspace
@@ -242,6 +244,17 @@ class ResearchAnalyzeResponse(BaseModel):
     evidence: list[dict[str, Any]]
     rag_results: list[dict[str, Any]]
     source_errors: dict[str, str] = Field(default_factory=dict)
+
+
+class AdmetAnalyzeRequest(BaseModel):
+    query: str = Field(..., description="Molecule name or SMILES")
+
+
+class AdmetAnalyzeResponse(BaseModel):
+    query: str
+    smiles: str
+    resolution: str
+    admet: dict[str, Any]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -903,6 +916,34 @@ async def research_analyze(req: ResearchAnalyzeRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
     return ResearchAnalyzeResponse(**_sanitize(result))
+
+
+@app.post("/admet/analyze", response_model=AdmetAnalyzeResponse)
+async def admet_analyze(req: AdmetAnalyzeRequest):
+    """Run descriptor-based ADMET screening for a molecule."""
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query must not be empty")
+
+    logger.info("[admet/analyze] query=%r", query)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        smiles, resolution = await loop.run_in_executor(_executor, lambda: _resolve_to_smiles(query))
+        admet = await loop.run_in_executor(_executor, lambda: analyze_admet(smiles))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[admet/analyze] crashed for query %r", query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return AdmetAnalyzeResponse(
+        query=query,
+        smiles=smiles,
+        resolution=resolution,
+        admet=_sanitize(admet),
+    )
 
 
 @app.post("/tree/expand", response_model=TreeExpandResponse)
