@@ -92,11 +92,35 @@ const NAV_ITEMS = [
 ]
 
 const ADMET_SECTION_LABELS = {
-  absorption: 'Absorption',
-  distribution: 'Distribution',
-  metabolism: 'Metabolism',
-  excretion: 'Excretion',
-  toxicity: 'Toxicity',
+  absorption: 'Всасывание',
+  distribution: 'Распределение',
+  metabolism: 'Метаболизм',
+  excretion: 'Выведение',
+  toxicity: 'Токсичность',
+}
+
+const ADMET_METHOD_LABELS = {
+  rdkit_descriptor_heuristics_v1: 'RDKit-дескрипторы',
+  rdkit_descriptor_heuristics_v2_with_safety_overlay: 'RDKit-дескрипторы + проверка безопасности',
+}
+
+const RISK_LEVEL_LABELS = {
+  low: 'низкий',
+  medium: 'средний',
+  high: 'высокий',
+}
+
+const SAFETY_STATUS_LABELS = {
+  SAFE: 'без критичных ограничений',
+  WARNING: 'требуется внимание',
+  CRITICAL_STOP: 'критический стоп',
+  UNKNOWN: 'нет данных',
+}
+
+const SEVERITY_LABELS = {
+  low: 'низкая',
+  medium: 'средняя',
+  high: 'высокая',
 }
 
 const AVAILABILITY_LEVEL_LABELS = {
@@ -919,7 +943,7 @@ export default function App() {
                 <div className="availability-results">
                   <div className="availability-hero">
                     <div>
-                      <div className="research-summary-kicker">Availability · local catalog</div>
+                      <div className="research-summary-kicker">Доступность · локальный каталог</div>
                       <h2>{availabilityResult.summary?.available_count || 0}/{availabilityResult.summary?.total || 0} доступны</h2>
                       <p>{availabilityResult.query}</p>
                     </div>
@@ -1023,9 +1047,9 @@ export default function App() {
                 {isAdmetRunning ? (
                   <span className="topbar-status">
                     <div className="spinner spinner-sm" />
-                    Выполняется ADMET screening...
+                    Выполняется ADMET-оценка...
                   </span>
-                ) : 'ADMET screening'}
+                ) : 'ADMET-оценка'}
               </span>
             </div>
 
@@ -1033,7 +1057,7 @@ export default function App() {
               {admetStatus === 'idle' && (
                 <div className="admet-empty-state">
                   <div className="empty-title">ADMET</div>
-                  <div className="empty-sub">Быстрая интерпретируемая оценка absorption, distribution, metabolism, excretion и toxicity по RDKit-дескрипторам.</div>
+                  <div className="empty-sub">Быстрая интерпретируемая оценка всасывания, распределения, метаболизма, выведения и токсичности по RDKit-дескрипторам и данным безопасности.</div>
                   <div className="empty-examples">
                     {EXAMPLES.map(ex => (
                       <button key={ex} className="example-chip" onClick={() => setAdmetInput(ex)}>{ex}</button>
@@ -1062,15 +1086,27 @@ export default function App() {
                 <div className="admet-results">
                   <div className={`admet-hero risk-${admetResult.admet?.overall?.risk_level || 'medium'}`}>
                     <div>
-                      <div className="research-summary-kicker">ADMET · {admetResult.admet?.method}</div>
+                      <div className="research-summary-kicker">ADMET · метод: {ADMET_METHOD_LABELS[admetResult.admet?.method] || admetResult.admet?.method}</div>
                       <h2>{admetResult.query}</h2>
                       <p>{admetResult.smiles}</p>
                     </div>
                     <div className="admet-score">
                       <strong>{admetResult.admet?.overall?.score}</strong>
-                      <span>{admetResult.admet?.overall?.risk_level}</span>
+                      <span>{RISK_LEVEL_LABELS[admetResult.admet?.overall?.risk_level] || admetResult.admet?.overall?.risk_level}</span>
                     </div>
                   </div>
+
+                  {admetResult.admet?.safety_overlay?.available && (
+                    <div className={`admet-safety-banner status-${admetResult.admet.safety_overlay.overall_status || 'SAFE'}`}>
+                      <div>
+                        <strong>Проверка безопасности: {SAFETY_STATUS_LABELS[admetResult.admet.safety_overlay.overall_status] || admetResult.admet.safety_overlay.overall_status}</strong>
+                        <span>{admetResult.admet.safety_overlay.molecule_reason || 'Данные GHS и рекомендации по СИЗ учтены вместе с ADMET-дескрипторами.'}</span>
+                      </div>
+                      {admetResult.admet.safety_overlay.h_codes?.length > 0 && (
+                        <code>{admetResult.admet.safety_overlay.h_codes.slice(0, 8).join(', ')}</code>
+                      )}
+                    </div>
+                  )}
 
                   <div className="admet-descriptor-grid">
                     {Object.entries(admetResult.admet?.descriptors || {}).map(([key, value]) => (
@@ -1093,7 +1129,7 @@ export default function App() {
                           <div className="admet-flag-list">
                             {section.flags.map((flag, index) => (
                               <div key={`${flag.message}-${index}`} className={`admet-flag severity-${flag.severity}`}>
-                                <strong>{flag.severity}</strong>
+                                <strong>{SEVERITY_LABELS[flag.severity] || flag.severity}</strong>
                                 <span>{flag.message}</span>
                                 <small>{flag.evidence}</small>
                               </div>

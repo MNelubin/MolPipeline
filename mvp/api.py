@@ -1027,8 +1027,21 @@ async def admet_analyze(req: AdmetAnalyzeRequest):
     import asyncio
     loop = asyncio.get_event_loop()
     try:
-        smiles, resolution = await loop.run_in_executor(_executor, lambda: _resolve_to_smiles(query))
-        admet = await loop.run_in_executor(_executor, lambda: analyze_admet(smiles))
+        def _run_admet_with_safety() -> tuple[str, str, dict[str, Any]]:
+            from .nodes.validate_and_guard_node import _resolve_molecule, _run_safety_checks
+
+            resolved = _resolve_molecule(query)
+            validation = resolved.get("validation", {})
+            if not validation.get("is_valid"):
+                raise ValueError(validation.get("error") or f"Could not resolve molecule: {query}")
+
+            smiles = resolved.get("smiles", "")
+            cid = resolved.get("pubchem_cid")
+            safety_guard = _run_safety_checks(smiles=smiles, cid=cid, reaction_description="")
+            resolution = validation.get("input_type") or "resolved"
+            return smiles, resolution, analyze_admet(smiles, safety_guard=safety_guard)
+
+        smiles, resolution, admet = await loop.run_in_executor(_executor, _run_admet_with_safety)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:

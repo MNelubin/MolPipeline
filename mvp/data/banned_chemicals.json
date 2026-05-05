@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "total": 150,
+    "total": 152,
     "stats": {
       "critical": 36,
-      "high": 78,
+      "high": 80,
       "medium": 36
     },
     "sources": [
@@ -23,6 +23,28 @@
     "format_version": "2.0"
   },
   "chemicals": [
+    {
+      "smiles": "COC(=O)C1C(OC(=O)c2ccccc2)CC2CCC1N2C",
+      "canonical_smiles": "COC(=O)C1C(OC(=O)c2ccccc2)CC2CCC1N2C",
+      "name": "Cocaine",
+      "cas": "50-36-2",
+      "category": "controlled_substance",
+      "danger_level": "high",
+      "source": "curated_controlled_substances",
+      "description": "Controlled substance; should not be treated as generally safe in ADMET-only screening.",
+      "pubchem_cid": 446220
+    },
+    {
+      "smiles": "CNC(C)Cc1ccccc1",
+      "canonical_smiles": "CNC(C)Cc1ccccc1",
+      "name": "Methamphetamine",
+      "cas": "537-46-2",
+      "category": "controlled_substance",
+      "danger_level": "high",
+      "source": "curated_controlled_substances",
+      "description": "Controlled substance; should not be treated as generally safe in ADMET-only screening.",
+      "pubchem_cid": 10836
+    },
     {
       "smiles": "[Br-].[Br-].CC[N+](C)(CC(=O)CCCCCCC(=O)C[N+](C)(CC)Cc1ncccc1OC(=O)N(C)C)Cc2ncccc2OC(=O)N(C)C",
       "canonical_smiles": "[Br-].[Br-].CC[N+](C)(CC(=O)CCCCCCC(=O)C[N+](C)(CC)Cc1ncccc1OC(=O)N(C)C)Cc2ncccc2OC(=O)N(C)C",

@@ -2343,6 +2343,52 @@ a.ext-link:hover { color: var(--cyan); }
     var(--bg-card);
 }
 
+.admet-safety-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.admet-safety-banner.status-CRITICAL_STOP {
+  border-color: var(--red-border);
+  background: var(--red-bg);
+}
+
+.admet-safety-banner.status-WARNING {
+  border-color: var(--amber-border);
+  background: var(--amber-bg);
+}
+
+.admet-safety-banner strong,
+.admet-safety-banner span {
+  display: block;
+}
+
+.admet-safety-banner strong {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.admet-safety-banner span {
+  color: var(--text-2);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.admet-safety-banner code {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .admet-hero h2 {
   font-size: 21px;
   margin-bottom: 4px;

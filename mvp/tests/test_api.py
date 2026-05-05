@@ -263,13 +263,21 @@ class TestAdmetEndpoint:
             "recommendations": [],
             "method": "rdkit_descriptor_heuristics_v1",
         }
-        with patch("mvp.api._resolve_to_smiles", return_value=("CCO", "smiles")), \
-             patch("mvp.api.analyze_admet", return_value=admet_result):
+        resolved = {
+            "validation": {"is_valid": True, "input_type": "name"},
+            "smiles": "CCO",
+            "pubchem_cid": 702,
+        }
+        safety_guard = {"overall_status": "SAFE", "molecule_check": {"status": "clear"}, "safety_data": {}}
+        with patch("mvp.nodes.validate_and_guard_node._resolve_molecule", return_value=resolved), \
+             patch("mvp.nodes.validate_and_guard_node._run_safety_checks", return_value=safety_guard), \
+             patch("mvp.api.analyze_admet", return_value=admet_result) as mock_admet:
             result = asyncio.run(admet_analyze(AdmetAnalyzeRequest(query="ethanol")))
 
         assert result.query == "ethanol"
         assert result.smiles == "CCO"
         assert result.admet["overall"]["risk_level"] == "low"
+        mock_admet.assert_called_once_with("CCO", safety_guard=safety_guard)
 
 
 class TestAvailabilityEndpoint:
