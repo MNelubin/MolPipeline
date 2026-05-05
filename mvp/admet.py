@@ -48,10 +48,11 @@ def _filter_none(items: list[dict[str, Any] | None]) -> list[dict[str, Any]]:
     return [item for item in items if item is not None]
 
 
-HIGH_TOX_H_CODES = {"H300", "H304", "H310", "H330", "H340", "H350", "H360", "H370", "H372"}
+ACUTE_FATAL_H_CODES = {"H300", "H310", "H330"}
+HIGH_TOX_H_CODES = {"H300", "H310", "H330", "H340", "H350"}
 MEDIUM_TOX_H_CODES = {
     "H301", "H302", "H311", "H312", "H314", "H317", "H318", "H331", "H332",
-    "H334", "H341", "H351", "H361", "H371", "H373",
+    "H334", "H341", "H351", "H360", "H361", "H370", "H371", "H372", "H373",
 }
 
 
@@ -237,7 +238,7 @@ def analyze_admet(smiles: str, safety_guard: dict[str, Any] | None = None) -> di
     if safety_overlay["overall_status"] == "CRITICAL_STOP":
         risk_level = "high"
         overall = min(overall, 40)
-    elif set(safety_overlay.get("h_codes", [])) & HIGH_TOX_H_CODES:
+    elif set(safety_overlay.get("h_codes", [])) & ACUTE_FATAL_H_CODES:
         risk_level = "high"
         overall = min(overall, 55)
     elif safety_overlay["overall_status"] == "WARNING":
