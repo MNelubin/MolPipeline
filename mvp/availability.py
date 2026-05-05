@@ -11,6 +11,7 @@ from .tools import retro_tools as _retro
 VENDOR_NAMES = {
     "EM": "eMolecules",
     "MC": "Mcule",
+    "LN": "LabNetwork",
     "CB": "ChemBridge",
     "CS": "ChemSpace",
     "SA": "Sigma-Aldrich",
