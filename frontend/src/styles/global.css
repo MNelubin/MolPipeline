@@ -2091,6 +2091,218 @@ a.ext-link:hover { color: var(--cyan); }
   text-transform: uppercase;
 }
 
+/* ─── Availability workspace ───────────────────────────────────────────── */
+.availability-empty-state,
+.availability-results {
+  width: 100%;
+  max-width: 1040px;
+  margin: auto;
+}
+
+.availability-empty-state {
+  text-align: center;
+}
+
+.availability-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(6,214,240,0.16), transparent 34%),
+    linear-gradient(135deg, rgba(18,29,46,0.98), rgba(10,18,30,0.98));
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  margin-bottom: 14px;
+}
+
+.availability-hero h2 {
+  font-size: 21px;
+  margin-bottom: 4px;
+}
+
+.availability-hero p {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.availability-score {
+  width: 104px;
+  height: 104px;
+  border-radius: 28px;
+  border: 1px solid var(--cyan-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7,11,18,0.55);
+  flex-shrink: 0;
+}
+
+.availability-score strong {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.availability-score span {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.availability-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.availability-summary-grid div {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px;
+}
+
+.availability-summary-grid span {
+  display: block;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.availability-summary-grid strong {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 18px;
+}
+
+.availability-list {
+  display: grid;
+  gap: 12px;
+}
+
+.availability-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px;
+}
+
+.availability-card.level-catalog,
+.availability-card.level-common_lab_reagent {
+  border-color: var(--green-border);
+}
+
+.availability-card.level-heuristic_likely {
+  border-color: var(--amber-border);
+}
+
+.availability-card.level-not_found,
+.availability-card.level-invalid {
+  border-color: var(--red-border);
+}
+
+.availability-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.availability-card-head strong,
+.availability-card-head code {
+  display: block;
+}
+
+.availability-card-head strong {
+  color: var(--text-1);
+  font-size: 15px;
+}
+
+.availability-card-head code {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.availability-card-head span {
+  align-self: flex-start;
+  color: var(--cyan);
+  border: 1px solid var(--cyan-border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.availability-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.availability-meta div {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+}
+
+.availability-meta small {
+  display: block;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.availability-meta b {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.availability-pack-row,
+.availability-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.availability-pack-row span,
+.availability-links a {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.availability-links a:hover {
+  color: var(--cyan);
+  border-color: var(--cyan-border);
+}
+
+.availability-warning {
+  margin-top: 10px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
 /* ─── ADMET workspace ──────────────────────────────────────────────────── */
 .admet-empty-state,
 .admet-results {

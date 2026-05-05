@@ -10,6 +10,7 @@ import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
 import { useResearchSearch } from './hooks/useResearchSearch'
 import { useAdmetAnalysis } from './hooks/useAdmetAnalysis'
+import { useAvailabilityCheck } from './hooks/useAvailabilityCheck'
 
 const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'ethanol']
 const MoleculeEditor = lazy(() => import('./components/MoleculeEditor'))
@@ -75,6 +76,19 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'availability',
+    label: 'Поставщики',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 4.5h7.5v6H2z" />
+        <path d="M9.5 6h2l1.5 2v2.5H9.5" />
+        <circle cx="4.5" cy="11.5" r="1" />
+        <circle cx="11.5" cy="11.5" r="1" />
+        <path d="M3.5 2.5h4" />
+      </svg>
+    ),
+  },
 ]
 
 const ADMET_SECTION_LABELS = {
@@ -85,6 +99,14 @@ const ADMET_SECTION_LABELS = {
   toxicity: 'Toxicity',
 }
 
+const AVAILABILITY_LEVEL_LABELS = {
+  catalog: 'В каталоге',
+  common_lab_reagent: 'Обычный реагент',
+  heuristic_likely: 'Вероятно доступен',
+  not_found: 'Не найден',
+  invalid: 'Ошибка',
+}
+
 export default function App() {
   const [page, setPage] = useState('chat')
   const [input, setInput] = useState('')
@@ -93,6 +115,7 @@ export default function App() {
   const [researchInput, setResearchInput] = useState('')
   const [researchMode, setResearchMode] = useState('literature')
   const [admetInput, setAdmetInput] = useState('')
+  const [availabilityInput, setAvailabilityInput] = useState('')
   const [model, setModel] = useState('openai/gpt-4o')
   const [history, setHistory] = useState(() => {
     try {
@@ -104,6 +127,7 @@ export default function App() {
   const retroTextareaRef = useRef(null)
   const researchTextareaRef = useRef(null)
   const admetTextareaRef = useRef(null)
+  const availabilityTextareaRef = useRef(null)
   const currentQueryRef = useRef('')
 
   const {
@@ -140,11 +164,19 @@ export default function App() {
     analyzeAdmet,
     reset: resetAdmet,
   } = useAdmetAnalysis()
+  const {
+    status: availabilityStatus,
+    result: availabilityResult,
+    error: availabilityError,
+    checkAvailability,
+    reset: resetAvailability,
+  } = useAvailabilityCheck()
 
   const isRunning = status === 'running'
   const isRetroRunning = retroStatus === 'running'
   const isResearchRunning = researchStatus === 'running'
   const isAdmetRunning = admetStatus === 'running'
+  const isAvailabilityRunning = availabilityStatus === 'running'
 
   // Save session to localStorage whenever pipeline state updates
   useEffect(() => {
@@ -246,6 +278,18 @@ export default function App() {
 
   const handleAdmetKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdmetSubmit() }
+  }
+
+  const handleAvailabilitySubmit = useCallback(async () => {
+    const query = availabilityInput.trim()
+    if (!query || isAvailabilityRunning) return
+
+    await checkAvailability(query)
+    availabilityTextareaRef.current?.focus()
+  }, [availabilityInput, checkAvailability, isAvailabilityRunning])
+
+  const handleAvailabilityKeyDown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAvailabilitySubmit() }
   }
 
   const moleculeInfo = pipelineState?.molecule_info || null
@@ -818,6 +862,155 @@ export default function App() {
               </div>
               <div className="input-hint">
                 Enter — запустить поиск · Shift+Enter — новая строка
+              </div>
+            </div>
+          </>
+        )}
+
+        {page === 'availability' && (
+          <>
+            <div className="topbar">
+              <span className="topbar-title">
+                {isAvailabilityRunning ? (
+                  <span className="topbar-status">
+                    <div className="spinner spinner-sm" />
+                    Проверяю доступность реагентов...
+                  </span>
+                ) : 'Поставщики и доступность реагентов'}
+              </span>
+            </div>
+
+            <div className="messages">
+              {availabilityStatus === 'idle' && (
+                <div className="availability-empty-state">
+                  <div className="empty-title">Поставщики</div>
+                  <div className="empty-sub">
+                    Проверка стартовых веществ через локальную buyables DB, список обычных лабораторных реагентов и fallback-эвристику.
+                  </div>
+                  <div className="empty-examples">
+                    {[
+                      'CC(=O)OC(C)=O.O=C(O)c1ccccc1O',
+                      'ethanol, acetic acid',
+                      'salicylic acid',
+                    ].map(ex => (
+                      <button key={ex} className="example-chip" onClick={() => setAvailabilityInput(ex)}>{ex}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isAvailabilityRunning && (
+                <div className="loading-row">
+                  <div className="spinner spinner-md" />
+                  Сверяю реагенты с локальными каталогами и готовлю ссылки на поставщиков...
+                </div>
+              )}
+
+              {availabilityStatus === 'error' && (
+                <div className="error-block">
+                  {availabilityError || 'Не удалось проверить доступность реагентов'}
+                  <button className="reset-link" onClick={resetAvailability}>
+                    Сбросить
+                  </button>
+                </div>
+              )}
+
+              {!isAvailabilityRunning && availabilityResult && (
+                <div className="availability-results">
+                  <div className="availability-hero">
+                    <div>
+                      <div className="research-summary-kicker">Availability · local catalog</div>
+                      <h2>{availabilityResult.summary?.available_count || 0}/{availabilityResult.summary?.total || 0} доступны</h2>
+                      <p>{availabilityResult.query}</p>
+                    </div>
+                    <div className="availability-score">
+                      <strong>{Math.round((availabilityResult.summary?.availability_ratio || 0) * 100)}</strong>
+                      <span>%</span>
+                    </div>
+                  </div>
+
+                  <div className="availability-summary-grid">
+                    <div><span>Каталог</span><strong>{availabilityResult.summary?.catalog_count || 0}</strong></div>
+                    <div><span>Обычные</span><strong>{availabilityResult.summary?.common_count || 0}</strong></div>
+                    <div><span>Эвристика</span><strong>{availabilityResult.summary?.heuristic_count || 0}</strong></div>
+                    <div><span>Не найдено</span><strong>{availabilityResult.summary?.not_found_count || 0}</strong></div>
+                    <div><span>С ценой</span><strong>{availabilityResult.summary?.priced_count || 0}</strong></div>
+                  </div>
+
+                  <div className="availability-list">
+                    {availabilityResult.items?.map((item, index) => (
+                      <div key={`${item.input}-${index}`} className={`availability-card level-${item.availability_level}`}>
+                        <div className="availability-card-head">
+                          <div>
+                            <strong>{item.label || item.input}</strong>
+                            {item.canonical_smiles && <code>{item.canonical_smiles}</code>}
+                          </div>
+                          <span>{AVAILABILITY_LEVEL_LABELS[item.availability_level] || item.availability_level}</span>
+                        </div>
+
+                        <div className="availability-meta">
+                          <div><small>Основание</small><b>{item.basis}</b></div>
+                          <div><small>Источник</small><b>{item.source_label || item.source || '—'}</b></div>
+                          <div><small>Цена $/g</small><b>{item.ppg != null ? item.ppg : '—'}</b></div>
+                          <div><small>Уверенность</small><b>{item.confidence}</b></div>
+                        </div>
+
+                        {item.estimated_pack_prices?.length > 0 && (
+                          <div className="availability-pack-row">
+                            {item.estimated_pack_prices.map(pack => (
+                              <span key={pack.size_g}>{pack.size_g} g ~ ${pack.estimated_usd}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {item.supplier_search_links?.length > 0 && (
+                          <div className="availability-links">
+                            {item.supplier_search_links.map(link => (
+                              <a key={link.label} href={link.url} target="_blank" rel="noreferrer">{link.label}</a>
+                            ))}
+                          </div>
+                        )}
+
+                        {item.warnings?.length > 0 && (
+                          <div className="availability-warning">{item.warnings[0]}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="input-area">
+              <div className="input-row">
+                <textarea
+                  ref={availabilityTextareaRef}
+                  className="input-box"
+                  rows={1}
+                  placeholder="ethanol, acetic acid или CC(=O)OC(C)=O.O=C(O)c1ccccc1O"
+                  value={availabilityInput}
+                  onChange={e => setAvailabilityInput(e.target.value)}
+                  onKeyDown={handleAvailabilityKeyDown}
+                  disabled={isAvailabilityRunning}
+                  style={{ height: 44 }}
+                  onInput={e => {
+                    e.target.style.height = '44px'
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                  }}
+                />
+                <button
+                  className="send-btn"
+                  onClick={handleAvailabilitySubmit}
+                  disabled={!availabilityInput.trim() || isAvailabilityRunning}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="13" x2="8" y2="3" />
+                    <polyline points="4 7 8 3 12 7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="input-hint">
+                Enter - проверить поставщиков · Shift+Enter - новая строка
               </div>
             </div>
           </>

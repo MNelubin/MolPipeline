@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from . import config as _cfg  # noqa: F401
 from .admet import analyze_admet
+from .availability import check_reagent_availability, summarize_availability
 from .config import DATA_DIR
 from .graph import build_graph
 from .research_workspace import run_research_workspace
@@ -257,6 +258,23 @@ class AdmetAnalyzeResponse(BaseModel):
     admet: dict[str, Any]
 
 
+class AvailabilityCheckRequest(BaseModel):
+    query: str | None = Field(
+        default=None,
+        description="Single molecule, comma/newline-separated reagents, or dot-separated reactant SMILES",
+    )
+    items: list[str] = Field(
+        default_factory=list,
+        description="Explicit reagent list. Used together with query when provided.",
+    )
+
+
+class AvailabilityCheckResponse(BaseModel):
+    query: str | None
+    items: list[dict[str, Any]]
+    summary: dict[str, Any]
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get_state(config: dict) -> dict[str, Any]:
@@ -439,6 +457,85 @@ def _resolve_to_smiles(query: str) -> tuple[str, str]:
         raise ValueError(f"PubChem returned invalid SMILES for CID {cid}")
 
     return Chem.MolToSmiles(mol, isomericSmiles=True), resolution
+
+
+def _parse_availability_items(query: str | None, items: list[str]) -> list[str]:
+    """Parse free-form reagent input into individual molecules."""
+    import re
+
+    parsed: list[str] = []
+    raw_chunks: list[str] = []
+    if query:
+        raw_chunks.append(query)
+    raw_chunks.extend(items or [])
+
+    for chunk in raw_chunks:
+        for token in re.split(r"[\n;,]+", chunk):
+            token = token.strip()
+            if not token:
+                continue
+            if "." in token and not any(ch.isspace() for ch in token):
+                parsed.extend(part.strip() for part in token.split(".") if part.strip())
+            else:
+                parsed.append(token)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for item in parsed:
+        key = item.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def _unresolved_availability_item(item: str, error: Exception) -> dict[str, Any]:
+    return {
+        "input": item,
+        "label": item,
+        "smiles": None,
+        "canonical_smiles": None,
+        "resolution": "unresolved",
+        "available": False,
+        "availability_level": "invalid",
+        "basis": "resolution_failed",
+        "confidence": "high",
+        "ppg": None,
+        "source": None,
+        "source_label": None,
+        "estimated_pack_prices": [],
+        "supplier_search_links": [],
+        "descriptors": {},
+        "warnings": [str(error)],
+    }
+
+
+def _run_availability_check(query: str | None, items: list[str]) -> dict[str, Any]:
+    parsed_items = _parse_availability_items(query, items)
+    if not parsed_items:
+        raise ValueError("query or items must contain at least one molecule")
+
+    results: list[dict[str, Any]] = []
+    for item in parsed_items:
+        try:
+            smiles, resolution = _resolve_to_smiles(item)
+            results.append(
+                check_reagent_availability(
+                    smiles,
+                    label=item,
+                    input_value=item,
+                    resolution=resolution,
+                )
+            )
+        except Exception as exc:
+            results.append(_unresolved_availability_item(item, exc))
+
+    return {
+        "query": query,
+        "items": results,
+        "summary": summarize_availability(results),
+    }
 
 
 def _run_ord_search(query: str, limit: int, top_n: int, scored: bool) -> dict[str, Any]:
@@ -944,6 +1041,31 @@ async def admet_analyze(req: AdmetAnalyzeRequest):
         resolution=resolution,
         admet=_sanitize(admet),
     )
+
+
+@app.post("/availability/check", response_model=AvailabilityCheckResponse)
+async def availability_check(req: AvailabilityCheckRequest):
+    """Check local catalog availability and supplier search hints for reagents."""
+    logger.info(
+        "[availability/check] query=%r items=%d",
+        (req.query or "")[:80],
+        len(req.items),
+    )
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: _run_availability_check(req.query, req.items),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[availability/check] crashed for query %r", req.query)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return AvailabilityCheckResponse(**_sanitize(result))
 
 
 @app.post("/tree/expand", response_model=TreeExpandResponse)

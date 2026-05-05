@@ -7,12 +7,15 @@ from unittest.mock import patch
 
 from ..api import (
     AdmetAnalyzeRequest,
+    AvailabilityCheckRequest,
     ResearchAnalyzeRequest,
     RetroAnalyzeRequest,
     RetroSearchRequest,
+    _run_availability_check,
     _retro_sources_snapshot,
     _run_retro_analyze,
     _run_retro_search,
+    availability_check,
     research_analyze,
     admet_analyze,
     retro_analyze,
@@ -267,3 +270,48 @@ class TestAdmetEndpoint:
         assert result.query == "ethanol"
         assert result.smiles == "CCO"
         assert result.admet["overall"]["risk_level"] == "low"
+
+
+class TestAvailabilityEndpoint:
+    def test_run_availability_check_returns_catalog_summary(self):
+        availability_item = {
+            "input": "ethanol",
+            "label": "ethanol",
+            "smiles": "CCO",
+            "canonical_smiles": "CCO",
+            "resolution": "pubchem_name",
+            "available": True,
+            "availability_level": "catalog",
+            "basis": "local_buyables_db",
+            "confidence": "high",
+            "ppg": 12.5,
+            "source": "SA",
+            "source_label": "Sigma-Aldrich",
+            "estimated_pack_prices": [{"size_g": 1, "estimated_usd": 12.5}],
+            "supplier_search_links": [],
+            "descriptors": {},
+            "warnings": [],
+        }
+
+        with patch("mvp.api._resolve_to_smiles", return_value=("CCO", "pubchem_name")), \
+             patch("mvp.api.check_reagent_availability", return_value=availability_item):
+            result = _run_availability_check("ethanol", [])
+
+        assert result["summary"]["total"] == 1
+        assert result["summary"]["available_count"] == 1
+        assert result["summary"]["catalog_count"] == 1
+        assert result["items"][0]["source_label"] == "Sigma-Aldrich"
+
+    def test_availability_check_endpoint_returns_payload(self):
+        runtime_result = {
+            "query": "ethanol",
+            "items": [{"input": "ethanol", "available": True, "availability_level": "common_lab_reagent"}],
+            "summary": {"total": 1, "available_count": 1, "availability_ratio": 1.0},
+        }
+
+        with patch("mvp.api._run_availability_check", return_value=runtime_result):
+            result = asyncio.run(availability_check(AvailabilityCheckRequest(query="ethanol")))
+
+        assert result.query == "ethanol"
+        assert result.summary["available_count"] == 1
+        assert result.items[0]["availability_level"] == "common_lab_reagent"
