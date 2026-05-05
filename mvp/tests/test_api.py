@@ -222,6 +222,14 @@ class TestResearchEndpoint:
             "interpreted_intent": "Find aspirin synthesis literature",
             "search_queries": ["aspirin synthesis literature PubMed"],
             "summary": "Found literature sources.",
+            "analysis": {
+                "answer": "Aspirin synthesis evidence looks relevant.",
+                "key_findings": [{"claim": "Found aspirin source", "evidence": ["S1"], "confidence": "medium"}],
+                "limitations": [],
+                "safety_notes": [],
+                "recommended_next_steps": [],
+                "analysis_engine": "llm",
+            },
             "candidates": [{"name": "aspirin", "canonical_smiles": "CC(=O)Oc1ccccc1C(=O)O"}],
             "sources": [{"url": "https://pubmed.ncbi.nlm.nih.gov/1/", "title": "Aspirin"}],
             "evidence": [{"url": "https://pubmed.ncbi.nlm.nih.gov/1/", "excerpt": "aspirin synthesis"}],
@@ -235,5 +243,6 @@ class TestResearchEndpoint:
 
         assert result.status == "ok"
         assert result.mode == "literature"
+        assert result.analysis["analysis_engine"] == "llm"
         assert result.candidates[0]["name"] == "aspirin"
         assert result.evidence[0]["excerpt"] == "aspirin synthesis"

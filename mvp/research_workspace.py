@@ -138,6 +138,96 @@ def _build_summary(
     return f"Режим {mode_label}: найдено {source_count} источников, но PubChem-кандидаты пока не извлечены."
 
 
+def _fallback_analysis(
+    query: str,
+    mode: ResearchMode,
+    candidates: list[Any],
+    evidence: list[dict[str, Any]],
+    rag_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    mode_label = {
+        "molecule": "подбор молекул",
+        "literature": "литературный обзор",
+        "patent": "патентный поиск",
+    }[mode]
+    findings: list[dict[str, Any]] = []
+    if evidence:
+        findings.append({
+            "claim": f"По запросу найдено {len(evidence)} релевантных web/PubMed источников для сценария: {mode_label}.",
+            "evidence": [f"S{idx}" for idx in range(1, min(len(evidence), 3) + 1)],
+            "confidence": "medium",
+        })
+    if candidates:
+        names = ", ".join(candidate.name for candidate in candidates[:5])
+        findings.append({
+            "claim": f"Из найденных текстов извлечены и проверены через PubChem кандидаты: {names}.",
+            "evidence": [f"S{idx}" for idx in range(1, min(len(evidence), 3) + 1)] or [],
+            "confidence": "medium",
+        })
+    if rag_results:
+        findings.append({
+            "claim": f"Локальный RAG добавил {len(rag_results)} результатов для сопоставления с внешним поиском.",
+            "evidence": [f"R{idx}" for idx in range(1, min(len(rag_results), 3) + 1)],
+            "confidence": "medium",
+        })
+
+    return {
+        "answer": (
+            f"Агент собрал данные по запросу \"{query}\" и подготовил первичный анализ. "
+            "Для окончательных химических решений нужно сверить первоисточники и экспериментальные условия."
+        ),
+        "key_findings": findings,
+        "candidate_assessment": [
+            {
+                "name": candidate.name,
+                "assessment": "Кандидат найден в источниках и разрешён через PubChem; требуется ручная проверка релевантности к запросу.",
+                "confidence": "medium",
+            }
+            for candidate in candidates[:6]
+        ],
+        "limitations": [
+            "Автоматический анализ использует извлечённые фрагменты, а не полный экспертный разбор статей.",
+            "Внешний web/PubMed поиск может быть неполным или нестабильным.",
+        ],
+        "safety_notes": [
+            "Не использовать вывод как готовый экспериментальный протокол без safety review.",
+        ],
+        "recommended_next_steps": [
+            "Открыть ключевые источники и проверить экспериментальные разделы.",
+            "Сопоставить найденные молекулы с safety guard и доступностью реагентов.",
+            "Для перспективных кандидатов запустить ретросинтез в отдельной вкладке.",
+        ],
+        "source_quality": "heuristic_fallback",
+        "analysis_engine": "heuristic",
+    }
+
+
+def _analyze_research_evidence(
+    query: str,
+    mode: ResearchMode,
+    interpreted_intent: str,
+    candidates: list[Any],
+    evidence: list[dict[str, Any]],
+    rag_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    try:
+        from .services.research_llm import llm_analyze_research_evidence
+
+        analysis = llm_analyze_research_evidence(
+            query,
+            mode,
+            interpreted_intent,
+            evidence,
+            candidates,
+            rag_results,
+        )
+        if analysis:
+            return analysis
+    except Exception as exc:
+        logger.info("[research_workspace] LLM analysis unavailable: %s", exc)
+    return _fallback_analysis(query, mode, candidates, evidence, rag_results)
+
+
 def run_research_workspace(
     query: str,
     mode: ResearchMode = "literature",
@@ -194,6 +284,14 @@ def run_research_workspace(
         evidence,
         mode,
     )
+    analysis = _analyze_research_evidence(
+        query,
+        mode,
+        research_query.interpreted_intent,
+        candidates,
+        evidence,
+        rag_results,
+    )
 
     return {
         "status": "ok" if evidence or candidates or rag_results else "empty",
@@ -202,6 +300,7 @@ def run_research_workspace(
         "interpreted_intent": research_query.interpreted_intent,
         "search_queries": search_queries,
         "summary": summary,
+        "analysis": analysis,
         "candidates": [candidate.model_dump(mode="json") for candidate in candidates],
         "sources": [source.model_dump(mode="json") for source in all_sources[:max_sources]],
         "evidence": evidence,

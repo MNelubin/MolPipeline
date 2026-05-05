@@ -645,6 +645,59 @@ export default function App() {
                     <p>{researchResult.summary}</p>
                   </div>
 
+                  {researchResult.analysis && (
+                    <div className="research-analysis-card">
+                      <div className="research-section-title">Анализ агента</div>
+                      {researchResult.analysis.answer && <p className="research-analysis-answer">{researchResult.analysis.answer}</p>}
+                      {researchResult.analysis.key_findings?.length > 0 && (
+                        <div className="research-analysis-grid">
+                          {researchResult.analysis.key_findings.map((finding, index) => (
+                            <div key={`${finding.claim}-${index}`} className="research-finding-card">
+                              <span className={`research-confidence ${finding.confidence || 'low'}`}>{finding.confidence || 'low'}</span>
+                              <strong>{finding.claim}</strong>
+                              {finding.evidence?.length > 0 && <small>Evidence: {finding.evidence.join(', ')}</small>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {researchResult.analysis.candidate_assessment?.length > 0 && (
+                        <div className="research-agent-list">
+                          <div className="research-agent-list-title">Оценка кандидатов</div>
+                          {researchResult.analysis.candidate_assessment.map((item, index) => (
+                            <div key={`${item.name}-${index}`} className="research-agent-row">
+                              <strong>{item.name}</strong>
+                              <span>{item.assessment}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {researchResult.analysis.limitations?.length > 0 && (
+                        <div className="research-agent-list">
+                          <div className="research-agent-list-title">Ограничения</div>
+                          {researchResult.analysis.limitations.map((item, index) => (
+                            <div key={`${item}-${index}`} className="research-agent-row muted">
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {researchResult.analysis.recommended_next_steps?.length > 0 && (
+                        <div className="research-agent-list">
+                          <div className="research-agent-list-title">Следующие шаги</div>
+                          {researchResult.analysis.recommended_next_steps.map((item, index) => (
+                            <div key={`${item}-${index}`} className="research-agent-row">
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="research-analysis-footnote">
+                        Engine: {researchResult.analysis.analysis_engine || 'unknown'}
+                        {researchResult.analysis.source_quality ? ` · ${researchResult.analysis.source_quality}` : ''}
+                      </div>
+                    </div>
+                  )}
+
                   {researchResult.candidates?.length > 0 && (
                     <div className="research-section">
                       <div className="research-section-title">PubChem-кандидаты</div>

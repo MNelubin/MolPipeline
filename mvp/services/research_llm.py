@@ -147,3 +147,85 @@ def llm_build_summary(
     if isinstance(s, str) and s.strip():
         return s.strip()
     return None
+
+
+def llm_analyze_research_evidence(
+    original_query: str,
+    mode: str,
+    interpreted_intent: str,
+    evidence: list[dict[str, Any]],
+    candidates: list[CandidateMolecule],
+    rag_results: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Analyze collected evidence into a structured research-agent report."""
+    if not evidence and not candidates and not rag_results:
+        return None
+
+    source_lines: list[str] = []
+    for idx, item in enumerate(evidence[:8], start=1):
+        source_lines.append(
+            "\n".join([
+                f"[S{idx}] {item.get('title') or item.get('url') or 'Untitled source'}",
+                f"Type: {item.get('source_type', 'web')}",
+                f"URL: {item.get('url', '')}",
+                f"Excerpt: {(item.get('excerpt') or item.get('snippet') or '')[:1200]}",
+            ])
+        )
+
+    candidate_lines = [
+        f"- {candidate.name}; CID={candidate.pubchem_cid}; SMILES={candidate.canonical_smiles or 'N/A'}"
+        for candidate in candidates[:10]
+    ]
+    rag_lines = [
+        "\n".join([
+            f"[R{idx}] {item.get('title') or 'Local RAG result'}",
+            f"Score: {item.get('score', '')}",
+            f"Text: {(item.get('child_text') or item.get('parent_text') or '')[:1000]}",
+        ])
+        for idx, item in enumerate(rag_results[:5], start=1)
+    ]
+
+    system = (
+        "You are a chemistry research analyst embedded in a molecule synthesis assistant. "
+        "Use only the provided evidence, candidates and local RAG snippets. "
+        "Do not invent citations. If evidence is weak, say so. "
+        "Reply with JSON only using this schema: "
+        "{"
+        "\"answer\": string, "
+        "\"key_findings\": [{\"claim\": string, \"evidence\": [\"S1\"], \"confidence\": \"high|medium|low\"}], "
+        "\"candidate_assessment\": [{\"name\": string, \"assessment\": string, \"confidence\": \"high|medium|low\"}], "
+        "\"limitations\": [string], "
+        "\"safety_notes\": [string], "
+        "\"recommended_next_steps\": [string], "
+        "\"source_quality\": string"
+        "}. "
+        "Use the same language as the user's query where possible."
+    )
+    user = (
+        f"Original query: {original_query}\n"
+        f"Mode: {mode}\n"
+        f"Interpreted intent: {interpreted_intent}\n\n"
+        "Evidence sources:\n"
+        + ("\n\n".join(source_lines) or "No web evidence.")
+        + "\n\nPubChem-resolved candidates:\n"
+        + ("\n".join(candidate_lines) or "No candidates.")
+        + "\n\nLocal RAG snippets:\n"
+        + ("\n\n".join(rag_lines) or "No local RAG snippets.")
+    )
+    data = _chat_json(system, user)
+    if not data:
+        return None
+
+    def _list(value: Any) -> list[Any]:
+        return value if isinstance(value, list) else []
+
+    return {
+        "answer": str(data.get("answer") or "").strip(),
+        "key_findings": _list(data.get("key_findings")),
+        "candidate_assessment": _list(data.get("candidate_assessment")),
+        "limitations": [str(item) for item in _list(data.get("limitations"))],
+        "safety_notes": [str(item) for item in _list(data.get("safety_notes"))],
+        "recommended_next_steps": [str(item) for item in _list(data.get("recommended_next_steps"))],
+        "source_quality": str(data.get("source_quality") or "").strip(),
+        "analysis_engine": "llm",
+    }

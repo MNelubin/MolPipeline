@@ -236,6 +236,7 @@ class ResearchAnalyzeResponse(BaseModel):
     interpreted_intent: str
     search_queries: list[str]
     summary: str
+    analysis: dict[str, Any] = Field(default_factory=dict)
     candidates: list[dict[str, Any]]
     sources: list[dict[str, Any]]
     evidence: list[dict[str, Any]]
