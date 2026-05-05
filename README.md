@@ -1,339 +1,221 @@
-# MolPipeline — ИИ-агент для ретросинтеза и планирования эксперимента
+# MolPipeline
 
-> Мультиагентный пайплайн на LangGraph, который принимает целевую молекулу и выдаёт полный пошаговый протокол синтеза, подкреплённый реальными химическими базами данных.
+MolPipeline - веб-приложение и API для анализа молекул, ретросинтеза, проверки безопасности, оценки ADMET и подбора доступных реагентов.
 
-**Демо:** `https://hack.humaneconomy.ru`
+Текущий публичный стенд: [https://hack.humaneconomy.ru](https://hack.humaneconomy.ru)
 
----
+## Что уже есть
 
-## Что делает система
+- Основной AI-сценарий: пользователь вводит название, SMILES или описание вещества, система валидирует молекулу, проверяет безопасность, собирает данные, предлагает маршруты синтеза и после подтверждения считает стехиометрию и план эксперимента.
+- Отдельная вкладка ретросинтеза: можно выбрать источник маршрута и получить тот же формат маршрутов, что используется в основном UI.
+- Редактор молекул: Ketcher встроен во фронт и позволяет рисовать структуру перед анализом.
+- Исследовательский режим: отдельный workspace для сбора фактов по молекуле, литературе, патентам и открытым источникам. При наличии LLM-ключа подключается LLM-анализ, без ключа работает эвристический режим.
+- ADMET-режим: расчет RDKit-дескрипторов, эвристическая оценка абсорбции, распределения, метаболизма, выведения и токсичности, плюс safety overlay из guard-агента.
+- Режим поставщиков: проверка коммерческой доступности реагентов по локальным buyables-данным.
+- Обогащение маршрутов: каждый маршрут ретросинтеза получает оценку доступности реагентов, ориентировочную цену, источник поставщика и вклад доступности в общий скоринг.
 
-Химик вводит молекулу (название, SMILES, CAS или текст на русском). Система:
+## Ретросинтез
 
-1. **Идентифицирует** молекулу через PubChem — канонический SMILES, формула, свойства, безопасность
-2. **Проверяет** по банлисту контролируемых веществ — немедленно блокирует запрещённые
-3. **Запускает ретросинтез** — сначала Open Reaction Database (ORD), затем веб-поиск (PubMed + DuckDuckGo), затем нейромодель ASKCOS
-4. **Строит дерево синтеза** рекурсивно, пока каждый лист не окажется коммерчески доступным или заблокированным
-5. **Оценивает и ранжирует** до 5 маршрутов по реализуемости, выходу и доступности реагентов
-6. **Рассчитывает стехиометрию** — точные массы, объёмы, эквиваленты под заданную целевую массу
-7. **Генерирует экспериментальный протокол** — пошаговая процедура для каждой стадии с обоснованиями, на русском языке
+Система не заменяет один подход другим, а объединяет несколько источников маршрутов в общий формат:
 
----
+- `ORD` - поиск похожих реакций в локальной базе Open Reaction Database, если база подготовлена на сервере.
+- `web` - поиск кандидатов из открытых веб-источников.
+- `retro_model` - локальная template-based модель на базе подготовленных шаблонов.
+- `AiZynthFinder` - внешний multi-step planner через отдельный сервис.
+- `RetroCast` - мост для адаптации внешних планировщиков и будущих источников маршрутов.
 
-## Преимущества перед обычным LLM
+Маршруты дедуплицируются и ранжируются по нескольким сигналам: правдоподобность, доступность исходников, ориентировочная стоимость, простота, эффективность, выход и наличие процедурных данных.
 
-| Критерий | Обычный LLM-промпт | MolPipeline |
-|---|---|---|
-| Источник реакций | Галлюцинированные / общие | ORD (реальные реакции) + веб-поиск + нейромодель |
-| Количества реагентов | Отсутствуют или приблизительные | Точные г, мл, моль, экв под целевую массу |
-| Глубина процедуры | 2–3 размытых предложения | 8 детальных шагов на стадию с обоснованием |
-| Дерево синтеза | Один шаг | Рекурсивное дерево до покупаемых листьев |
-| Проверка безопасности | Нет | Банлист + GHS-паспорт на каждом узле |
-| Ранжирование путей | Нет | Score = выход × доступность × качество процедуры |
-| Многостадийность | Не связаны | Стадии связаны — продукт стадии N = реагент стадии N+1 |
+## Безопасность
 
----
+Проверка безопасности выполняется до расчетов и дополнительно используется в ADMET:
+
+- локальные списки запрещенных веществ и реакций;
+- PubChem/GHS-флаги, если доступны;
+- предупреждения по PPE, токсичности, горючести и регуляторным рискам;
+- жесткое повышение риска для запрещенных или явно опасных веществ.
+
+Важно: ADMET-оценка не является медицинской, токсикологической или регуляторной экспертизой. Это инженерный скрининг для ранней фильтрации и объяснения рисков.
+
+## Доступность реагентов
+
+Подбор поставщиков основан на локальных buyables-данных и эвристиках:
+
+- eMolecules;
+- Mcule;
+- LabNetwork;
+- ChemBridge;
+- ChemSpace;
+- Sigma-Aldrich;
+- внутренние fallback-эвристики для простых и распространенных реагентов.
+
+В маршрутах ретросинтеза доступность отображается на уровне каждого реагента и в сводке маршрута: сколько реагентов найдено, есть ли цены, минимальная/средняя/максимальная цена за грамм и примерная стоимость для масштаба 1 г.
+
+## Фронтенд
+
+Основные разделы интерфейса:
+
+| Раздел | Назначение |
+| --- | --- |
+| Анализ молекул | Основной диалоговый сценарий с графом анализа, безопасностью, ретросинтезом и расчетом эксперимента. |
+| Калькулятор | Быстрые химические расчеты. |
+| Ретросинтез | Отдельный workspace с выбором источника маршрута. |
+| Исследования | Сбор и анализ информации из литературы, патентов и открытых источников. |
+| ADMET | Отдельный скрининг фармакокинетических и токсикологических эвристик. |
+| Поставщики | Проверка доступности реагента и ориентировочных поставщиков. |
+
+## Backend API
+
+Основной backend - FastAPI-приложение `mvp.api`.
+
+| Метод | Путь | Назначение |
+| --- | --- | --- |
+| `GET` | `/health` | Проверка состояния API. |
+| `POST` | `/analyze` | Старт основного анализа молекулы. |
+| `POST` | `/resume` | Продолжение графа после подтверждения пользователем. |
+| `POST` | `/ord/search` | Поиск реакций в ORD-источнике. |
+| `GET` | `/retro/sources` | Состояние источников ретросинтеза и доступность AiZynthFinder. |
+| `POST` | `/retro/search` | Быстрый поиск маршрутов ретросинтеза по источникам. |
+| `POST` | `/retro/analyze` | Полный standalone-анализ ретросинтеза для отдельной вкладки. |
+| `POST` | `/tree/expand` | Расширение дерева ретросинтеза. |
+| `POST` | `/research/analyze` | Исследовательский агент по молекуле/литературе/патентам. |
+| `POST` | `/admet/analyze` | ADMET-скрининг с safety overlay. |
+| `POST` | `/availability/check` | Проверка доступности реагента. |
 
 ## Архитектура
 
-```
-Ввод пользователя
-    │
-    ▼
-classify_node              ← эвристика: SMILES / название / исследовательский запрос
-    │
-    ▼
-validate_and_guard_node    ← PubChem resolve + проверка банлиста
-    │ (not_found)
-    ▼
-research_node              ← веб-поиск + LLM-синтез информации о молекуле
-    │ (found)
-    ▼
-molecule_info_node         ← LLM-обогащение данных PubChem → карточка молекулы
-    │
-  [ПРЕРЫВАНИЕ #1 — пользователь подтверждает продолжение]
-    │
-    ▼
-retrosynthesis_node        ← ORD → Web → ASKCOS → score_route → дерево
-    │
-  ┌─┴─────────────────┐
-  ▼                   ▼
-guard_safety_node   reagent_node     ← параллельный fan-out
-  └─────────┬─────────┘
-            ▼
-      aggregate_node       ← объединение, ранжирование, выбор лучшего пути
-            │
-  [ПРЕРЫВАНИЕ #2 — пользователь выбирает маршрут + целевую массу]
-            │
-            ▼
-    stoichiometry_node     ← точный расчёт масс/объёмов
-            │
-            ▼
-  experiment_planner_node  ← генерация процедуры по стадиям через LLM
-            │
-           END → протокол, готовый к PDF
+Основной AI-граф:
+
+```text
+classify
+  -> validate_and_guard
+  -> molecule_info
+  -> user interrupt
+  -> retrosynthesis
+  -> tree expansion
+  -> safety/reagent checks
+  -> aggregate
+  -> user interrupt
+  -> stoichiometry
+  -> experiment planner
 ```
 
-### Логика маршрутизации
+Standalone-workspaces (`/retro/*`, `/research/analyze`, `/admet/analyze`, `/availability/check`) работают поверх тех же сервисов, но не требуют прохождения всего основного графа.
 
-| Условие | Следующий узел |
-|---|---|
-| SMILES/название найдено в PubChem | `molecule_info` |
-| Не найдено, без предыдущего research | `research_node` (веб + LLM) |
-| Не найдено после research | `END` с ошибкой |
-| Попадание в банлист | `END` с предупреждением |
-| ORD содержит реакцию | Использовать маршрут из ORD |
-| ORD пуст | Веб-поиск → ASKCOS нейромодель |
-| Лист покупаемый | `status=buyable`, остановка ветки |
-| Глубина ≥ 6 или таймаут | `status=depth_limit/timeout` |
+## Данные и модели
 
----
+Крупные данные и артефакты не обязаны храниться в Git:
 
-## Стек технологий
-
-| Слой | Технология |
-|---|---|
-| Граф агентов | LangGraph `StateGraph` с `MemorySaver` checkpointer |
-| LLM | OpenRouter API (GPT-4o и другие модели) |
-| Ретросинтез (БД) | Open Reaction Database (ORD) — SQLite, 2.3M реакций |
-| Ретросинтез (веб) | PubMed + DuckDuckGo + LLM-экстракция маршрутов |
-| Ретросинтез (ML) | Template-relevance нейромодель (163K шаблонов, ~192 MB) |
-| RAG | SPECTER2 эмбеддинги + ChromaDB + BM25 гибридный поиск |
-| Валидация молекул | RDKit + PubChem REST API |
-| Безопасность | Банлист (ФСКН, КХО, двойного назначения) + PubChem GHS |
-| Покупаемость | БД buyables (690K+ молекул от eMolecules, Mcule, ChemBridge, ChemSpace) |
-| Backend API | FastAPI + SSE-стриминг |
-| Frontend | React 18 + Vite, ReactFlow визуализация графов |
-| Стехиометрия | Калькулятор масс/объёмов с PubChem-данными о плотности |
-| Деплой | Systemd + Caddy reverse proxy |
-
----
-
-## Структура проекта
-
-```
-├── mvp/                              # Основной бэкенд
-│   ├── api.py                        # FastAPI приложение (SSE, прерывания)
-│   ├── graph.py                      # LangGraph StateGraph — определение графа
-│   ├── state.py                      # MVPState TypedDict
-│   ├── config.py                     # Фабрика LLM, прокси, переменные окружения
-│   ├── journal.py                    # Журнал решений агента
-│   ├── procedure_inference.py        # Генерация процедур через LLM
-│   ├── tree_expansion.py             # Рекурсивное раскрытие дерева синтеза
-│   ├── retro_predictor.py            # Standalone ретросинтез-модель
-│   ├── retro_tools.py                # ORD-поиск, веб-поиск, скоринг
-│   ├── tools.py                      # PubChem-тулы, банлист, покупаемость
-│   ├── nodes/                        # Узлы графа (11 шт.)
-│   │   ├── classify_node.py          #   Классификатор ввода
-│   │   ├── validate_and_guard_node.py #  PubChem-резолв + банлист
-│   │   ├── research_node.py          #   Веб-исследование (fallback)
-│   │   ├── molecule_info_node.py     #   LLM-карточка молекулы
-│   │   ├── retrosynthesis_node.py    #   ORD + Web + ASKCOS + дерево
-│   │   ├── guard_safety_node.py      #   GHS-безопасность по маршрутам
-│   │   ├── reagent_node.py           #   Проверка покупаемости
-│   │   ├── aggregate_node.py         #   Объединение и ранжирование
-│   │   ├── stoichiometry_node.py     #   Расчёт стехиометрии
-│   │   └── experiment_planner_node.py #  Генерация протокола
-│   ├── tools/                        # Инструменты (8 модулей)
-│   │   ├── calculations.py           #   Стехиометрический калькулятор
-│   │   ├── rdkit_tools.py            #   RDKit: свойства, SMILES, парсинг реакций
-│   │   ├── pubchem.py                #   PubChem API: плотность, имена, CID
-│   │   ├── retro_tools.py            #   ORD + веб-поиск + скоринг + покупаемость
-│   │   ├── safety.py                 #   Проверка безопасности
-│   │   ├── research.py               #   Поиск информации
-│   │   └── rag_search.py             #   RAG-поиск по научной литературе
-│   ├── models/                       # Pydantic-модели
-│   │   ├── calculations.py           #   StoichiometryRequest, CalculationResult
-│   │   ├── validation.py             #   ValidationResult
-│   │   └── research.py               #   ResearchResult
-│   ├── services/                     # Внешние сервисы
-│   │   ├── research_llm.py           #   LLM-исследование
-│   │   ├── web_search.py             #   DuckDuckGo + PubMed
-│   │   └── web_scraper.py            #   Парсинг веб-страниц
-│   ├── rag/                          # RAG-система (Retrieval-Augmented Generation)
-│   │   ├── retriever.py              #   Гибридный ретривер (SPECTER2 + BM25)
-│   │   ├── embeddings.py             #   Эмбеддинги научных текстов (SPECTER2)
-│   │   ├── bm25.py                   #   BM25Okapi ранжирование
-│   │   ├── tracking.py               #   Трекинг проиндексированных документов
-│   │   └── models.py                 #   Модели: DocumentSource, LiteratureDocument
-│   └── tests/                        # Юнит-тесты (284 шт.)
-├── backend/                          # Вспомогательный бэкенд
-│   ├── main.py                       # FastAPI: 2D/3D молекул, калькулятор
-│   └── calculator_combined.py        # Стехиометрический калькулятор (standalone)
-└── frontend/                         # React-фронтенд
-    ├── index.html
-    ├── package.json
-    ├── vite.config.js
-    └── src/
-        ├── App.jsx                   # Главный компонент + localStorage-персистенция
-        ├── components/
-        │   ├── MoleculeCard.jsx      #   Карточка молекулы (вкладки)
-        │   ├── RetroCard.jsx         #   Маршруты синтеза
-        │   ├── SynthesisGraph.jsx    #   ReactFlow-визуализация дерева
-        │   ├── SynthesisTree.jsx     #   Раскрывающееся дерево
-        │   ├── ExperimentProtocol.jsx #  Протокол эксперимента
-        │   ├── CalculatorCard.jsx    #   Стехиометрический калькулятор
-        │   ├── PathwaySelector.jsx   #   Выбор маршрута синтеза
-        │   ├── ModelSelector.jsx     #   Выбор LLM-модели
-        │   ├── PipelineProgress.jsx  #   Индикатор прогресса
-        │   ├── TestPage.jsx          #   Страница запуска тестов
-        │   ├── ChatMessage.jsx       #   Сообщения чата
-        │   ├── ProtocolGraph.jsx     #   Визуализация протокола
-        │   └── Viewer3D.jsx          #   3D-визуализация молекулы
-        ├── hooks/
-        │   ├── useInteractivePipeline.js  # Хук управления пайплайном
-        │   └── useSSEPipeline.js     #   SSE-подключение
-        └── styles/
-            └── global.css            # Глобальные стили
-```
-
----
-
-## Данные
-
-Все данные хранятся на сервере в директории `data/` и **не включены в репозиторий**.
-
-### Базы данных
-
-| Файл | Размер | Описание |
-|---|---|---|
-| `ord_reactions.db` | 1.8 GB | Open Reaction Database — 2.3M реакций, индексированных по продукту (SQLite). Основной источник для ретросинтеза |
-| `buyables.db` | 22 MB | База коммерчески доступных реагентов — 690K+ молекул (SQLite). Источники: eMolecules, Mcule, ChemBridge, ChemSpace |
-
-### Сырые данные покупаемых реагентов
-
-| Файл | Размер | Описание |
-|---|---|---|
-| `buyables/buyables.json.gz` | 16 MB | Объединённый каталог покупаемых молекул |
-| `buyables/chemspace_buyables_dedup_id_pub.json.gz` | 11 MB | ChemSpace каталог |
-| `buyables/mcule_buyables_fd2.json.gz` | 14 MB | Mcule каталог |
-| `buyables/chembridge_buyables.json.gz` | 821 KB | ChemBridge каталог |
-
-### Модель ретросинтеза
-
-| Файл | Размер | Описание |
-|---|---|---|
-| `retro_model/model_latest.pt` | 192 MB | Веса template-relevance нейромодели (извлечена из ASKCOS v2) |
-| `retro_model/templates.jsonl` | 74 MB | 163K шаблонов реакций (SMARTS) |
-| `retro_model/*.py` | ~30 KB | Код инференса модели (handler, parser, utils) |
-
-### Банлисты безопасности
-
-| Файл | Размер | Описание |
-|---|---|---|
-| `banned_chemicals.json` | 17 KB | 150 контролируемых веществ (CWC, ФСКН РФ, двойное назначение). Поля: name, SMILES, CAS, severity (critical/high/medium), SMARTS-паттерны |
-| `banned_reactions.json` | 6 KB | 19 запрещённых типов реакций (синтез ОВ, взрывчатки, наркотиков). Поля: name, SMARTS pattern, severity |
-
-### RAG-система
-
-Гибридный поиск по научной литературе (SPECTER2 + BM25):
-
-| Компонент | Описание |
-|---|---|
-| ChromaDB vectorstore | Векторные эмбеддинги научных статей (SPECTER2, 384-dim) |
-| `literature_tracking.db` | SQLite: метаданные проиндексированных документов, parent/child чанки |
-| Источники документов | PMC, BigQuery Patents, USPTO, S2ORC, ручная индексация |
-
-### Рантайм-данные (создаются автоматически)
-
-| Файл | Описание |
-|---|---|
-| `mvp/data/checkpoints.db` | LangGraph checkpoints — состояние сессий для возобновления |
-| `mvp/logs/*.jsonl` | Журнал решений агента (JSONL) |
-
----
-
-## API-эндпоинты
-
-| Метод | Путь | Описание |
-|---|---|---|
-| `POST` | `/analyze` | Запуск пайплайна (SSE-стрим) |
-| `GET` | `/stream/{thread_id}` | Возобновление интерактивной сессии |
-| `POST` | `/resume/{thread_id}` | Продолжение после прерывания (выбор маршрута) |
-| `POST` | `/tree/expand` | Рекурсивное дерево синтеза для маршрута |
-| `POST` | `/api/calculate` | Стехиометрический калькулятор |
-| `GET` | `/health` | Health check |
-
-### SSE-события
-
-```
-pipeline_start  →  { query, model }
-node_start      →  { node, label }
-node_complete   →  { node, label, output }
-interrupt       →  { phase: "card_ready" | "select_pathway", payload }
-pipeline_done   →  {}
-error           →  { message }
-```
-
----
+- `data/retro_model/` - код и артефакты локальной template-based модели, часть тяжелых файлов игнорируется Git.
+- `data/buyables/` - локальные buyables-источники для поставщиков.
+- `mvp/data/banned_chemicals.json` - локальный список запрещенных веществ.
+- `mvp/data/banned_reactions.json` - локальный список запрещенных реакций.
+- ORD SQLite-база готовится отдельно и может лежать только на сервере.
 
 ## Переменные окружения
 
-```env
-# Обязательные
-OPENROUTER_API_KEY=sk-or-...       # Ключ OpenRouter для LLM
-LLM_MODEL=openai/gpt-4o            # Модель по умолчанию
+Ключевые переменные:
 
-# Опциональные
-SOCKS_PROXY=socks5://user:pass@host:port   # Прокси для гео-блокировок
-LANGSMITH_API_KEY=lsv2_pt_...              # LangSmith трейсинг
-LANGSMITH_PROJECT=hackaton
-ASKCOS_BASE_URL=http://localhost:9100      # ASKCOS (self-hosted)
-```
+| Переменная | Назначение |
+| --- | --- |
+| `OPENROUTER_API_KEY` | LLM-анализ для research-агента и расширенных объяснений. Без ключа включаются fallback-эвристики. |
+| `ASKCOS_BASE_URL` | Адрес ASKCOS-совместимого источника, если используется. |
+| `RETRO_ENABLE_ORD` | Включить ORD-источник. |
+| `RETRO_ENABLE_WEB` | Включить web-источник. |
+| `RETRO_ENABLE_RETRO_MODEL` | Включить локальную template-based модель. |
+| `RETRO_ENABLE_AIZYNTH` | Включить AiZynthFinder. |
+| `RETRO_ENABLE_RETROCAST` | Включить RetroCast bridge. |
+| `RETRO_ORD_AUTHORITATIVE` | Если ORD нашел маршруты, считать его приоритетным источником. |
+| `RETRO_TREE_INCLUDE_EXPERIMENTAL` | Разрешить экспериментальные источники при расширении дерева. |
+| `AIZYNTH_BASE_URL` | URL AiZynthFinder-сервиса. |
+| `RETROCAST_BASE_URL` | URL RetroCast bridge, если он вынесен отдельно. |
+| `AIZYNTH_TIMEOUT_SEC` | Timeout для AiZynthFinder. |
+| `AIZYNTH_MAX_TRANSFORMS` | Максимальное число трансформаций AiZynthFinder. |
+| `AIZYNTH_TIME_LIMIT` | Внутренний лимит поиска AiZynthFinder. |
+| `AIZYNTH_ITERATIONS` | Число итераций поиска AiZynthFinder. |
+| `AIZYNTH_EXPANSION_MODEL` | Модель расширения AiZynthFinder. |
+| `AIZYNTH_STOCK` | Stock-набор AiZynthFinder. |
 
----
+## Локальный запуск
 
-## Запуск локально
+Backend:
 
 ```bash
-# 1. Установить зависимости
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-
-# 2. Настроить переменные окружения
-cp .env.example .env
-# Заполнить OPENROUTER_API_KEY
-
-# 3. Подготовить данные (см. раздел "Данные")
-# Разместить data/ рядом с проектом
-
-# 4. Запустить API агента
-uvicorn mvp.api:app --port 8765 --reload
-
-# 5. Запустить бэкенд калькулятора / молекул
-uvicorn backend.main:app --port 8002 --reload
-
-# 6. Запустить фронтенд
-cd frontend
-npm install && npm run dev
-# → http://localhost:5173
+uvicorn mvp.api:app --host 0.0.0.0 --port 8765
 ```
 
----
-
-## Запуск тестов
+Frontend:
 
 ```bash
-# Быстрые юнит-тесты (без сети, без LLM) — 284 теста
-pytest mvp/tests/ -m "not integration and not slow and not llm"
-
-# Все тесты включая интеграционные (PubChem + ORD)
-pytest mvp/tests/
+cd frontend
+npm install
+npm run dev
 ```
 
----
+Для AiZynthFinder используется отдельный optional-сервис. Его зависимости вынесены в `requirements-aizynth.txt`, пример systemd-конфига лежит в `deploy/systemd/chemist-aizynth.service`, Dockerfile - в `deploy/docker/aizynth.Dockerfile`.
 
-## Вдохновение и заимствования
+## Production
 
-При проектировании MolPipeline мы также смотрели на проект [arqoofficial/itmo-chemcrow2](https://github.com/arqoofficial/itmo-chemcrow2) — AI-ассистент для химиков с FastAPI/React-стеком, LangGraph-агентом и набором хемоинформатических сервисов вокруг ретросинтеза, поиска литературы и safety-check'ов.
+Текущий production-путь на сервере:
 
-Некоторые архитектурные идеи и продуктовые решения могут быть адаптированы из этого проекта в MolPipeline. Репозиторий `itmo-chemcrow2` распространяется по лицензии MIT, поэтому при использовании существенных фрагментов кода или прямых адаптаций необходимо сохранять исходное уведомление об авторских правах и текст лицензии.
+```text
+/opt/projects/chemist-agent
+```
 
-Источник:
-- Репозиторий: `https://github.com/arqoofficial/itmo-chemcrow2`
-- Лицензия: `https://github.com/arqoofficial/itmo-chemcrow2/blob/main/LICENSE`
+Основные systemd-сервисы:
 
----
+```text
+chemist-api.service
+chemist-backend.service
+nginx.service
+chemist-aizynth.service
+```
 
-## Лицензия
+На внешнем хосте Caddy должен проксировать API-префиксы на backend-порт `8765`, включая:
 
-Все права защищены.
+```text
+/analyze
+/resume
+/tree/*
+/ord/*
+/retro/*
+/research/*
+/admet/*
+/availability/*
+/health
+```
+
+Фронтенд и calculator/backend-обвязка проксируются отдельно на frontend-порт, который используется в текущем деплое.
+
+## Проверки
+
+Backend:
+
+```bash
+python -m pytest mvp/tests -q
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+Для production-проверки после деплоя используются публичные smoke-запросы к `https://hack.humaneconomy.ru`: `/health`, `/retro/analyze`, `/admet/analyze`, `/availability/check`.
+
+## Статус разработки
+
+Ближайшие направления:
+
+- подключить более сильную LLM-модель для research-агента после добавления ключа;
+- улучшить реакционный prediction workspace;
+- расширить supplier-проверку живыми источниками цен, если это понадобится для production;
+- добавить наблюдаемость и алерты только после стабилизации основных сценариев.
+
+## Атрибуция
+
+Проект использует собственную реализацию MolPipeline. Часть идей по расширяемым химическим инструментам и отдельным workspace-режимам была изучена на основе [arqoofficial/itmo-chemcrow2](https://github.com/arqoofficial/itmo-chemcrow2) в рамках разрешенного заимствования идей; код не копируется без учета лицензии исходного проекта.
