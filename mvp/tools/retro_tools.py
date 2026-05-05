@@ -272,6 +272,15 @@ def _get_cheap_canonical() -> set[str]:
 
 _BUYABLES_DB_PATH = Path(__file__).parent.parent.parent / "data" / "buyables.db"
 
+_BUYABLE_SOURCE_LABELS = {
+    "EM": "eMolecules",
+    "MC": "Mcule",
+    "LN": "LabNetwork",
+    "CB": "ChemBridge",
+    "CS": "ChemSpace",
+    "SA": "Sigma-Aldrich",
+}
+
 
 def _buyables_lookup(smiles: str) -> dict | None:
     """Lookup SMILES in local buyables SQLite.
@@ -326,6 +335,79 @@ def _is_buyable(smiles: str) -> bool:
     return (heavy <= 10 and rings <= 1 and chiral == 0) or heavy <= 6
 
 
+def _source_label(source: Any) -> str | None:
+    if source is None:
+        return None
+    text = str(source).strip()
+    if not text:
+        return None
+    return ", ".join(
+        _BUYABLE_SOURCE_LABELS.get(part.strip(), part.strip())
+        for part in text.replace(";", ",").split(",")
+        if part.strip()
+    )
+
+
+def _availability_level(canonical: str) -> tuple[bool, str, str, dict | None]:
+    catalog = _buyables_lookup(canonical)
+    if catalog is not None:
+        return True, "catalog", "local_buyables_db", catalog
+    if canonical in _get_cheap_canonical():
+        return True, "common_lab_reagent", "curated_common_reagents", None
+    if _is_buyable(canonical):
+        return True, "heuristic_likely", "small_simple_structure_heuristic", None
+    return False, "not_found", "not_found_in_local_catalog_or_heuristic", None
+
+
+def _price_affordability(ppg: float | None, level: str) -> float:
+    if ppg is None:
+        if level == "common_lab_reagent":
+            return 1.0
+        if level == "heuristic_likely":
+            return 0.45
+        return 0.0
+    if ppg <= 1:
+        return 1.0
+    if ppg <= 10:
+        return 0.85
+    if ppg <= 100:
+        return 0.6
+    if ppg <= 1000:
+        return 0.3
+    return 0.1
+
+
+def _summarize_reactant_availability(items: list[dict[str, Any]]) -> dict[str, Any]:
+    total = len(items)
+    available_count = sum(1 for item in items if item.get("available"))
+    catalog_count = sum(1 for item in items if item.get("availability_level") == "catalog")
+    common_count = sum(1 for item in items if item.get("availability_level") == "common_lab_reagent")
+    heuristic_count = sum(1 for item in items if item.get("availability_level") == "heuristic_likely")
+    not_found_count = sum(1 for item in items if item.get("availability_level") == "not_found")
+    prices = [float(item["ppg"]) for item in items if item.get("ppg") is not None]
+    affordability_values = [float(item.get("affordability", 0)) for item in items]
+
+    summary: dict[str, Any] = {
+        "total": total,
+        "available_count": available_count,
+        "availability_ratio": round(available_count / total, 4) if total else 0,
+        "catalog_count": catalog_count,
+        "common_count": common_count,
+        "heuristic_count": heuristic_count,
+        "not_found_count": not_found_count,
+        "priced_count": len(prices),
+        "affordability": round(sum(affordability_values) / total, 4) if total else 0,
+    }
+    if prices:
+        summary.update({
+            "min_ppg": round(min(prices), 4),
+            "max_ppg": round(max(prices), 4),
+            "avg_ppg": round(sum(prices) / len(prices), 4),
+            "estimated_total_1g_usd": round(sum(prices), 2),
+        })
+    return summary
+
+
 def score_route(route: dict[str, Any]) -> dict[str, Any]:
     """Score a single retrosynthesis route."""
     reactants_str = route.get("reactants", "")
@@ -339,27 +421,69 @@ def score_route(route: dict[str, Any]) -> dict[str, Any]:
     total_atoms = 0
     max_atoms = 0
     total_chiral = 0
+    reactant_availability: list[dict[str, Any]] = []
 
     for smi in reactants:
         if not HAS_RDKIT:
             total_atoms += len(smi)
             max_atoms = max(max_atoms, len(smi))
-            if len(smi) < 15:
+            available = len(smi) < 15
+            if available:
                 buyable_count += 1
+            level = "heuristic_likely" if available else "not_found"
+            reactant_availability.append({
+                "input": smi,
+                "canonical_smiles": smi,
+                "available": available,
+                "availability_level": level,
+                "basis": "string_length_heuristic",
+                "ppg": None,
+                "source": None,
+                "source_label": None,
+                "affordability": _price_affordability(None, level),
+            })
             continue
 
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
+            reactant_availability.append({
+                "input": smi,
+                "canonical_smiles": None,
+                "available": False,
+                "availability_level": "invalid",
+                "basis": "invalid_smiles",
+                "ppg": None,
+                "source": None,
+                "source_label": None,
+                "affordability": 0.0,
+            })
             continue
         heavy = mol.GetNumHeavyAtoms()
         total_atoms += heavy
         max_atoms = max(max_atoms, heavy)
         total_chiral += len(Chem.FindMolChiralCenters(mol))
         canonical = Chem.MolToSmiles(mol, isomericSmiles=True)
-        if _is_buyable(canonical):
+        available, level, basis, catalog = _availability_level(canonical)
+        ppg = catalog.get("ppg") if catalog else None
+        source = catalog.get("source") if catalog else None
+        if available:
             buyable_count += 1
+        reactant_availability.append({
+            "input": smi,
+            "canonical_smiles": canonical,
+            "available": available,
+            "availability_level": level,
+            "basis": basis,
+            "ppg": float(ppg) if ppg is not None else None,
+            "source": source,
+            "source_label": _source_label(source),
+            "affordability": _price_affordability(float(ppg) if ppg is not None else None, level),
+            "heavy_atoms": heavy,
+        })
 
     buyability_ratio = buyable_count / max(n_reactants, 1)
+    availability_summary = _summarize_reactant_availability(reactant_availability)
+    affordability = availability_summary.get("affordability", 0)
     simplicity = 1.0 / (1.0 + 0.08 * max_atoms)
     simplicity *= 1.0 / (1.0 + 0.3 * total_chiral)
     efficiency = 1.0 / (1.0 + 0.25 * (n_reactants - 1))
@@ -375,16 +499,20 @@ def score_route(route: dict[str, Any]) -> dict[str, Any]:
         + 0.20 * min(plausibility, 1.0)
         + 0.20 * buyability_ratio
         + 0.15 * simplicity
-        + 0.10 * efficiency
+        + 0.07 * efficiency
+        + 0.03 * affordability
         + yield_bonus
         + procedure_bonus
     )
 
     route["final_score"] = round(composite, 4)
+    route["reactant_availability"] = reactant_availability
+    route["availability_summary"] = availability_summary
     route["scoring"] = {
         "model_score": round(min(model_score, 1.0), 4),
         "plausibility": round(min(plausibility, 1.0), 4),
         "buyability": round(buyability_ratio, 4),
+        "affordability": round(affordability, 4),
         "simplicity": round(simplicity, 4),
         "efficiency": round(efficiency, 4),
         "yield_bonus": round(yield_bonus, 4),

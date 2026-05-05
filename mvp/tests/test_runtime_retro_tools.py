@@ -11,6 +11,7 @@ from ..tools.retro_tools import (
     get_aizynthfinder_routes,
     get_enabled_sources_for_mode,
     search_and_rank,
+    score_route,
 )
 
 
@@ -165,3 +166,16 @@ class TestSearchAndRankRuntime:
 
         assert result["routes"] == []
         assert result["source_errors"] == {"aizynthfinder": "planner down"}
+
+
+class TestRuntimeScoreRouteAvailability:
+    def test_score_route_attaches_reactant_availability_summary(self):
+        route = {"reactants": "O.CCO", "source": "ord", "score": 0.8, "plausibility": 0.9}
+
+        score_route(route)
+
+        assert route["availability_summary"]["total"] == 2
+        assert route["availability_summary"]["available_count"] == 2
+        assert route["scoring"]["affordability"] > 0
+        assert len(route["reactant_availability"]) == 2
+        assert all(item["available"] for item in route["reactant_availability"])

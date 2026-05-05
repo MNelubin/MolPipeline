@@ -53,6 +53,7 @@ export default function PathwaySelector({ pathways, onSelect }) {
           const buyable = pathway.buyable_leaves ?? 0
           const unresolved = pathway.unresolved_leaves ?? 0
           const isSelected = selectedIdx === i
+          const availabilitySummary = pathway.availability_summary || null
 
           return (
             <div
@@ -84,6 +85,15 @@ export default function PathwaySelector({ pathways, onSelect }) {
 
                 <span className="leaf-counts">{buyable} куп. / {unresolved} нераз.</span>
               </div>
+
+              {availabilitySummary && (
+                <div className="pathway-availability">
+                  <span>{availabilitySummary.available_count}/{availabilitySummary.total} реагента доступны</span>
+                  {availabilitySummary.estimated_total_1g_usd != null && (
+                    <span>1 г ~ ${availabilitySummary.estimated_total_1g_usd}</span>
+                  )}
+                </div>
+              )}
 
               <div className="pathway-reactants">{pathway.reactants || '—'}</div>
 

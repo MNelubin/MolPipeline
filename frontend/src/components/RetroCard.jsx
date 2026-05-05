@@ -41,6 +41,14 @@ const SEARCH_MODE_LABEL = {
   all: 'All enabled sources',
 }
 
+const AVAILABILITY_LEVEL_LABEL = {
+  catalog: 'В каталоге',
+  common_lab_reagent: 'Обычный реагент',
+  heuristic_likely: 'Вероятно доступен',
+  not_found: 'Не найден',
+  invalid: 'Ошибка',
+}
+
 function ScoreBar({ value, max = 1 }) {
   const pct = Math.round((value / max) * 100)
   const level = pct > 70 ? 'high' : pct > 40 ? 'medium' : 'low'
@@ -59,6 +67,8 @@ function RouteCard({ route, index }) {
   const src = SOURCE_LABEL[route.source] || { text: route.source?.toUpperCase(), color: 'var(--text-3)' }
   const scoring = route.scoring || {}
   const steps = route.procedure_steps_ru || []
+  const availability = route.reactant_availability || []
+  const availabilitySummary = route.availability_summary || null
 
   return (
     <div className="route-card">
@@ -105,6 +115,34 @@ function RouteCard({ route, index }) {
           <div className="smiles-box" style={{ wordBreak: 'break-all', marginBottom: 12 }}>
             {route.reactants || '—'}
           </div>
+
+          {availabilitySummary && (
+            <>
+              <div className="section-title">Доступность реагентов</div>
+              <div className="route-availability-summary">
+                <span>{availabilitySummary.available_count}/{availabilitySummary.total} доступны</span>
+                <span>Каталог: {availabilitySummary.catalog_count}</span>
+                <span>С ценой: {availabilitySummary.priced_count}</span>
+                {availabilitySummary.estimated_total_1g_usd != null && (
+                  <span>Оценка 1 г: ${availabilitySummary.estimated_total_1g_usd}</span>
+                )}
+              </div>
+              {availability.length > 0 && (
+                <div className="route-availability-list">
+                  {availability.map((item, i) => (
+                    <div key={`${item.input}-${i}`} className={`route-availability-item level-${item.availability_level}`}>
+                      <code>{item.canonical_smiles || item.input}</code>
+                      <span>{AVAILABILITY_LEVEL_LABEL[item.availability_level] || item.availability_level}</span>
+                      <small>
+                        {item.source_label || item.basis}
+                        {item.ppg != null ? ` · $${item.ppg}/г` : ''}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Conditions */}
           {(route.temperature || route.solvent || route.catalyst || route.expected_yield != null) && (

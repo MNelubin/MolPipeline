@@ -1431,6 +1431,24 @@ a.ext-link:hover { color: var(--cyan); }
   padding-left: 26px;
 }
 
+.pathway-availability {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-left: 26px;
+  margin-bottom: var(--sp-sm);
+}
+
+.pathway-availability span {
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
 .pathway-score-area { padding-left: 26px; }
 
 .pathway-controls {
@@ -1587,6 +1605,75 @@ a.ext-link:hover { color: var(--cyan); }
 .route-reaction-reactants { color: var(--text-2); word-break: break-all; }
 .route-reaction-arrow { color: var(--cyan); font-size: 14px; font-weight: 700; }
 .route-reaction-products { color: var(--green); word-break: break-all; }
+
+.route-availability-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.route-availability-summary span {
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.route-availability-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.route-availability-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(120px, auto);
+  gap: 8px;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+
+.route-availability-item.level-catalog,
+.route-availability-item.level-common_lab_reagent {
+  border-color: var(--green-border);
+}
+
+.route-availability-item.level-heuristic_likely {
+  border-color: var(--amber-border);
+}
+
+.route-availability-item.level-not_found,
+.route-availability-item.level-invalid {
+  border-color: var(--red-border);
+}
+
+.route-availability-item code {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.route-availability-item span {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.route-availability-item small {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: right;
+}
 
 .score-grid {
   display: grid;
