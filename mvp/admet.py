@@ -217,7 +217,7 @@ def analyze_admet(smiles: str, safety_guard: dict[str, Any] | None = None) -> di
         },
         "excretion": {
             "score": _score_from_flags(excretion_flags),
-            "interpretation": "Грубая оценка clearance-направления по MW, TPSA и LogP.",
+            "interpretation": "Грубая оценка направления выведения по молекулярной массе, TPSA и LogP.",
             "flags": excretion_flags,
         },
         "toxicity": {

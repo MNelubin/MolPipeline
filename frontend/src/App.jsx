@@ -104,6 +104,23 @@ const ADMET_METHOD_LABELS = {
   rdkit_descriptor_heuristics_v2_with_safety_overlay: 'RDKit-дескрипторы + проверка безопасности',
 }
 
+const ADMET_DESCRIPTOR_LABELS = {
+  molecular_weight: 'Молекулярная масса',
+  logp: 'LogP',
+  tpsa: 'TPSA',
+  h_bond_donors: 'Доноры H-связей',
+  h_bond_acceptors: 'Акцепторы H-связей',
+  rotatable_bonds: 'Вращаемые связи',
+  ring_count: 'Кольца',
+  aromatic_rings: 'Ароматические кольца',
+  heavy_atoms: 'Тяжелые атомы',
+  formal_charge: 'Формальный заряд',
+  lipinski_violations: 'Нарушения Lipinski',
+  veber_violations: 'Нарушения Veber',
+  solubility_band: 'Растворимость',
+  permeability_band: 'Проницаемость',
+}
+
 const RISK_LEVEL_LABELS = {
   low: 'низкий',
   medium: 'средний',
@@ -1111,7 +1128,7 @@ export default function App() {
                   <div className="admet-descriptor-grid">
                     {Object.entries(admetResult.admet?.descriptors || {}).map(([key, value]) => (
                       <div key={key} className="admet-descriptor">
-                        <span>{key.replaceAll('_', ' ')}</span>
+                        <span>{ADMET_DESCRIPTOR_LABELS[key] || key.replaceAll('_', ' ')}</span>
                         <strong>{String(value)}</strong>
                       </div>
                     ))}
