@@ -241,6 +241,36 @@ def _research_tool(query: str, mode: str = "literature", max_sources: int = 6) -
     return run_research_workspace(query, mode=mode, max_sources=max_sources)
 
 
+def _last_substantive_user_message(history: list[dict[str, str]]) -> str:
+    for item in reversed(history):
+        if item.get("role") != "user":
+            continue
+        content = (item.get("content") or "").strip()
+        if content and not _is_source_followup_request(content):
+            return content
+    return ""
+
+
+def _is_source_followup_request(message: str) -> bool:
+    text = message.casefold()
+    return any(marker in text for marker in (
+        "со ссылк", "ссылки", "источник", "источники", "sources", "citations", "references",
+    )) and len(text) < 180
+
+
+def _contextual_research_query(message: str, history: list[dict[str, str]]) -> str:
+    previous = _last_substantive_user_message(history)
+    if not previous:
+        return message
+    if _is_source_followup_request(message) or _looks_context_dependent(message):
+        return (
+            f"{previous}\n\n"
+            f"Follow-up request: {message}\n"
+            "Find sources for the previous chemistry topic, not for citation formatting itself."
+        )
+    return message
+
+
 def _openrouter_client():
     if not OPENROUTER_API_KEY:
         return None
@@ -448,7 +478,8 @@ def _looks_context_dependent(message: str) -> bool:
     markers = (
         "это", "этот", "эта", "эту", "его", "ее", "её", "она", "он", "они", "котор",
         "а теперь", "теперь", "дальше", "следующий", "там", "в ней", "в нем",
-        "it", "that", "this", "they", "them", "now", "next",
+        "ссылк", "источник", "источники", "подробнее",
+        "it", "that", "this", "they", "them", "now", "next", "sources", "citations",
     )
     return len(text) < 120 and any(marker in text for marker in markers)
 
@@ -601,6 +632,7 @@ def _final_answer_with_llm(
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
         "If no tools were selected, answer as a normal chemistry tutor from general chemistry knowledge and use fallback_summary as guidance. "
         "For real-world materials and product composition, do not force a single-molecule framing: explain mixtures, mineral phases, additives, coatings and likely variability. "
+        "For hazardous or dual-use synthesis topics, including nitration of toluene, explosives and narcotics, keep the answer high-level and non-operational: do not provide temperatures, reagent ratios, step-by-step procedures, purification instructions, yields, procurement advice or scale-up guidance. "
         "Do not invent synthesis routes, prices, safety classifications or citations. "
         "When research/web sources include URLs, cite them as Markdown links: [title](url). "
         "If tools did not find enough data, say exactly what is missing and what to try next. "
@@ -675,7 +707,8 @@ def _append_research_source_links(answer: str, artifacts: dict[str, Any]) -> str
         seen.add(url)
         if url in answer:
             continue
-        links.append(f"- [{title}]({url})")
+        safe_url = str(url).replace("(", "%28").replace(")", "%29")
+        links.append(f"- [{title}]({safe_url})")
         if len(links) >= 6:
             break
     if not links:
@@ -833,8 +866,20 @@ def _build_suggestions(
     artifacts: dict[str, Any],
     history: list[dict[str, str]],
 ) -> list[str]:
-    context = "\n".join([query, *(item["content"] for item in history[-4:])])
+    context = query
+    if _looks_context_dependent(query):
+        context = "\n".join([query, *(item["content"] for item in history[-4:])])
     pool: list[str] = []
+    safety = artifacts.get("safety") or {}
+    blocked = safety.get("overall_status") == "CRITICAL_STOP"
+
+    if blocked:
+        return _stable_suggestion_sample(f"{query}|blocked", [
+            "Объяснить, почему запрос заблокирован",
+            "Предложить безопасную учебную альтернативу",
+            "Показать только общую теорию без процедур",
+            "Перейти к разрешенному веществу",
+        ], limit=4)
 
     if artifacts.get("retrosynthesis", {}).get("routes"):
         pool.extend([
@@ -973,7 +1018,7 @@ def run_chem_chat(
                 or safety_guard.get("reaction_check", {}).get("reason")
                 or "критический safety-stop"
             )
-            answer_lines.append(f"Дальнейший синтетический сценарий заблокирован: {reason}")
+            answer_lines.append(f"Действия, связанные с синтезом, маршрутом или доступностью, заблокированы: {reason}")
     elif should_resolve and intent != "availability":
         answer_lines.append(resolved.get("error") or "Не удалось распознать молекулу через PubChem/RDKit.")
 
@@ -1021,12 +1066,21 @@ def run_chem_chat(
         })
 
     if wants_availability:
+        if safety_guard and safety_guard.get("overall_status") == "CRITICAL_STOP":
+            answer_lines.append("Проверку доступности и поставщиков для заблокированного опасного сценария не выполняю.")
+            wants_availability = False
+
+    if wants_availability:
         _emit_progress(progress_callback, {
             "type": "tool_start",
             "tool": "availability_check",
             "label": "Проверяю доступность реагентов",
         })
-        availability = _availability_tool(query)
+        availability_query = query
+        retro_routes = (artifacts.get("retrosynthesis") or {}).get("routes") or []
+        if retro_routes and retro_routes[0].get("reactants"):
+            availability_query = retro_routes[0]["reactants"]
+        availability = _availability_tool(availability_query)
         tools_used.append("availability_check")
         artifacts["availability"] = availability
         answer_lines.extend(_availability_summary(availability))
@@ -1038,12 +1092,14 @@ def run_chem_chat(
         })
 
     if wants_research:
+        research_query = _contextual_research_query(query, compact_history)
         _emit_progress(progress_callback, {
             "type": "tool_start",
             "tool": "research_analyze",
             "label": "Собираю web/PubMed/RAG evidence",
+            "query": research_query,
         })
-        research = _research_tool(query, mode=selected_research_mode, max_sources=max_sources)
+        research = _research_tool(research_query, mode=selected_research_mode, max_sources=max_sources)
         tools_used.append("research_analyze")
         artifacts["research"] = research
         if intent == "general":

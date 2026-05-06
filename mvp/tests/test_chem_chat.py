@@ -76,6 +76,36 @@ def test_broad_general_question_falls_back_when_model_refuses_russian():
     mock_research.assert_not_called()
 
 
+def test_source_followup_research_uses_previous_topic():
+    captured_queries = []
+    plan = {
+        "intent": "research",
+        "target_molecules": [],
+        "tools": ["research_analyze"],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "source follow-up",
+    }
+    research = {
+        "summary": "Found nitration sources.",
+        "sources": [{"title": "Toluene nitration overview", "url": "https://example.org/toluene", "source_type": "web"}],
+        "evidence": [{"id": "S1"}],
+    }
+
+    def fake_research(query: str, **kwargs):
+        captured_queries.append(query)
+        return research
+
+    history = [{"role": "user", "content": "расскажи про нитрование толуола"}]
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, {"answer": "ok"}]), \
+         patch("mvp.chem_chat.run_research_workspace", side_effect=fake_research):
+        result = run_chem_chat("Попросить ответ со ссылками на источники", history=history)
+
+    assert result["tools_used"] == ["research_analyze"]
+    assert "нитрование толуола" in captured_queries[0]
+    assert "citation formatting" in captured_queries[0]
+
+
 def test_retrosynthesis_question_extracts_target_and_runs_safety_gate_first():
     resolved = {
         "validation": {
@@ -117,6 +147,36 @@ def test_retrosynthesis_question_extracts_target_and_runs_safety_gate_first():
     assert result["tools_used"] == ["resolve_molecule", "safety_check", "retrosynthesis_search"]
     assert result["artifacts"]["molecule"]["query_used"] == "aspirin"
     assert "Найдено маршрутов: 1" in result["answer"]
+
+
+def test_availability_after_retrosynthesis_checks_route_reactants_not_target():
+    resolved = {
+        "validation": {"is_valid": True, "input_type": "name"},
+        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+        "pubchem_cid": 2244,
+    }
+    safety = {
+        "overall_status": "SAFE",
+        "molecule_check": {"status": "clear", "reason": "Not found in banlists."},
+        "reaction_check": {"status": "allowed"},
+        "safety_data": {},
+    }
+    retro = {
+        "routes": [{"source": "ord", "reactants": "CC(=O)OC(C)=O.O=C(O)c1ccccc1O"}],
+        "total_unique": 1,
+        "source_errors": {},
+    }
+    availability = {"items": [], "summary": {"total": 2, "available_count": 2, "priced_count": 2}}
+
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+         patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
+         patch("mvp.chem_chat.search_and_rank", return_value=retro), \
+         patch("mvp.chem_chat._attach_procedure_steps"), \
+         patch("mvp.chem_chat._availability_tool", return_value=availability) as mock_availability:
+        run_chem_chat("Найди путь синтеза аспирина и оцени доступность реагентов")
+
+    mock_availability.assert_called_once_with("CC(=O)OC(C)=O.O=C(O)c1ccccc1O")
 
 def test_chat_uses_fixed_deepseek_model_for_planning_and_answering():
     plan = {

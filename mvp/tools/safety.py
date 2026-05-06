@@ -83,6 +83,21 @@ def banlist_check(smiles: str) -> dict:
                 "reason": f"Substructure match: {entry.get('name')}.",
             }
 
+    nitro = Chem.MolFromSmarts("[N+](=O)[O-]")
+    aromatic_nitro = Chem.MolFromSmarts("[c:1][N+](=O)[O-]")
+    if nitro and aromatic_nitro:
+        nitro_count = len(mol.GetSubstructMatches(nitro))
+        aromatic_nitro_count = len(mol.GetSubstructMatches(aromatic_nitro))
+        if nitro_count >= 3 and aromatic_nitro_count >= 3:
+            return {
+                "smiles": canon,
+                "name": "trinitroaromatic explosive motif",
+                "status": "banned",
+                "category": "explosive_synthesis",
+                "danger_level": "high",
+                "reason": "Trinitroaromatic explosive motif detected.",
+            }
+
     return {
         "smiles": canon, "name": None,
         "status": "clear", "category": None,

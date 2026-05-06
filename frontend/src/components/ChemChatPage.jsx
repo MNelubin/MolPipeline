@@ -27,7 +27,7 @@ function formatSessionTime(value) {
 
 function renderInlineMarkdown(text) {
   const parts = []
-  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|(https?:\/\/[^\s)]+))/g
+  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|(https?:\/\/[^\s<]+))/g
   let lastIndex = 0
   let match
   while ((match = pattern.exec(text)) !== null) {
