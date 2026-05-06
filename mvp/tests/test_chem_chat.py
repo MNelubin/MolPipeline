@@ -137,6 +137,50 @@ def test_chat_emits_progress_events():
     mock_research.assert_not_called()
 
 
+def test_chat_passes_recent_history_to_planner_and_final_answer():
+    captured_payloads = []
+    plan = {
+        "intent": "admet",
+        "target_molecules": ["aspirin"],
+        "tools": ["resolve_molecule", "safety_check", "admet_screen"],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "follow-up asks for ADMET of previous aspirin target",
+    }
+    resolved = {
+        "validation": {"is_valid": True, "input_type": "name"},
+        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+        "pubchem_cid": 2244,
+    }
+    safety = {
+        "overall_status": "SAFE",
+        "molecule_check": {"status": "clear", "reason": "Not found in banlists."},
+        "reaction_check": {},
+        "safety_data": {},
+    }
+    admet = {"overall": {"score": 91, "risk_level": "low"}, "safety_overlay": {}}
+
+    def fake_llm(system, user, **kwargs):
+        captured_payloads.append(user)
+        return plan if len(captured_payloads) == 1 else {"answer": "ADMET по аспирину рассчитан."}
+
+    history = [
+        {"role": "user", "content": "Найди путь синтеза аспирина"},
+        {"role": "assistant", "content": "Целевая молекула: aspirin."},
+    ]
+
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=fake_llm), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+         patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
+         patch("mvp.chem_chat.analyze_admet", return_value=admet):
+        result = run_chem_chat("а теперь проверь ADMET", history=history)
+
+    assert result["tools_used"] == ["resolve_molecule", "safety_check", "admet_screen"]
+    assert "conversation_history" in captured_payloads[0]
+    assert "Найди путь синтеза аспирина" in captured_payloads[0]
+    assert "conversation_history" in captured_payloads[1]
+
+
 def test_safety_stop_blocks_retrosynthesis_tool():
     resolved = {
         "validation": {"is_valid": True, "input_type": "name"},

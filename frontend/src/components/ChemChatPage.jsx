@@ -257,7 +257,7 @@ function ArtifactBlock({ result }) {
   )
 }
 
-function AssistantMessage({ message }) {
+function AssistantMessage({ message, onSuggestionClick }) {
   const result = message.result
   return (
     <div className={`chemchat-message assistant${message.error ? ' error' : ''}`}>
@@ -283,7 +283,11 @@ function AssistantMessage({ message }) {
         {result && <ArtifactBlock result={result} />}
         {result?.suggested_next_actions?.length > 0 && (
           <div className="chemchat-suggestions">
-            {result.suggested_next_actions.map(action => <span key={action}>{action}</span>)}
+            {result.suggested_next_actions.map(action => (
+              <button type="button" key={action} onClick={() => onSuggestionClick(action)}>
+                {action}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -312,6 +316,11 @@ export default function ChemChatPage() {
       handleSubmit()
     }
   }
+
+  const handleSuggestionClick = useCallback(action => {
+    setInput(action)
+    textareaRef.current?.focus()
+  }, [])
 
   return (
     <>
@@ -345,7 +354,7 @@ export default function ChemChatPage() {
             </div>
             <div className="empty-examples">
               {EXAMPLES.map(example => (
-                <button key={example} className="example-chip" onClick={() => setInput(example)}>
+                <button key={example} className="example-chip" onClick={() => handleSuggestionClick(example)}>
                   {example}
                 </button>
               ))}
@@ -359,7 +368,7 @@ export default function ChemChatPage() {
               <div className="chemchat-bubble">{message.content}</div>
             </div>
           ) : (
-            <AssistantMessage key={`${message.ts}-${index}`} message={message} />
+            <AssistantMessage key={`${message.ts}-${index}`} message={message} onSuggestionClick={handleSuggestionClick} />
           )
         ))}
 

@@ -278,6 +278,10 @@ class AvailabilityCheckResponse(BaseModel):
 
 class ChemChatRequest(BaseModel):
     message: str = Field(..., description="Free-form chemistry-specific user task.")
+    history: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Recent chat turns as {role, content}. Used only as conversational context.",
+    )
     source_mode: Literal["auto", "ord", "web", "retro_model", "aizynthfinder", "all"] = Field(
         default="auto",
         description="Retrosynthesis source mode when the chat decides to run retrosynthesis.",
@@ -832,6 +836,7 @@ async def _run_chem_chat_request(req: ChemChatRequest) -> ChemChatResponse:
             _executor,
             lambda: run_chem_chat(
                 message,
+                history=req.history,
                 source_mode=req.source_mode,
                 top_n=req.top_n,
                 research_mode=req.research_mode,
@@ -878,6 +883,7 @@ async def chem_chat_stream(req: ChemChatRequest):
             try:
                 result = run_chem_chat(
                     message,
+                    history=req.history,
                     source_mode=req.source_mode,
                     top_n=req.top_n,
                     research_mode=req.research_mode,

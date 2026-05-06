@@ -12,6 +12,10 @@ export function useChemChat() {
     if (!text) return null
 
     const userMessage = { role: 'user', content: text, ts: Date.now() }
+    const history = messages
+      .filter(item => item.content && !item.streaming && (item.role === 'user' || item.role === 'assistant'))
+      .slice(-8)
+      .map(item => ({ role: item.role, content: item.content }))
     const assistantId = `assistant-${Date.now()}`
     const assistantDraft = {
       id: assistantId,
@@ -75,6 +79,7 @@ export function useChemChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
+          history,
           source_mode: options.sourceMode || 'auto',
           top_n: options.topN || 5,
           research_mode: options.researchMode || 'literature',
@@ -133,7 +138,7 @@ export function useChemChat() {
       setStatus('error')
       throw e
     }
-  }, [])
+  }, [messages])
 
   const reset = useCallback(() => {
     setStatus('idle')

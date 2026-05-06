@@ -304,7 +304,22 @@ def _chat_llm_json(system: str, user: str, *, max_tokens: int = 1200) -> dict[st
         return None
 
 
-def _normalize_llm_plan(plan: dict[str, Any] | None, message: str) -> dict[str, Any]:
+def _compact_chat_history(history: list[dict[str, Any]] | None) -> list[dict[str, str]]:
+    compact: list[dict[str, str]] = []
+    for item in history or []:
+        role = str(item.get("role") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        compact.append({"role": role, "content": content[:2000]})
+    return compact[-8:]
+
+
+def _normalize_llm_plan(
+    plan: dict[str, Any] | None,
+    message: str,
+    default_source_mode: str = "auto",
+) -> dict[str, Any]:
     fallback_intent = classify_chem_intent(message)
     if not isinstance(plan, dict):
         plan = {}
@@ -313,10 +328,19 @@ def _normalize_llm_plan(plan: dict[str, Any] | None, message: str) -> dict[str, 
     if intent not in VALID_INTENTS:
         intent = fallback_intent
 
+    source_mode = str(plan.get("source_mode") or default_source_mode or "auto").strip()
+    if source_mode not in {"auto", "ord", "web", "retro_model", "aizynthfinder", "all"}:
+        source_mode = "auto"
+
     raw_tools = plan.get("tools")
     tools = [str(tool).strip() for tool in raw_tools] if isinstance(raw_tools, list) else []
     tools = [tool for tool in tools if tool in VALID_TOOLS]
-    if intent == "general" and tools == ["research_analyze"] and _is_broad_educational_question(message):
+    if (
+        intent == "general"
+        and tools == ["research_analyze"]
+        and source_mode == "auto"
+        and _is_broad_educational_question(message)
+    ):
         tools = []
     if not tools:
         if intent == "general":
@@ -348,10 +372,6 @@ def _normalize_llm_plan(plan: dict[str, Any] | None, message: str) -> dict[str, 
         targets = []
     targets = [str(target).strip() for target in targets if str(target).strip()]
 
-    source_mode = str(plan.get("source_mode") or "auto").strip()
-    if source_mode not in {"auto", "ord", "web", "retro_model", "aizynthfinder", "all"}:
-        source_mode = "auto"
-
     research_mode = str(plan.get("research_mode") or "literature").strip()
     if research_mode not in {"molecule", "literature", "patent"}:
         research_mode = "literature"
@@ -382,17 +402,23 @@ def _is_broad_educational_question(message: str) -> bool:
     )
 
 
-def _plan_with_llm(message: str, source_mode: str, research_mode: str) -> dict[str, Any]:
+def _plan_with_llm(
+    message: str,
+    source_mode: str,
+    research_mode: str,
+    history: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     system = (
         "You are the planner for MolPipeline ChemChat, a chemistry-specific assistant. "
         "Choose which project tools must be called before answering. "
         "Do not answer chemistry facts directly in this planning step. "
+        "Use conversation_history to resolve follow-up questions, but current user message has priority. "
         "Return JSON only with keys: intent, target_molecules, tools, source_mode, research_mode, reasoning. "
         "intent must be one of: general, molecule, safety, retrosynthesis, availability, admet, research, mixed. "
         "tools must be selected from: resolve_molecule, safety_check, retrosynthesis_search, "
         "availability_check, admet_screen, research_analyze. "
-        "For broad educational questions such as definitions, basic concepts, or simple comparisons, use an empty tools list. "
-        "Use research_analyze only when the user explicitly asks for sources, literature, web evidence, PubMed, papers, patents, or current/external data. "
+        "For broad educational questions such as definitions, basic concepts, or simple comparisons, usually use an empty tools list. "
+        "Use research_analyze when the user asks for sources, literature, web evidence, PubMed, papers, patents, current/external data, or selects a web/all source mode. "
         "For synthesis/route/retrosynthesis requests include resolve_molecule, safety_check, retrosynthesis_search. "
         "For supplier/price/buyability requests use availability_check and extract every reagent if possible. "
         "For safety/ADMET requests include resolve_molecule and safety_check. "
@@ -401,13 +427,14 @@ def _plan_with_llm(message: str, source_mode: str, research_mode: str) -> dict[s
     user = json.dumps(
         {
             "message": message,
+            "conversation_history": _compact_chat_history(history),
             "default_source_mode": source_mode,
             "default_research_mode": research_mode,
         },
         ensure_ascii=False,
     )
     plan = _chat_llm_json(system, user, max_tokens=900)
-    normalized = _normalize_llm_plan(plan, message)
+    normalized = _normalize_llm_plan(plan, message, default_source_mode=source_mode)
     normalized["llm_raw_plan"] = plan or None
     return normalized
 
@@ -492,10 +519,17 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
-def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[str, Any], fallback: str) -> str:
+def _final_answer_with_llm(
+    message: str,
+    plan: dict[str, Any],
+    artifacts: dict[str, Any],
+    fallback: str,
+    history: list[dict[str, Any]] | None = None,
+) -> str:
     system = (
         "You are MolPipeline ChemChat running on deepseek/deepseek-v4-flash. "
         "Answer in the user's language, usually Russian; Russian Cyrillic text is valid user input. "
+        "Use conversation_history to keep continuity in follow-up questions, but do not override current tool outputs. "
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
         "If no tools were selected, answer as a normal chemistry tutor from general chemistry knowledge and use fallback_summary as guidance. "
         "Do not invent synthesis routes, prices, safety classifications or citations. "
@@ -506,6 +540,7 @@ def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[s
     user = json.dumps(
         {
             "user_message": message,
+            "conversation_history": _compact_chat_history(history),
             "plan": {k: v for k, v in plan.items() if k != "llm_raw_plan"},
             "tool_outputs": _compact_artifacts_for_llm(artifacts),
             "fallback_summary": fallback,
@@ -712,6 +747,7 @@ def _research_summary(research: dict[str, Any]) -> list[str]:
 def run_chem_chat(
     message: str,
     *,
+    history: list[dict[str, Any]] | None = None,
     source_mode: str = "auto",
     top_n: int = 5,
     research_mode: str = "literature",
@@ -728,7 +764,8 @@ def run_chem_chat(
         "label": "Модель планирует инструменты",
         "model": CHEM_CHAT_MODEL,
     })
-    plan = _plan_with_llm(query, source_mode=source_mode, research_mode=research_mode)
+    compact_history = _compact_chat_history(history)
+    plan = _plan_with_llm(query, source_mode=source_mode, research_mode=research_mode, history=compact_history)
     intent = plan["intent"]
     selected_tools = set(plan["tools"])
     selected_source_mode = plan.get("source_mode") or source_mode
@@ -930,7 +967,7 @@ def run_chem_chat(
         "label": "Модель формирует финальный Markdown-ответ",
         "model": CHEM_CHAT_MODEL,
     })
-    answer = _final_answer_with_llm(query, plan, artifacts, fallback_answer)
+    answer = _final_answer_with_llm(query, plan, artifacts, fallback_answer, history=compact_history)
 
     return {
         "status": "ok",

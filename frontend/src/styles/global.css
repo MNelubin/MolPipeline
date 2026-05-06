@@ -2915,7 +2915,7 @@ a.ext-link:hover { color: var(--cyan); }
 }
 
 .chemchat-tools span,
-.chemchat-suggestions span {
+.chemchat-suggestions button {
   border: 1px solid var(--border-hi);
   border-radius: 999px;
   padding: 3px 8px;
@@ -2925,10 +2925,16 @@ a.ext-link:hover { color: var(--cyan); }
   background: rgba(255,255,255,0.025);
 }
 
-.chemchat-suggestions span {
+.chemchat-suggestions button {
   color: var(--cyan);
   border-color: var(--cyan-border);
   background: var(--cyan-bg);
+  cursor: pointer;
+}
+
+.chemchat-suggestions button:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 224, 255, 0.16);
 }
 
 .chemchat-artifacts {
