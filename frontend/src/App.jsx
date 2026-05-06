@@ -6,6 +6,7 @@ import MoleculeCard from './components/MoleculeCard'
 import PathwaySelector from './components/PathwaySelector'
 import ExperimentProtocol from './components/ExperimentProtocol'
 import ProtocolGraph from './components/ProtocolGraph'
+import ChemChatPage from './components/ChemChatPage'
 import { useInteractivePipeline } from './hooks/useInteractivePipeline'
 import { useRetrosynthesisSearch } from './hooks/useRetrosynthesisSearch'
 import { useResearchSearch } from './hooks/useResearchSearch'
@@ -16,6 +17,17 @@ const EXAMPLES = ['aspirin', 'caffeine', 'CC(=O)Oc1ccccc1C(O)=O', 'dopamine', 'e
 const MoleculeEditor = lazy(() => import('./components/MoleculeEditor'))
 
 const NAV_ITEMS = [
+  {
+    id: 'chemchat',
+    label: 'Общий чат',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 3.5h10v6.5h-4l-3 2.5V10h-3z" />
+        <path d="M5 6h5" />
+        <path d="M5 8h3" />
+      </svg>
+    ),
+  },
   {
     id: 'chat',
     label: 'Анализ молекул',
@@ -149,7 +161,7 @@ const AVAILABILITY_LEVEL_LABELS = {
 }
 
 export default function App() {
-  const [page, setPage] = useState('chat')
+  const [page, setPage] = useState('chemchat')
   const [input, setInput] = useState('')
   const [retroInput, setRetroInput] = useState('')
   const [retroSourceMode, setRetroSourceMode] = useState('auto')
@@ -390,8 +402,10 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main area */}
+        {/* Main area */}
       <main className="main">
+
+        {page === 'chemchat' && <ChemChatPage />}
 
         {/* CHAT PAGE */}
         {page === 'chat' && (

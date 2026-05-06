@@ -2716,6 +2716,204 @@ a.ext-link:hover { color: var(--cyan); }
   color: var(--amber);
 }
 
+.chemchat-source-select {
+  background: var(--bg-2);
+  color: var(--text-1);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.chemchat-messages { gap: 18px; }
+
+.chemchat-empty {
+  margin: auto;
+  max-width: 760px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.chemchat-message {
+  display: flex;
+  padding: 0 24px;
+}
+
+.chemchat-message.user { justify-content: flex-end; }
+.chemchat-message.assistant { justify-content: flex-start; }
+
+.chemchat-bubble {
+  max-width: min(920px, 100%);
+  background: linear-gradient(145deg, rgba(18, 29, 46, 0.96), rgba(13, 21, 32, 0.96));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.chemchat-message.user .chemchat-bubble {
+  max-width: 720px;
+  background: var(--cyan-bg);
+  border-color: var(--cyan-border);
+  color: var(--text-1);
+}
+
+.chemchat-message.error .chemchat-bubble {
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+
+.chemchat-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-1);
+}
+
+.chemchat-answer p { margin: 0; }
+
+.chemchat-tools,
+.chemchat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.chemchat-tools span,
+.chemchat-suggestions span {
+  border: 1px solid var(--border-hi);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  background: rgba(255,255,255,0.025);
+}
+
+.chemchat-suggestions span {
+  color: var(--cyan);
+  border-color: var(--cyan-border);
+  background: var(--cyan-bg);
+}
+
+.chemchat-artifacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.chemchat-artifact-card,
+.chemchat-wide-artifact {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: rgba(7, 11, 18, 0.42);
+  padding: 12px;
+}
+
+.chemchat-wide-artifact {
+  grid-column: 1 / -1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.chemchat-artifact-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+
+.chemchat-kv {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 6px;
+}
+
+.chemchat-kv span,
+.chemchat-mini-list span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.chemchat-kv code,
+.chemchat-mini-list code {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.chemchat-status-line {
+  display: inline-flex;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.chemchat-artifact-card.safety-CRITICAL_STOP {
+  border-color: var(--red-border);
+  background: var(--red-bg);
+}
+
+.chemchat-artifact-card.safety-WARNING {
+  border-color: var(--amber-border);
+  background: var(--amber-bg);
+}
+
+.chemchat-score {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  color: var(--green);
+  line-height: 1;
+}
+
+.chemchat-score span {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-left: 3px;
+}
+
+.chemchat-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.chemchat-mini-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+}
+
+.chemchat-mini-list strong {
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.chemchat-reset {
+  margin-left: 10px;
+  border: none;
+  background: transparent;
+  color: var(--cyan);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.chemchat-reset:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+
 /* ─── Calculator card ───────────────────────────────────────────────────── */
 .calc-mode-switcher {
   display: flex;

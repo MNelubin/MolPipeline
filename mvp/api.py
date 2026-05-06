@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 from . import config as _cfg  # noqa: F401
 from .admet import analyze_admet
 from .availability import check_reagent_availability, summarize_availability
+from .chem_chat import TOOL_REGISTRY, run_chem_chat
 from .config import DATA_DIR
 from .graph import build_graph
 from .research_workspace import run_research_workspace
@@ -273,6 +274,26 @@ class AvailabilityCheckResponse(BaseModel):
     query: str | None
     items: list[dict[str, Any]]
     summary: dict[str, Any]
+
+
+class ChemChatRequest(BaseModel):
+    message: str = Field(..., description="Free-form chemistry-specific user task.")
+    source_mode: Literal["auto", "ord", "web", "retro_model", "aizynthfinder", "all"] = Field(
+        default="auto",
+        description="Retrosynthesis source mode when the chat decides to run retrosynthesis.",
+    )
+    top_n: int = Field(default=5, ge=1, le=10)
+    research_mode: Literal["molecule", "literature", "patent"] = Field(default="literature")
+    max_sources: int = Field(default=6, ge=1, le=10)
+
+
+class ChemChatResponse(BaseModel):
+    status: str
+    intent: str
+    answer: str
+    tools_used: list[str]
+    artifacts: dict[str, Any]
+    suggested_next_actions: list[str] = Field(default_factory=list)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -777,6 +798,62 @@ def _retro_sources_snapshot() -> dict[str, Any]:
 @app.get("/health")
 async def health():
     return {"status": "ok", "graph_ready": _graph is not None}
+
+
+@app.get("/chat/tools")
+async def chat_tools():
+    """Expose chemistry tools available to the general chat orchestrator."""
+    return {
+        "tools": [
+            {
+                "name": spec.name,
+                "description": spec.description,
+                "requires_safety_gate": spec.requires_safety_gate,
+            }
+            for spec in TOOL_REGISTRY.values()
+        ]
+    }
+
+
+async def _run_chem_chat_request(req: ChemChatRequest) -> ChemChatResponse:
+    message = req.message.strip()
+    if not message:
+        raise HTTPException(status_code=422, detail="message must not be empty")
+
+    logger.info("[chat/message] message=%r source_mode=%s", message[:120], req.source_mode)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: run_chem_chat(
+                message,
+                source_mode=req.source_mode,
+                top_n=req.top_n,
+                research_mode=req.research_mode,
+                max_sources=req.max_sources,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        logger.exception("[chat/message] crashed for message %r", message[:120])
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return ChemChatResponse(**_sanitize(result))
+
+
+@app.post("/chat/message", response_model=ChemChatResponse)
+async def chem_chat_message(req: ChemChatRequest):
+    """Run the general chemistry chat orchestrator over MolPipeline tools."""
+    return await _run_chem_chat_request(req)
+
+
+@app.post("/research/chat", response_model=ChemChatResponse)
+async def research_chat_alias(req: ChemChatRequest):
+    """Deploy-compatible alias for ChemChat under the already proxied research prefix."""
+    return await _run_chem_chat_request(req)
 
 
 @app.get("/retro/sources", response_model=RetroSourcesResponse)
