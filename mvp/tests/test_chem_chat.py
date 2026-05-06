@@ -293,6 +293,38 @@ def test_safety_stop_blocks_retrosynthesis_tool():
     mock_retro.assert_not_called()
 
 
+def test_explosive_safety_stop_blocks_retrosynthesis_and_availability():
+    resolved = {
+        "validation": {"is_valid": True, "input_type": "name"},
+        "smiles": "Cc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]",
+        "pubchem_cid": 8376,
+    }
+    safety = {
+        "overall_status": "CRITICAL_STOP",
+        "molecule_check": {"status": "clear", "reason": "Not found in banlists."},
+        "explosive_check": {
+            "hazard_type": "explosive",
+            "status": "blocked",
+            "reason": "Exact explosive hazard match: TNT.",
+        },
+        "reaction_check": {},
+        "safety_data": {},
+    }
+
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+         patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
+         patch("mvp.chem_chat.search_and_rank") as mock_retro, \
+         patch("mvp.chem_chat._availability_tool") as mock_availability:
+        result = run_chem_chat("проверь доступность элементов для ретросинтеза тротила")
+
+    assert result["artifacts"]["safety"]["explosive_check"]["hazard_type"] == "explosive"
+    assert "retrosynthesis_search" not in result["tools_used"]
+    assert "availability_check" not in result["tools_used"]
+    mock_retro.assert_not_called()
+    mock_availability.assert_not_called()
+
+
 def test_availability_question_extracts_multiple_reagents_from_text():
     def fake_resolve(query: str):
         if query == "benzaldehyde":

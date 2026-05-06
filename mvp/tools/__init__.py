@@ -43,3 +43,8 @@ from .safety import (  # noqa: F401
     ppe_recommender,
     reaction_banlist_check,
 )
+
+from .explosive import (  # noqa: F401
+    explosive_alias_check,
+    explosive_hazard_check,
+)

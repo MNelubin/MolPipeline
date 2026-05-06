@@ -557,7 +557,10 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
         compact["safety"] = {
             "overall_status": safety.get("overall_status"),
             "molecule_status": (safety.get("molecule_check") or {}).get("status"),
+            "explosive_status": (safety.get("explosive_check") or {}).get("status"),
+            "explosive_reason": (safety.get("explosive_check") or {}).get("reason"),
             "reason": (safety.get("molecule_check") or {}).get("reason")
+            or (safety.get("explosive_check") or {}).get("reason")
             or (safety.get("reaction_check") or {}).get("reason"),
             "h_phrases": (safety.get("safety_data") or {}).get("h_phrases", [])[:6],
         }
@@ -1015,6 +1018,7 @@ def run_chem_chat(
         if status == "CRITICAL_STOP":
             reason = (
                 safety_guard.get("molecule_check", {}).get("reason")
+                or safety_guard.get("explosive_check", {}).get("reason")
                 or safety_guard.get("reaction_check", {}).get("reason")
                 or "критический safety-stop"
             )

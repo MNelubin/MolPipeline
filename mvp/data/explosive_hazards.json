@@ -1,0 +1,109 @@
+{
+  "_meta": {
+    "format_version": "1.0",
+    "purpose": "Data-driven explosive hazard classification for safety gating.",
+    "basis": [
+      "GHS explosive hazard statements H200-H205",
+      "Common energetic-material structural motifs",
+      "Curated exact matches for common explosive compounds"
+    ],
+    "notes": [
+      "This is not an exhaustive regulatory database.",
+      "The detector is conservative: high-confidence energetic motifs block synthesis, route, procurement and availability workflows."
+    ],
+    "ghs_explosive_codes": ["H200", "H201", "H202", "H203", "H204", "H205"]
+  },
+  "exact_compounds": [
+    {
+      "name": "TNT",
+      "aliases": ["tnt", "trinitrotoluene", "2,4,6-trinitrotoluene", "тнт", "тротил"],
+      "smiles": "Cc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]",
+      "danger_level": "high",
+      "hazard_family": "nitroaromatic_explosive"
+    },
+    {
+      "name": "Picric acid",
+      "aliases": ["picric acid", "2,4,6-trinitrophenol", "пикриновая кислота"],
+      "smiles": "Oc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]",
+      "danger_level": "high",
+      "hazard_family": "nitroaromatic_explosive"
+    },
+    {
+      "name": "Nitroglycerin",
+      "aliases": ["nitroglycerin", "glyceryl trinitrate", "нитроглицерин"],
+      "smiles": "O=[N+]([O-])OCC(CO[N+](=O)[O-])O[N+](=O)[O-]",
+      "danger_level": "high",
+      "hazard_family": "nitrate_ester_explosive"
+    },
+    {
+      "name": "PETN",
+      "aliases": ["petn", "pentaerythritol tetranitrate", "пентрит"],
+      "smiles": "O=[N+]([O-])OCC(CO[N+](=O)[O-])(CO[N+](=O)[O-])CO[N+](=O)[O-]",
+      "danger_level": "high",
+      "hazard_family": "nitrate_ester_explosive"
+    },
+    {
+      "name": "RDX",
+      "aliases": ["rdx", "cyclonite", "hexogen", "гексоген"],
+      "smiles": "O=[N+]([O-])N1CN([N+](=O)[O-])CN([N+](=O)[O-])C1",
+      "danger_level": "high",
+      "hazard_family": "nitramine_explosive"
+    },
+    {
+      "name": "HMX",
+      "aliases": ["hmx", "octogen", "октоген"],
+      "smiles": "O=[N+]([O-])N1CN([N+](=O)[O-])CN([N+](=O)[O-])CN([N+](=O)[O-])C1",
+      "danger_level": "high",
+      "hazard_family": "nitramine_explosive"
+    },
+    {
+      "name": "TATP",
+      "aliases": ["tatp", "triacetone triperoxide", "трипероксид ацетона"],
+      "smiles": "CC1(C)OOOC(C)(C)OOOC(C)(C)OOO1",
+      "danger_level": "high",
+      "hazard_family": "organic_peroxide_explosive"
+    }
+  ],
+  "motifs": [
+    {
+      "name": "trinitroaromatic motif",
+      "smarts": "[c][N+](=O)[O-]",
+      "min_matches": 3,
+      "danger_level": "high",
+      "hazard_family": "nitroaromatic_explosive",
+      "reason": "Aromatic ring with three or more nitro substituents."
+    },
+    {
+      "name": "multiple nitrate ester motif",
+      "smarts": "[O][N+](=O)[O-]",
+      "min_matches": 2,
+      "danger_level": "high",
+      "hazard_family": "nitrate_ester_explosive",
+      "reason": "Multiple nitrate ester groups."
+    },
+    {
+      "name": "nitramine energetic motif",
+      "smarts": "[N][N+](=O)[O-]",
+      "min_matches": 2,
+      "danger_level": "high",
+      "hazard_family": "nitramine_explosive",
+      "reason": "Multiple nitramine groups."
+    },
+    {
+      "name": "cyclic peroxide energetic motif",
+      "smarts": "[O][O]",
+      "min_matches": 3,
+      "danger_level": "high",
+      "hazard_family": "organic_peroxide_explosive",
+      "reason": "Multiple peroxide bonds."
+    },
+    {
+      "name": "low-molecular organic azide motif",
+      "smarts": "[N]=[N+]=[N-]",
+      "min_matches": 1,
+      "danger_level": "medium",
+      "hazard_family": "organic_azide",
+      "reason": "Organic azide motif; energetic risk depends on molecular context."
+    }
+  ]
+}

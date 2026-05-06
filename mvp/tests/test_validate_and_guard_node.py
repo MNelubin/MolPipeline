@@ -99,6 +99,12 @@ class TestDetermineOverallStatus:
     def test_both_restricted_is_warning(self):
         assert _determine_overall_status("restricted", "restricted") == "WARNING"
 
+    def test_explosive_blocked_is_critical(self):
+        assert _determine_overall_status("clear", "allowed", "blocked") == "CRITICAL_STOP"
+
+    def test_explosive_warning_is_warning(self):
+        assert _determine_overall_status("clear", "allowed", "warning") == "WARNING"
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # validate_and_guard_node — mocked resolution

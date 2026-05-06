@@ -198,7 +198,13 @@ function ArtifactBlock({ result }) {
         <div className={`chemchat-artifact-card safety-${safety.overall_status || 'SAFE'}`}>
           <div className="chemchat-artifact-title">Safety gate</div>
           <div className="chemchat-status-line">{safety.overall_status || 'UNKNOWN'}</div>
-          <p>{safety.molecule_check?.reason || safety.reaction_check?.reason || 'Критичных флагов не найдено.'}</p>
+          <p>{safety.molecule_check?.reason || safety.explosive_check?.reason || safety.reaction_check?.reason || 'Критичных флагов не найдено.'}</p>
+          {safety.explosive_check?.status && safety.explosive_check.status !== 'clear' && (
+            <div className="chemchat-kv">
+              <span>Тип риска</span>
+              <strong>{safety.explosive_check.hazard_type || 'explosive'}</strong>
+            </div>
+          )}
         </div>
       )}
 
