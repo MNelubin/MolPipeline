@@ -89,6 +89,27 @@ def test_chat_uses_fixed_deepseek_model_for_planning_and_answering():
     assert mock_llm.call_count == 2
 
 
+def test_chat_emits_progress_events():
+    events = []
+    plan = {
+        "intent": "general",
+        "target_molecules": [],
+        "tools": ["research_analyze"],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "general chemistry question",
+    }
+
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, {"answer": "ok"}]), \
+         patch("mvp.chem_chat.run_research_workspace", return_value={"summary": "tool summary", "sources": [], "evidence": []}):
+        run_chem_chat("Explain SN1 vs SN2", progress_callback=events.append)
+
+    event_types = [event["type"] for event in events]
+    assert "plan" in event_types
+    assert any(event.get("tool") == "research_analyze" and event["type"] == "tool_start" for event in events)
+    assert any(event.get("stage") == "final_answer" for event in events)
+
+
 def test_safety_stop_blocks_retrosynthesis_tool():
     resolved = {
         "validation": {"is_valid": True, "input_type": "name"},

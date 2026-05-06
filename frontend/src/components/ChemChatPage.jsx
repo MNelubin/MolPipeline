@@ -18,6 +18,136 @@ const SOURCE_OPTIONS = [
   { id: 'aizynthfinder', label: 'AiZynthFinder' },
 ]
 
+function renderInlineMarkdown(text) {
+  const parts = []
+  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|(https?:\/\/[^\s)]+))/g
+  let lastIndex = 0
+  let match
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
+    if (match[2] && match[3]) {
+      parts.push(
+        <a key={match.index} href={match[3]} target="_blank" rel="noreferrer">
+          {match[2]}
+        </a>
+      )
+    } else if (match[4]) {
+      parts.push(<code key={match.index}>{match[4]}</code>)
+    } else if (match[5]) {
+      parts.push(<strong key={match.index}>{match[5]}</strong>)
+    } else if (match[6]) {
+      parts.push(
+        <a key={match.index} href={match[6]} target="_blank" rel="noreferrer">
+          {match[6]}
+        </a>
+      )
+    }
+    lastIndex = pattern.lastIndex
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts
+}
+
+function MarkdownText({ text }) {
+  const lines = String(text || '').split('\n')
+  const blocks = []
+  let listItems = []
+  let tableRows = []
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      blocks.push(
+        <ul key={`list-${blocks.length}`}>
+          {listItems.map((item, index) => <li key={index}>{renderInlineMarkdown(item)}</li>)}
+        </ul>
+      )
+      listItems = []
+    }
+  }
+
+  const flushTable = () => {
+    if (tableRows.length === 0) return
+    const rows = tableRows
+      .map(row => row.replace(/^\||\|$/g, '').split('|').map(cell => cell.trim()))
+      .filter(cells => !cells.every(cell => /^:?-{3,}:?$/.test(cell) || cell === ''))
+    if (rows.length > 0) {
+      const [head, ...body] = rows
+      blocks.push(
+        <div key={`table-${blocks.length}`} className="chemchat-table-wrap">
+          <table className="chemchat-table">
+            <thead>
+              <tr>{head.map((cell, index) => <th key={index}>{renderInlineMarkdown(cell)}</th>)}</tr>
+            </thead>
+            <tbody>
+              {body.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, cellIndex) => <td key={cellIndex}>{renderInlineMarkdown(cell)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+    tableRows = []
+  }
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim()
+    if (!trimmed) {
+      flushList()
+      flushTable()
+      return
+    }
+    if (trimmed.includes('|') && trimmed.split('|').length >= 3) {
+      flushList()
+      tableRows.push(trimmed)
+      return
+    }
+    flushTable()
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/)
+    if (heading) {
+      flushList()
+      const Tag = heading[1].length === 1 ? 'h3' : 'h4'
+      blocks.push(<Tag key={index}>{renderInlineMarkdown(heading[2])}</Tag>)
+      return
+    }
+    const list = trimmed.match(/^[-*]\s+(.+)$/)
+    if (list) {
+      listItems.push(list[1])
+      return
+    }
+    flushList()
+    blocks.push(<p key={index}>{renderInlineMarkdown(trimmed)}</p>)
+  })
+  flushList()
+  flushTable()
+
+  return <div className="chemchat-md">{blocks}</div>
+}
+
+function ProgressTimeline({ events = [] }) {
+  if (!events.length) return null
+  return (
+    <div className="chemchat-progress">
+      {events.slice(-12).map((event, index) => (
+        <div key={`${event.type}-${event.tool || event.stage}-${index}`} className={`chemchat-progress-row event-${event.type}`}>
+          <span className="chemchat-progress-dot" />
+          <div>
+            <strong>{event.label || event.tool || event.stage || event.type}</strong>
+            <small>
+              {event.tool || event.stage || event.intent || ''}
+              {event.routes !== undefined ? ` · маршрутов: ${event.routes}` : ''}
+              {event.sources !== undefined ? ` · источников: ${event.sources}` : ''}
+              {event.status ? ` · ${event.status}` : ''}
+            </small>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ArtifactBlock({ result }) {
   const artifacts = result?.artifacts || {}
   const molecule = artifacts.molecule
@@ -99,7 +229,13 @@ function ArtifactBlock({ result }) {
             <div className="chemchat-mini-list">
               {(research.sources || []).slice(0, 5).map((source, index) => (
                 <div key={`${source.url || source.title}-${index}`}>
-                  <strong>{source.title || source.name || 'Источник'}</strong>
+                  {source.url ? (
+                    <a href={source.url} target="_blank" rel="noreferrer">
+                      {source.title || source.name || source.url}
+                    </a>
+                  ) : (
+                    <strong>{source.title || source.name || 'Источник'}</strong>
+                  )}
                   <span>{source.source_type || source.type || 'source'}</span>
                 </div>
               ))}
@@ -116,11 +252,18 @@ function AssistantMessage({ message }) {
   return (
     <div className={`chemchat-message assistant${message.error ? ' error' : ''}`}>
       <div className="chemchat-bubble">
-        <div className="chemchat-answer">
-          {message.content.split('\n').map((line, index) => (
-            <p key={index}>{line}</p>
-          ))}
-        </div>
+        {message.progress?.length > 0 && <ProgressTimeline events={message.progress} />}
+        {message.streaming && !message.content && (
+          <div className="chemchat-stream-note">
+            <div className="spinner spinner-sm" />
+            Жду следующий шаг...
+          </div>
+        )}
+        {message.content && (
+          <div className="chemchat-answer">
+            <MarkdownText text={message.content} />
+          </div>
+        )}
         {result?.tools_used?.length > 0 && (
           <div className="chemchat-tools">
             {result.model && <span>model: {result.model}</span>}

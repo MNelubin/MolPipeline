@@ -460,6 +460,14 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
         compact["research"] = {
             "summary": research.get("summary"),
             "analysis": research.get("analysis"),
+            "sources": [
+                {
+                    "title": source.get("title") or source.get("name") or source.get("url"),
+                    "url": source.get("url"),
+                    "type": source.get("source_type") or source.get("type"),
+                }
+                for source in (research.get("sources") or [])[:8]
+            ],
             "sources_count": len(research.get("sources") or []),
             "evidence_count": len(research.get("evidence") or []),
         }
@@ -472,6 +480,7 @@ def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[s
         "Answer in the user's language, usually Russian. "
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
         "Do not invent synthesis routes, prices, safety classifications or citations. "
+        "When research/web sources include URLs, cite them as Markdown links: [title](url). "
         "If tools did not find enough data, say exactly what is missing and what to try next. "
         "Keep the answer concise but useful for a chemist."
     )
@@ -490,9 +499,40 @@ def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[s
         max_tokens=1600,
     )
     if not data:
-        return fallback
+        return _append_research_source_links(fallback, artifacts)
     answer = data.get("answer")
-    return answer.strip() if isinstance(answer, str) and answer.strip() else fallback
+    answer_text = answer.strip() if isinstance(answer, str) and answer.strip() else fallback
+    return _append_research_source_links(answer_text, artifacts)
+
+
+def _append_research_source_links(answer: str, artifacts: dict[str, Any]) -> str:
+    research = artifacts.get("research") or {}
+    sources = research.get("sources") or []
+    links: list[str] = []
+    seen: set[str] = set()
+    for source in sources:
+        url = source.get("url")
+        title = source.get("title") or source.get("name") or url
+        if not url or not title or url in seen:
+            continue
+        seen.add(url)
+        if url in answer:
+            continue
+        links.append(f"- [{title}]({url})")
+        if len(links) >= 6:
+            break
+    if not links:
+        return answer
+    return answer.rstrip() + "\n\n### Источники\n" + "\n".join(links)
+
+
+def _emit_progress(callback: Callable[[dict[str, Any]], None] | None, event: dict[str, Any]) -> None:
+    if callback is None:
+        return
+    try:
+        callback(event)
+    except Exception:
+        logger.debug("ChemChat progress callback failed", exc_info=True)
 
 
 TOOL_REGISTRY: dict[str, ChemToolSpec] = {
@@ -623,11 +663,18 @@ def run_chem_chat(
     top_n: int = 5,
     research_mode: str = "literature",
     max_sources: int = 6,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     query = message.strip()
     if not query:
         raise ValueError("message must not be empty")
 
+    _emit_progress(progress_callback, {
+        "type": "status",
+        "stage": "planning",
+        "label": "Модель планирует инструменты",
+        "model": CHEM_CHAT_MODEL,
+    })
     plan = _plan_with_llm(query, source_mode=source_mode, research_mode=research_mode)
     intent = plan["intent"]
     selected_tools = set(plan["tools"])
@@ -636,24 +683,57 @@ def run_chem_chat(
     tools_used: list[str] = []
     artifacts: dict[str, Any] = {}
     answer_lines: list[str] = []
+    _emit_progress(progress_callback, {
+        "type": "plan",
+        "stage": "planned",
+        "label": "План готов",
+        "intent": intent,
+        "tools": plan["tools"],
+        "target_molecules": plan.get("target_molecules", []),
+        "used_llm": plan.get("used_llm", False),
+    })
 
     resolved: dict[str, Any] = {"status": "skipped", "query": query}
     resolved_ok = False
     should_resolve = "resolve_molecule" in selected_tools
     if should_resolve:
+        _emit_progress(progress_callback, {
+            "type": "tool_start",
+            "tool": "resolve_molecule",
+            "label": "Распознаю целевую молекулу",
+        })
         targets = plan.get("target_molecules") or []
         resolved = _resolve_from_message(str(targets[0])) if targets else _resolve_from_message(query)
         tools_used.append("resolve_molecule")
         artifacts["molecule"] = resolved
         resolved_ok = resolved.get("status") == "ok"
+        _emit_progress(progress_callback, {
+            "type": "tool_done",
+            "tool": "resolve_molecule",
+            "label": "Молекула распознана" if resolved_ok else "Молекулу распознать не удалось",
+            "status": resolved.get("status"),
+            "smiles": resolved.get("smiles"),
+            "query_used": resolved.get("query_used") or resolved.get("query"),
+        })
     smiles = resolved.get("smiles") if resolved_ok else None
     cid = resolved.get("pubchem_cid") if resolved_ok else None
 
     safety_guard: dict[str, Any] | None = None
     if resolved_ok:
+        _emit_progress(progress_callback, {
+            "type": "tool_start",
+            "tool": "safety_check",
+            "label": "Проверяю banlist, GHS и PPE",
+        })
         safety_guard = _safety_tool(smiles, cid=cid, reaction_description=query)
         tools_used.append("safety_check")
         artifacts["safety"] = safety_guard
+        _emit_progress(progress_callback, {
+            "type": "tool_done",
+            "tool": "safety_check",
+            "label": "Safety gate завершен",
+            "status": safety_guard.get("overall_status", "UNKNOWN"),
+        })
 
         status = safety_guard.get("overall_status", "SAFE")
         query_used = resolved.get("query_used") or resolved.get("query") or query
@@ -675,30 +755,78 @@ def run_chem_chat(
     wants_safety_only = intent == "safety" or selected_tools == {"resolve_molecule", "safety_check"}
 
     if resolved_ok and wants_retro and safety_guard and safety_guard.get("overall_status") != "CRITICAL_STOP":
+        _emit_progress(progress_callback, {
+            "type": "tool_start",
+            "tool": "retrosynthesis_search",
+            "label": "Ищу и ранжирую маршруты ретросинтеза",
+            "source_mode": selected_source_mode,
+        })
         retro = _retro_tool(smiles, top_n=top_n, source_mode=selected_source_mode)
         tools_used.append("retrosynthesis_search")
         artifacts["retrosynthesis"] = retro
         answer_lines.extend(_route_summary(retro))
+        _emit_progress(progress_callback, {
+            "type": "tool_done",
+            "tool": "retrosynthesis_search",
+            "label": "Ретросинтез завершен",
+            "routes": len(retro.get("routes") or []),
+            "sources_used": retro.get("sources_used", []),
+        })
 
     if resolved_ok and wants_admet:
+        _emit_progress(progress_callback, {
+            "type": "tool_start",
+            "tool": "admet_screen",
+            "label": "Считаю ADMET-дескрипторы",
+        })
         admet = _admet_tool(smiles, safety_guard=safety_guard)
         tools_used.append("admet_screen")
         artifacts["admet"] = admet
         answer_lines.extend(_admet_summary(admet))
+        _emit_progress(progress_callback, {
+            "type": "tool_done",
+            "tool": "admet_screen",
+            "label": "ADMET завершен",
+            "score": (admet.get("overall") or {}).get("score"),
+            "risk_level": (admet.get("overall") or {}).get("risk_level"),
+        })
 
     if wants_availability:
+        _emit_progress(progress_callback, {
+            "type": "tool_start",
+            "tool": "availability_check",
+            "label": "Проверяю доступность реагентов",
+        })
         availability = _availability_tool(query)
         tools_used.append("availability_check")
         artifacts["availability"] = availability
         answer_lines.extend(_availability_summary(availability))
+        _emit_progress(progress_callback, {
+            "type": "tool_done",
+            "tool": "availability_check",
+            "label": "Проверка поставщиков завершена",
+            "summary": availability.get("summary"),
+        })
 
     if wants_research:
+        _emit_progress(progress_callback, {
+            "type": "tool_start",
+            "tool": "research_analyze",
+            "label": "Собираю web/PubMed/RAG evidence",
+        })
         research = _research_tool(query, mode=selected_research_mode, max_sources=max_sources)
         tools_used.append("research_analyze")
         artifacts["research"] = research
         if intent == "general":
             answer_lines.append("Вопрос не требует целевой молекулы, поэтому использую общий химический research-режим.")
         answer_lines.extend(_research_summary(research))
+        _emit_progress(progress_callback, {
+            "type": "tool_done",
+            "tool": "research_analyze",
+            "label": "Research завершен",
+            "sources": len(research.get("sources") or []),
+            "evidence": len(research.get("evidence") or []),
+        })
 
     if resolved_ok and wants_safety_only and safety_guard:
         mol_check = safety_guard.get("molecule_check", {})
@@ -727,6 +855,12 @@ def run_chem_chat(
         suggestions.insert(0, "Выбрать лучший маршрут и посчитать масштаб")
 
     fallback_answer = "\n".join(answer_lines)
+    _emit_progress(progress_callback, {
+        "type": "status",
+        "stage": "final_answer",
+        "label": "Модель формирует финальный Markdown-ответ",
+        "model": CHEM_CHAT_MODEL,
+    })
     answer = _final_answer_with_llm(query, plan, artifacts, fallback_answer)
 
     return {

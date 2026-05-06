@@ -23,7 +23,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
@@ -851,6 +851,70 @@ async def _run_chem_chat_request(req: ChemChatRequest) -> ChemChatResponse:
 async def chem_chat_message(req: ChemChatRequest):
     """Run the general chemistry chat orchestrator over MolPipeline tools."""
     return await _run_chem_chat_request(req)
+
+
+@app.post("/chat/stream")
+async def chem_chat_stream(req: ChemChatRequest):
+    """Stream ChemChat progress and final response as server-sent events."""
+    message = req.message.strip()
+    if not message:
+        raise HTTPException(status_code=422, detail="message must not be empty")
+
+    import json
+    import queue
+    import threading
+
+    def _sse(event: str, payload: dict[str, Any]) -> str:
+        data = json.dumps(_sanitize(payload), ensure_ascii=False)
+        return f"event: {event}\ndata: {data}\n\n"
+
+    def _stream():
+        events: queue.Queue[dict[str, Any] | None] = queue.Queue()
+
+        def emit(payload: dict[str, Any]) -> None:
+            events.put(payload)
+
+        def worker() -> None:
+            try:
+                result = run_chem_chat(
+                    message,
+                    source_mode=req.source_mode,
+                    top_n=req.top_n,
+                    research_mode=req.research_mode,
+                    max_sources=req.max_sources,
+                    progress_callback=emit,
+                )
+                events.put({"type": "final", "result": result})
+            except Exception as exc:
+                logger.exception("[chat/stream] crashed for message %r", message[:120])
+                events.put({"type": "error", "message": str(exc)})
+            finally:
+                events.put(None)
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        yield _sse("status", {
+            "type": "status",
+            "stage": "accepted",
+            "label": "Запрос принят",
+            "model": CHEM_CHAT_MODEL,
+        })
+
+        while True:
+            item = events.get()
+            if item is None:
+                break
+            event_name = item.get("type", "status")
+            yield _sse(event_name, item)
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/research/chat", response_model=ChemChatResponse)
