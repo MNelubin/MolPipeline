@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import RetroCard from './RetroCard'
 import { useChemChat } from '../hooks/useChemChat'
 
@@ -312,6 +312,7 @@ export default function ChemChatPage() {
   const [input, setInput] = useState('')
   const [sourceMode, setSourceMode] = useState('auto')
   const textareaRef = useRef(null)
+  const messagesEndRef = useRef(null)
   const {
     status,
     messages,
@@ -324,6 +325,11 @@ export default function ChemChatPage() {
     reset,
   } = useChemChat()
   const isRunning = status === 'running'
+
+  useEffect(() => {
+    if (messages.length === 0) return
+    messagesEndRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+  }, [messages, status])
 
   const handleSubmit = useCallback(async () => {
     const text = input.trim()
@@ -452,6 +458,7 @@ export default function ChemChatPage() {
             Оркестратор выбирает tools и собирает ответ...
           </div>
         )}
+        <div ref={messagesEndRef} className="chemchat-scroll-anchor" aria-hidden="true" />
       </div>
 
       <div className="input-area">

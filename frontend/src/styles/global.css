@@ -2841,6 +2841,11 @@ a.ext-link:hover { color: var(--cyan); }
 
 .chemchat-messages { gap: 18px; }
 
+.chemchat-scroll-anchor {
+  height: 1px;
+  width: 100%;
+}
+
 .chemchat-empty {
   margin: auto;
   max-width: 760px;
