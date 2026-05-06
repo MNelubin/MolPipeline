@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
@@ -319,7 +320,9 @@ def _normalize_llm_plan(
     plan: dict[str, Any] | None,
     message: str,
     default_source_mode: str = "auto",
+    context: str | None = None,
 ) -> dict[str, Any]:
+    planning_context = context or message
     fallback_intent = classify_chem_intent(message)
     if not isinstance(plan, dict):
         plan = {}
@@ -354,9 +357,13 @@ def _normalize_llm_plan(
         intent == "general"
         and tools == ["research_analyze"]
         and source_mode == "auto"
-        and _is_broad_educational_question(message)
+        and _is_broad_educational_question(planning_context)
     ):
         tools = []
+    if intent == "general" and not tools and source_mode in {"web", "all"}:
+        tools = ["research_analyze"]
+    if intent == "general" and not tools and _looks_like_real_world_composition_question(planning_context):
+        tools = ["research_analyze"]
     if not tools:
         if intent == "general":
             tools = []
@@ -408,7 +415,42 @@ def _is_broad_educational_question(message: str) -> bool:
         "что такое", "расскажи про", "объясни", "какие самые", "в чем разница",
         "what is", "explain", "overview", "basics",
     )
-    return any(marker in text for marker in broad_markers) and not _mentions_external_evidence(message)
+    return (
+        any(marker in text for marker in broad_markers)
+        and not _mentions_external_evidence(message)
+        and not _looks_like_real_world_composition_question(message)
+    )
+
+
+def _looks_like_real_world_composition_question(message: str) -> bool:
+    text = message.casefold()
+    composition_markers = (
+        "из чего", "состав", "состоят", "состоит", "что используют", "используется",
+        "made of", "made from", "composition", "what are", "what is used",
+    )
+    material_markers = (
+        "керами", "фарфор", "фаянс", "стекл", "глазур", "глина", "каолин", "кварц",
+        "полевой шпат", "пластик", "полимер", "металл", "сплав", "бетон", "цемент",
+        "ceramic", "porcelain", "glass", "glaze", "clay", "kaolin", "quartz",
+        "feldspar", "plastic", "polymer", "metal", "alloy", "concrete", "cement",
+    )
+    product_markers = (
+        "кружк", "чашк", "посуда", "плитк", "упаковк", "бутылк", "краск", "клей",
+        "mug", "cup", "tableware", "tile", "packaging", "bottle", "paint", "adhesive",
+    )
+    has_composition = any(marker in text for marker in composition_markers)
+    has_material_context = any(marker in text for marker in material_markers + product_markers)
+    return has_composition and has_material_context
+
+
+def _looks_context_dependent(message: str) -> bool:
+    text = message.casefold().strip()
+    markers = (
+        "это", "этот", "эта", "эту", "его", "ее", "её", "она", "он", "они", "котор",
+        "а теперь", "теперь", "дальше", "следующий", "там", "в ней", "в нем",
+        "it", "that", "this", "they", "them", "now", "next",
+    )
+    return len(text) < 120 and any(marker in text for marker in markers)
 
 
 def _mentions_external_evidence(message: str) -> bool:
@@ -437,6 +479,7 @@ def _plan_with_llm(
         "availability_check, admet_screen, research_analyze. "
         "For broad educational questions such as definitions, basic concepts, or simple comparisons, usually use an empty tools list. "
         "Use research_analyze when the user asks for sources, literature, web evidence, PubMed, papers, patents, current/external data, or selects a web/all source mode. "
+        "Also use research_analyze for real-world product/material composition questions, industrial formulations, consumer goods, and 'what is this usually made of/used in' questions, because those require external/web evidence rather than pure textbook recall. "
         "For synthesis/route/retrosynthesis requests include resolve_molecule, safety_check, retrosynthesis_search. "
         "For supplier/price/buyability requests use availability_check and extract every reagent if possible. "
         "For safety/ADMET requests include resolve_molecule and safety_check. "
@@ -452,7 +495,14 @@ def _plan_with_llm(
         ensure_ascii=False,
     )
     plan = _chat_llm_json(system, user, max_tokens=900)
-    normalized = _normalize_llm_plan(plan, message, default_source_mode=source_mode)
+    history_context = "\n".join(item["content"] for item in _compact_chat_history(history))
+    planning_context = f"{history_context}\n{message}" if history_context and _looks_context_dependent(message) else message
+    normalized = _normalize_llm_plan(
+        plan,
+        message,
+        default_source_mode=source_mode,
+        context=planning_context,
+    )
     normalized["llm_raw_plan"] = plan or None
     return normalized
 
@@ -550,6 +600,7 @@ def _final_answer_with_llm(
         "Use conversation_history to keep continuity in follow-up questions, but do not override current tool outputs. "
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
         "If no tools were selected, answer as a normal chemistry tutor from general chemistry knowledge and use fallback_summary as guidance. "
+        "For real-world materials and product composition, do not force a single-molecule framing: explain mixtures, mineral phases, additives, coatings and likely variability. "
         "Do not invent synthesis routes, prices, safety classifications or citations. "
         "When research/web sources include URLs, cite them as Markdown links: [title](url). "
         "If tools did not find enough data, say exactly what is missing and what to try next. "
@@ -762,6 +813,76 @@ def _research_summary(research: dict[str, Any]) -> list[str]:
     ]
 
 
+def _stable_suggestion_sample(seed: str, suggestions: list[str], limit: int = 4) -> list[str]:
+    scored = []
+    seen: set[str] = set()
+    for suggestion in suggestions:
+        clean = " ".join(suggestion.split())
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        digest = hashlib.sha256(f"{seed}|{clean}".encode("utf-8")).hexdigest()
+        scored.append((digest, clean))
+    return [item for _, item in sorted(scored)[:limit]]
+
+
+def _build_suggestions(
+    query: str,
+    intent: str,
+    tools_used: list[str],
+    artifacts: dict[str, Any],
+    history: list[dict[str, str]],
+) -> list[str]:
+    context = "\n".join([query, *(item["content"] for item in history[-4:])])
+    pool: list[str] = []
+
+    if artifacts.get("retrosynthesis", {}).get("routes"):
+        pool.extend([
+            "Выбрать лучший маршрут и посчитать масштаб",
+            "Проверить доступность всех исходных реагентов",
+            "Сравнить маршруты по безопасности и цене",
+            "Показать подробности первого маршрута",
+        ])
+
+    if _looks_like_real_world_composition_question(context) or "research_analyze" in tools_used:
+        pool.extend([
+            "Показать источники и ссылки подробнее",
+            "Разложить состав на вещества и минералы",
+            "Объяснить, какая часть отвечает за прочность",
+            "Найти типичный промышленный состав",
+            "Сравнить варианты материалов между собой",
+            "Проверить безопасность контакта с пищей",
+        ])
+
+    if intent in {"admet", "safety"} or any(tool in tools_used for tool in ("admet_screen", "safety_check")):
+        pool.extend([
+            "Пояснить риск простыми словами",
+            "Сравнить с похожим веществом",
+            "Показать, какие параметры сильнее всего влияют на оценку",
+            "Проверить доступность вещества и ограничения",
+        ])
+
+    if intent in {"availability", "mixed"} or "availability_check" in tools_used:
+        pool.extend([
+            "Показать только доступные позиции",
+            "Сравнить поставщиков по цене",
+            "Проверить альтернативные реагенты",
+            "Связать доступность с маршрутом синтеза",
+        ])
+
+    if not pool:
+        pool.extend([
+            "Попросить ответ со ссылками на источники",
+            "Попросить короткое объяснение на примере",
+            "Уточнить практическое применение",
+            "Перейти к конкретному веществу или материалу",
+            "Сравнить два похожих случая",
+            "Попросить таблицу с ключевыми отличиями",
+        ])
+
+    return _stable_suggestion_sample(f"{query}|{intent}|{','.join(tools_used)}", pool, limit=4)
+
+
 def run_chem_chat(
     message: str,
     *,
@@ -957,26 +1078,7 @@ def run_chem_chat(
     if intent == "general" and not tools_used:
         answer_lines.append(_direct_general_fallback(query))
 
-    if not tools_used and intent == "general":
-        suggestions = [
-            "Объяснить на примерах из органической химии",
-            "Показать самые распространенные элементы по критериям",
-            "Перейти к вопросу про конкретную молекулу",
-        ]
-    elif "research_analyze" in tools_used:
-        suggestions = [
-            "Попросить источники и ссылки подробнее",
-            "Сузить вопрос до конкретной реакции или молекулы",
-            "Сравнить найденные данные с ADMET/safety",
-        ]
-    else:
-        suggestions = [
-            "Построить ретросинтез и сравнить маршруты",
-            "Проверить доступность исходных реагентов",
-            "Сделать ADMET и safety-разбор",
-        ]
-    if artifacts.get("retrosynthesis", {}).get("routes"):
-        suggestions.insert(0, "Выбрать лучший маршрут и посчитать масштаб")
+    suggestions = _build_suggestions(query, intent, tools_used, artifacts, compact_history)
 
     fallback_answer = "\n".join(answer_lines)
     _emit_progress(progress_callback, {
@@ -995,5 +1097,5 @@ def run_chem_chat(
         "answer": answer,
         "tools_used": tools_used,
         "artifacts": artifacts,
-        "suggested_next_actions": suggestions[:4],
+        "suggested_next_actions": suggestions,
     }

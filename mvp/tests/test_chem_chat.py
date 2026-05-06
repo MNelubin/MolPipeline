@@ -30,6 +30,31 @@ def test_broad_general_question_answers_directly_without_research():
     mock_research.assert_not_called()
 
 
+def test_real_world_material_composition_uses_research_even_without_explicit_sources():
+    plan = {
+        "intent": "general",
+        "target_molecules": [],
+        "tools": [],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "general question",
+    }
+    research = {
+        "summary": "Керамические кружки обычно состоят из глины, кварца, полевого шпата и глазури.",
+        "sources": [{"title": "Ceramic materials overview", "url": "https://example.org/ceramics", "source_type": "web"}],
+        "evidence": [{"id": "S1"}],
+    }
+
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, {"answer": "research-backed answer"}]), \
+         patch("mvp.chem_chat.run_research_workspace", return_value=research) as mock_research:
+        result = run_chem_chat("из чего обычно состоят керамические кружки?")
+
+    assert result["tools_used"] == ["research_analyze"]
+    assert result["artifacts"]["research"]["summary"].startswith("Керамические кружки")
+    assert "Перейти к вопросу про конкретную молекулу" not in result["suggested_next_actions"]
+    mock_research.assert_called_once()
+
+
 def test_broad_general_question_falls_back_when_model_refuses_russian():
     plan = {
         "intent": "general",
