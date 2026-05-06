@@ -1,6 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://hack.humaneconomy.ru'
+const CLIENT_ID_KEY = 'molpipeline_anon_client_id'
+
+function makeClientId() {
+  if (globalThis.crypto?.randomUUID) return `anon-${globalThis.crypto.randomUUID()}`
+  return `anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function getClientId() {
+  try {
+    const stored = localStorage.getItem(CLIENT_ID_KEY)
+    if (stored) return stored
+    const next = makeClientId()
+    localStorage.setItem(CLIENT_ID_KEY, next)
+    return next
+  } catch {
+    return makeClientId()
+  }
+}
 
 export function useChemChat() {
   const [status, setStatus] = useState('idle')
@@ -8,6 +26,8 @@ export function useChemChat() {
   const [sessions, setSessions] = useState([])
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [error, setError] = useState(null)
+  const [clientId] = useState(getClientId)
+  const clientQuery = `client_id=${encodeURIComponent(clientId)}`
 
   const normalizeStoredMessage = item => {
     const payload = item.payload || {}
@@ -25,7 +45,7 @@ export function useChemChat() {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/chat/sessions?limit=50`)
+      const res = await fetch(`${API_BASE}/chat/sessions?limit=50&${clientQuery}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
       const data = await res.json()
       setSessions(data.sessions || [])
@@ -34,7 +54,7 @@ export function useChemChat() {
       console.warn('Failed to load ChemChat sessions', e)
       return []
     }
-  }, [])
+  }, [clientQuery])
 
   useEffect(() => {
     refreshSessions()
@@ -42,7 +62,7 @@ export function useChemChat() {
 
   const loadSession = useCallback(async sessionId => {
     if (!sessionId || status === 'running') return null
-    const res = await fetch(`${API_BASE}/chat/sessions/${encodeURIComponent(sessionId)}`)
+    const res = await fetch(`${API_BASE}/chat/sessions/${encodeURIComponent(sessionId)}?${clientQuery}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
     const data = await res.json()
     setActiveSessionId(data.id)
@@ -50,7 +70,7 @@ export function useChemChat() {
     setStatus('done')
     setError(null)
     return data
-  }, [status])
+  }, [clientQuery, status])
 
   const startNewSession = useCallback(() => {
     if (status === 'running') return
@@ -62,7 +82,7 @@ export function useChemChat() {
 
   const deleteSession = useCallback(async sessionId => {
     if (!sessionId || status === 'running') return
-    const res = await fetch(`${API_BASE}/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(`${API_BASE}/chat/sessions/${encodeURIComponent(sessionId)}?${clientQuery}`, {
       method: 'DELETE',
     })
     if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
@@ -72,7 +92,7 @@ export function useChemChat() {
       setStatus('idle')
     }
     await refreshSessions()
-  }, [activeSessionId, refreshSessions, status])
+  }, [activeSessionId, clientQuery, refreshSessions, status])
 
   const sendMessage = useCallback(async (message, options = {}) => {
     const text = message.trim()
@@ -148,6 +168,7 @@ export function useChemChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: options.sessionId || activeSessionId,
+          client_id: clientId,
           message: text,
           history,
           source_mode: options.sourceMode || 'auto',
@@ -209,7 +230,7 @@ export function useChemChat() {
       setStatus('error')
       throw e
     }
-  }, [activeSessionId, messages, refreshSessions])
+  }, [activeSessionId, clientId, messages, refreshSessions])
 
   const reset = useCallback(() => {
     startNewSession()

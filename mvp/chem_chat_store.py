@@ -17,6 +17,8 @@ _DB_PATH = DATA_DIR / "chem_chat_sessions.db"
 _INIT_LOCK = threading.Lock()
 _INITIALIZED = False
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+_CLIENT_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{8,120}$")
+_DEFAULT_CLIENT_ID = "default"
 
 
 def _utc_now() -> str:
@@ -46,12 +48,22 @@ def _init_db() -> None:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS chat_sessions (
                     id TEXT PRIMARY KEY,
+                    client_id TEXT NOT NULL DEFAULT 'default',
                     title TEXT NOT NULL,
                     source_mode TEXT NOT NULL DEFAULT 'auto',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
             """)
+            columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(chat_sessions)").fetchall()
+            }
+            if "client_id" not in columns:
+                conn.execute(
+                    "ALTER TABLE chat_sessions "
+                    "ADD COLUMN client_id TEXT NOT NULL DEFAULT 'default'"
+                )
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,6 +79,10 @@ def _init_db() -> None:
                 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id
                 ON chat_messages(session_id, id)
             """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_sessions_client_updated
+                ON chat_sessions(client_id, updated_at DESC)
+            """)
             conn.commit()
         finally:
             conn.close()
@@ -79,6 +95,13 @@ def _safe_session_id(session_id: str | None = None) -> str:
     return f"chat-{uuid.uuid4().hex[:16]}"
 
 
+def _safe_client_id(client_id: str | None = None) -> str:
+    value = (client_id or "").strip()
+    if value and _CLIENT_ID_RE.match(value):
+        return value
+    return _DEFAULT_CLIENT_ID
+
+
 def _make_title(message: str) -> str:
     title = " ".join(message.strip().split())
     if not title:
@@ -86,23 +109,48 @@ def _make_title(message: str) -> str:
     return title[:72] + ("..." if len(title) > 72 else "")
 
 
-def ensure_session(session_id: str | None, first_message: str, source_mode: str = "auto") -> str:
+def ensure_session(
+    session_id: str | None,
+    first_message: str,
+    source_mode: str = "auto",
+    client_id: str | None = None,
+) -> str:
     safe_id = _safe_session_id(session_id)
+    safe_client_id = _safe_client_id(client_id)
     now = _utc_now()
     with _connect() as conn:
-        row = conn.execute("SELECT id FROM chat_sessions WHERE id = ?", (safe_id,)).fetchone()
+        row = conn.execute(
+            "SELECT id, client_id FROM chat_sessions WHERE id = ?",
+            (safe_id,),
+        ).fetchone()
+        if row is not None and row["client_id"] != safe_client_id:
+            safe_id = _safe_session_id(None)
+            row = None
         if row is None:
             conn.execute(
                 """
-                INSERT INTO chat_sessions (id, title, source_mode, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO chat_sessions (
+                    id, client_id, title, source_mode, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (safe_id, _make_title(first_message), source_mode or "auto", now, now),
+                (
+                    safe_id,
+                    safe_client_id,
+                    _make_title(first_message),
+                    source_mode or "auto",
+                    now,
+                    now,
+                ),
             )
         else:
             conn.execute(
-                "UPDATE chat_sessions SET updated_at = ?, source_mode = ? WHERE id = ?",
-                (now, source_mode or "auto", safe_id),
+                """
+                UPDATE chat_sessions
+                SET updated_at = ?, source_mode = ?
+                WHERE id = ? AND client_id = ?
+                """,
+                (now, source_mode or "auto", safe_id, safe_client_id),
             )
         conn.commit()
     return safe_id
@@ -139,12 +187,14 @@ def append_message(
     }
 
 
-def list_sessions(limit: int = 50) -> list[dict[str, Any]]:
+def list_sessions(limit: int = 50, client_id: str | None = None) -> list[dict[str, Any]]:
+    safe_client_id = _safe_client_id(client_id)
     with _connect() as conn:
         rows = conn.execute(
             """
             SELECT
                 s.id,
+                s.client_id,
                 s.title,
                 s.source_mode,
                 s.created_at,
@@ -159,20 +209,25 @@ def list_sessions(limit: int = 50) -> list[dict[str, Any]]:
                 ) AS last_message
             FROM chat_sessions s
             LEFT JOIN chat_messages m ON m.session_id = s.id
+            WHERE s.client_id = ?
             GROUP BY s.id
             ORDER BY s.updated_at DESC
             LIMIT ?
             """,
-            (limit,),
+            (safe_client_id, limit),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def get_session(session_id: str) -> dict[str, Any] | None:
+def get_session(session_id: str, client_id: str | None = None) -> dict[str, Any] | None:
     if not _SESSION_ID_RE.match(session_id):
         return None
+    safe_client_id = _safe_client_id(client_id)
     with _connect() as conn:
-        session = conn.execute("SELECT * FROM chat_sessions WHERE id = ?", (session_id,)).fetchone()
+        session = conn.execute(
+            "SELECT * FROM chat_sessions WHERE id = ? AND client_id = ?",
+            (session_id, safe_client_id),
+        ).fetchone()
         if session is None:
             return None
         rows = conn.execute(
@@ -205,8 +260,12 @@ def get_session(session_id: str) -> dict[str, Any] | None:
     return result
 
 
-def get_context_messages(session_id: str, limit: int = 8) -> list[dict[str, str]]:
-    session = get_session(session_id)
+def get_context_messages(
+    session_id: str,
+    limit: int = 8,
+    client_id: str | None = None,
+) -> list[dict[str, str]]:
+    session = get_session(session_id, client_id)
     if not session:
         return []
     messages = session.get("messages", [])
@@ -217,10 +276,14 @@ def get_context_messages(session_id: str, limit: int = 8) -> list[dict[str, str]
     ][-limit:]
 
 
-def delete_session(session_id: str) -> bool:
+def delete_session(session_id: str, client_id: str | None = None) -> bool:
     if not _SESSION_ID_RE.match(session_id):
         return False
+    safe_client_id = _safe_client_id(client_id)
     with _connect() as conn:
-        cursor = conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+        cursor = conn.execute(
+            "DELETE FROM chat_sessions WHERE id = ? AND client_id = ?",
+            (session_id, safe_client_id),
+        )
         conn.commit()
         return cursor.rowcount > 0

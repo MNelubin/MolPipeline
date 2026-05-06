@@ -289,6 +289,10 @@ class ChemChatRequest(BaseModel):
         default=None,
         description="Persistent ChemChat session id. If omitted, the server creates one.",
     )
+    client_id: str | None = Field(
+        default=None,
+        description="Anonymous browser client id used to scope persisted sessions.",
+    )
     message: str = Field(..., description="Free-form chemistry-specific user task.")
     history: list[dict[str, str]] = Field(
         default_factory=list,
@@ -317,11 +321,13 @@ class ChemChatResponse(BaseModel):
 
 class ChemChatSessionCreateRequest(BaseModel):
     title: str | None = None
+    client_id: str | None = None
     source_mode: Literal["auto", "ord", "web", "retro_model", "aizynthfinder", "all"] = "auto"
 
 
 class ChemChatSessionSummary(BaseModel):
     id: str
+    client_id: str | None = None
     title: str
     source_mode: str
     created_at: str
@@ -341,6 +347,7 @@ class ChemChatStoredMessage(BaseModel):
 
 class ChemChatSessionDetail(BaseModel):
     id: str
+    client_id: str | None = None
     title: str
     source_mode: str
     created_at: str
@@ -869,39 +876,42 @@ async def chat_tools():
 
 
 @app.get("/chat/sessions")
-async def chem_chat_sessions(limit: int = 50):
+async def chem_chat_sessions(limit: int = 50, client_id: str | None = None):
     """List persisted ChemChat sessions."""
     safe_limit = max(1, min(limit, 100))
-    return {"sessions": _sanitize(list_sessions(limit=safe_limit))}
+    return {"sessions": _sanitize(list_sessions(limit=safe_limit, client_id=client_id))}
 
 
 @app.post("/chat/sessions", response_model=ChemChatSessionSummary)
 async def chem_chat_create_session(req: ChemChatSessionCreateRequest):
     """Create an empty persisted ChemChat session."""
     title = (req.title or "Новый чат").strip() or "Новый чат"
-    session_id = ensure_session(None, title, req.source_mode)
-    session = get_session(session_id)
+    session_id = ensure_session(None, title, req.source_mode, client_id=req.client_id)
+    session = get_session(session_id, client_id=req.client_id)
     if session is None:
         raise HTTPException(status_code=500, detail="failed to create chat session")
-    summary = {k: session[k] for k in ("id", "title", "source_mode", "created_at", "updated_at")}
+    summary = {
+        k: session[k]
+        for k in ("id", "client_id", "title", "source_mode", "created_at", "updated_at")
+    }
     summary["message_count"] = 0
     summary["last_message"] = None
     return ChemChatSessionSummary(**summary)
 
 
 @app.get("/chat/sessions/{session_id}", response_model=ChemChatSessionDetail)
-async def chem_chat_get_session(session_id: str):
+async def chem_chat_get_session(session_id: str, client_id: str | None = None):
     """Return one persisted ChemChat session with messages."""
-    session = get_session(session_id)
+    session = get_session(session_id, client_id=client_id)
     if session is None:
         raise HTTPException(status_code=404, detail="chat session not found")
     return ChemChatSessionDetail(**_sanitize(session))
 
 
 @app.delete("/chat/sessions/{session_id}")
-async def chem_chat_delete_session(session_id: str):
+async def chem_chat_delete_session(session_id: str, client_id: str | None = None):
     """Delete one persisted ChemChat session."""
-    deleted = delete_session(session_id)
+    deleted = delete_session(session_id, client_id=client_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="chat session not found")
     return {"status": "deleted", "session_id": session_id}
@@ -913,8 +923,8 @@ async def _run_chem_chat_request(req: ChemChatRequest) -> ChemChatResponse:
         raise HTTPException(status_code=422, detail="message must not be empty")
 
     logger.info("[chat/message] message=%r source_mode=%s", message[:120], req.source_mode)
-    session_id = ensure_session(req.session_id, message, req.source_mode)
-    stored_history = get_context_messages(session_id)
+    session_id = ensure_session(req.session_id, message, req.source_mode, client_id=req.client_id)
+    stored_history = get_context_messages(session_id, client_id=req.client_id)
     history = stored_history or req.history
     append_message(session_id, "user", message, {"source_mode": req.source_mode})
 
@@ -964,8 +974,8 @@ async def chem_chat_stream(req: ChemChatRequest):
     message = req.message.strip()
     if not message:
         raise HTTPException(status_code=422, detail="message must not be empty")
-    session_id = ensure_session(req.session_id, message, req.source_mode)
-    stored_history = get_context_messages(session_id)
+    session_id = ensure_session(req.session_id, message, req.source_mode, client_id=req.client_id)
+    stored_history = get_context_messages(session_id, client_id=req.client_id)
     history = stored_history or req.history
     append_message(session_id, "user", message, {"source_mode": req.source_mode})
 

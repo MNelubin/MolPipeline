@@ -811,6 +811,7 @@ body {
   justify-content: center;
   gap: var(--sp-sm);
   color: var(--text-3);
+  text-align: center;
 }
 
 .empty-icon {
@@ -835,11 +836,18 @@ body {
   flex-wrap: wrap;
   gap: var(--sp-sm);
   margin-top: var(--sp-lg);
+  margin-left: auto;
+  margin-right: auto;
   justify-content: center;
+  align-items: center;
   max-width: 380px;
+  width: 100%;
 }
 
 .example-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-family: var(--font-mono);
   padding: 6px 16px;
@@ -849,6 +857,8 @@ body {
   color: var(--text-2);
   cursor: pointer;
   transition: all 0.2s var(--ease);
+  text-align: center;
+  max-width: 100%;
 }
 
 .example-chip:hover {
@@ -1767,6 +1777,7 @@ a.ext-link:hover { color: var(--cyan); }
   max-width: 920px;
   margin: 0 auto;
   width: 100%;
+  text-align: center;
 }
 
 .retro-source-grid {
@@ -3014,6 +3025,10 @@ a.ext-link:hover { color: var(--cyan); }
   flex-wrap: wrap;
   gap: 7px;
   margin-top: 12px;
+}
+
+.chemchat-suggestions {
+  justify-content: center;
 }
 
 .chemchat-tools span,
