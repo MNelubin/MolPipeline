@@ -7,15 +7,23 @@ ADMET and availability are always produced by deterministic project modules.
 
 from __future__ import annotations
 
+import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
 from .admet import analyze_admet
 from .availability import check_reagent_availability, summarize_availability
+from .config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, SOCKS_PROXY
 from .nodes.validate_and_guard_node import _resolve_molecule, _run_safety_checks
 from .research_workspace import run_research_workspace
 from .tools.retro_tools import search_and_rank
 
+logger = logging.getLogger(__name__)
+
+CHEM_CHAT_MODEL = "deepseek/deepseek-v4-flash"
+VALID_INTENTS: set[str] = {"general", "retrosynthesis", "admet", "availability", "research", "safety", "molecule", "mixed"}
+VALID_TOOLS: set[str] = {"resolve_molecule", "safety_check", "retrosynthesis_search", "admet_screen", "availability_check", "research_analyze"}
 
 Intent = Literal[
     "general",
@@ -232,6 +240,261 @@ def _research_tool(query: str, mode: str = "literature", max_sources: int = 6) -
     return run_research_workspace(query, mode=mode, max_sources=max_sources)
 
 
+def _openrouter_client():
+    if not OPENROUTER_API_KEY:
+        return None
+    try:
+        from openai import OpenAI
+    except ImportError:
+        logger.warning("openai package is not installed; ChemChat LLM disabled")
+        return None
+
+    kwargs: dict[str, Any] = {
+        "api_key": OPENROUTER_API_KEY,
+        "base_url": OPENROUTER_BASE_URL,
+    }
+    if SOCKS_PROXY:
+        import httpx
+
+        transport = httpx.HTTPTransport(proxy=SOCKS_PROXY)
+        kwargs["http_client"] = httpx.Client(transport=transport, timeout=120.0)
+    return OpenAI(**kwargs)
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        data = json.loads(text[start:end + 1])
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _chat_llm_json(system: str, user: str, *, max_tokens: int = 1200) -> dict[str, Any] | None:
+    client = _openrouter_client()
+    if client is None:
+        return None
+    try:
+        resp = client.chat.completions.create(
+            model=CHEM_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.1,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        return _extract_json_object(text)
+    except Exception as exc:
+        logger.warning("ChemChat LLM call failed: %s", exc)
+        return None
+
+
+def _normalize_llm_plan(plan: dict[str, Any] | None, message: str) -> dict[str, Any]:
+    fallback_intent = classify_chem_intent(message)
+    if not isinstance(plan, dict):
+        plan = {}
+
+    intent = str(plan.get("intent") or fallback_intent).strip()
+    if intent not in VALID_INTENTS:
+        intent = fallback_intent
+
+    raw_tools = plan.get("tools")
+    tools = [str(tool).strip() for tool in raw_tools] if isinstance(raw_tools, list) else []
+    tools = [tool for tool in tools if tool in VALID_TOOLS]
+    if not tools:
+        if intent == "general":
+            tools = ["research_analyze"]
+        elif intent == "retrosynthesis":
+            tools = ["resolve_molecule", "safety_check", "retrosynthesis_search"]
+        elif intent == "admet":
+            tools = ["resolve_molecule", "safety_check", "admet_screen"]
+        elif intent == "availability":
+            tools = ["availability_check"]
+        elif intent == "research":
+            tools = ["research_analyze"]
+        elif intent == "safety":
+            tools = ["resolve_molecule", "safety_check"]
+        elif intent == "molecule":
+            tools = ["resolve_molecule", "safety_check"]
+        else:
+            tools = ["resolve_molecule", "safety_check", "retrosynthesis_search", "availability_check", "admet_screen"]
+
+    # Safety is a hard gate for molecule-specific tools.
+    gated_tools = {"retrosynthesis_search", "admet_screen"}
+    if any(tool in tools for tool in gated_tools):
+        for required in ("resolve_molecule", "safety_check"):
+            if required not in tools:
+                tools.insert(0 if required == "resolve_molecule" else 1, required)
+
+    targets = plan.get("target_molecules")
+    if not isinstance(targets, list):
+        targets = []
+    targets = [str(target).strip() for target in targets if str(target).strip()]
+
+    source_mode = str(plan.get("source_mode") or "auto").strip()
+    if source_mode not in {"auto", "ord", "web", "retro_model", "aizynthfinder", "all"}:
+        source_mode = "auto"
+
+    research_mode = str(plan.get("research_mode") or "literature").strip()
+    if research_mode not in {"molecule", "literature", "patent"}:
+        research_mode = "literature"
+
+    return {
+        "intent": intent,
+        "tools": tools,
+        "target_molecules": targets,
+        "source_mode": source_mode,
+        "research_mode": research_mode,
+        "reasoning": str(plan.get("reasoning") or "").strip(),
+        "used_llm": isinstance(plan, dict) and bool(plan),
+    }
+
+
+def _plan_with_llm(message: str, source_mode: str, research_mode: str) -> dict[str, Any]:
+    system = (
+        "You are the planner for MolPipeline ChemChat, a chemistry-specific assistant. "
+        "Choose which project tools must be called before answering. "
+        "Do not answer chemistry facts directly in this planning step. "
+        "Return JSON only with keys: intent, target_molecules, tools, source_mode, research_mode, reasoning. "
+        "intent must be one of: general, molecule, safety, retrosynthesis, availability, admet, research, mixed. "
+        "tools must be selected from: resolve_molecule, safety_check, retrosynthesis_search, "
+        "availability_check, admet_screen, research_analyze. "
+        "For synthesis/route/retrosynthesis requests include resolve_molecule, safety_check, retrosynthesis_search. "
+        "For general chemistry questions that do not need a concrete molecule, use research_analyze only. "
+        "For supplier/price/buyability requests use availability_check and extract every reagent if possible. "
+        "For safety/ADMET requests include resolve_molecule and safety_check. "
+        "target_molecules should contain English/common molecule names or SMILES extracted from the user text."
+    )
+    user = json.dumps(
+        {
+            "message": message,
+            "default_source_mode": source_mode,
+            "default_research_mode": research_mode,
+        },
+        ensure_ascii=False,
+    )
+    plan = _chat_llm_json(system, user, max_tokens=900)
+    normalized = _normalize_llm_plan(plan, message)
+    normalized["llm_raw_plan"] = plan or None
+    return normalized
+
+
+def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    molecule = artifacts.get("molecule")
+    if molecule:
+        validation = molecule.get("validation") or {}
+        compact["molecule"] = {
+            "status": molecule.get("status"),
+            "query_used": molecule.get("query_used") or molecule.get("query"),
+            "smiles": molecule.get("smiles"),
+            "formula": validation.get("molecular_formula"),
+            "molecular_weight": validation.get("molecular_weight"),
+            "pubchem_cid": molecule.get("pubchem_cid"),
+            "error": molecule.get("error"),
+        }
+    safety = artifacts.get("safety")
+    if safety:
+        compact["safety"] = {
+            "overall_status": safety.get("overall_status"),
+            "molecule_status": (safety.get("molecule_check") or {}).get("status"),
+            "reason": (safety.get("molecule_check") or {}).get("reason")
+            or (safety.get("reaction_check") or {}).get("reason"),
+            "h_phrases": (safety.get("safety_data") or {}).get("h_phrases", [])[:6],
+        }
+    retro = artifacts.get("retrosynthesis")
+    if retro:
+        routes = retro.get("routes") or []
+        best = routes[0] if routes else {}
+        compact["retrosynthesis"] = {
+            "total_found": retro.get("total_found"),
+            "total_unique": retro.get("total_unique"),
+            "sources_used": retro.get("sources_used"),
+            "source_errors": retro.get("source_errors"),
+            "best_route": {
+                "source": best.get("source_label") or best.get("source"),
+                "reactants": best.get("reactants"),
+                "score": best.get("final_score"),
+                "availability_summary": best.get("availability_summary"),
+            } if best else None,
+        }
+    admet = artifacts.get("admet")
+    if admet:
+        compact["admet"] = {
+            "overall": admet.get("overall"),
+            "safety_overlay": admet.get("safety_overlay"),
+        }
+    availability = artifacts.get("availability")
+    if availability:
+        compact["availability"] = {
+            "summary": availability.get("summary"),
+            "items": [
+                {
+                    "label": item.get("label") or item.get("input"),
+                    "smiles": item.get("smiles"),
+                    "available": item.get("available"),
+                    "level": item.get("availability_level"),
+                    "source": item.get("source_label") or item.get("source"),
+                    "ppg": item.get("ppg"),
+                }
+                for item in (availability.get("items") or [])[:8]
+            ],
+        }
+    research = artifacts.get("research")
+    if research:
+        compact["research"] = {
+            "summary": research.get("summary"),
+            "analysis": research.get("analysis"),
+            "sources_count": len(research.get("sources") or []),
+            "evidence_count": len(research.get("evidence") or []),
+        }
+    return compact
+
+
+def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[str, Any], fallback: str) -> str:
+    system = (
+        "You are MolPipeline ChemChat running on deepseek/deepseek-v4-flash. "
+        "Answer in the user's language, usually Russian. "
+        "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
+        "Do not invent synthesis routes, prices, safety classifications or citations. "
+        "If tools did not find enough data, say exactly what is missing and what to try next. "
+        "Keep the answer concise but useful for a chemist."
+    )
+    user = json.dumps(
+        {
+            "user_message": message,
+            "plan": {k: v for k, v in plan.items() if k != "llm_raw_plan"},
+            "tool_outputs": _compact_artifacts_for_llm(artifacts),
+            "fallback_summary": fallback,
+        },
+        ensure_ascii=False,
+    )
+    data = _chat_llm_json(
+        system,
+        user + "\nReturn JSON only: {\"answer\": string, \"suggested_next_actions\": [string, ...]}.",
+        max_tokens=1600,
+    )
+    if not data:
+        return fallback
+    answer = data.get("answer")
+    return answer.strip() if isinstance(answer, str) and answer.strip() else fallback
+
+
 TOOL_REGISTRY: dict[str, ChemToolSpec] = {
     "resolve_molecule": ChemToolSpec(
         name="resolve_molecule",
@@ -365,16 +628,21 @@ def run_chem_chat(
     if not query:
         raise ValueError("message must not be empty")
 
-    intent = classify_chem_intent(query)
+    plan = _plan_with_llm(query, source_mode=source_mode, research_mode=research_mode)
+    intent = plan["intent"]
+    selected_tools = set(plan["tools"])
+    selected_source_mode = plan.get("source_mode") or source_mode
+    selected_research_mode = plan.get("research_mode") or research_mode
     tools_used: list[str] = []
     artifacts: dict[str, Any] = {}
     answer_lines: list[str] = []
 
     resolved: dict[str, Any] = {"status": "skipped", "query": query}
     resolved_ok = False
-    should_resolve = intent in ("retrosynthesis", "admet", "availability", "safety", "molecule", "mixed")
+    should_resolve = "resolve_molecule" in selected_tools
     if should_resolve:
-        resolved = _resolve_from_message(query)
+        targets = plan.get("target_molecules") or []
+        resolved = _resolve_from_message(str(targets[0])) if targets else _resolve_from_message(query)
         tools_used.append("resolve_molecule")
         artifacts["molecule"] = resolved
         resolved_ok = resolved.get("status") == "ok"
@@ -400,14 +668,14 @@ def run_chem_chat(
     elif should_resolve and intent != "availability":
         answer_lines.append(resolved.get("error") or "Не удалось распознать молекулу через PubChem/RDKit.")
 
-    wants_retro = intent in ("retrosynthesis", "mixed")
-    wants_admet = intent in ("admet", "mixed")
-    wants_availability = intent in ("availability", "mixed")
-    wants_research = intent in ("research", "mixed", "general") or (should_resolve and not resolved_ok)
-    wants_safety_only = intent == "safety"
+    wants_retro = "retrosynthesis_search" in selected_tools
+    wants_admet = "admet_screen" in selected_tools
+    wants_availability = "availability_check" in selected_tools
+    wants_research = "research_analyze" in selected_tools or (should_resolve and not resolved_ok)
+    wants_safety_only = intent == "safety" or selected_tools == {"resolve_molecule", "safety_check"}
 
     if resolved_ok and wants_retro and safety_guard and safety_guard.get("overall_status") != "CRITICAL_STOP":
-        retro = _retro_tool(smiles, top_n=top_n, source_mode=source_mode)
+        retro = _retro_tool(smiles, top_n=top_n, source_mode=selected_source_mode)
         tools_used.append("retrosynthesis_search")
         artifacts["retrosynthesis"] = retro
         answer_lines.extend(_route_summary(retro))
@@ -425,7 +693,7 @@ def run_chem_chat(
         answer_lines.extend(_availability_summary(availability))
 
     if wants_research:
-        research = _research_tool(query, mode=research_mode, max_sources=max_sources)
+        research = _research_tool(query, mode=selected_research_mode, max_sources=max_sources)
         tools_used.append("research_analyze")
         artifacts["research"] = research
         if intent == "general":
@@ -458,10 +726,15 @@ def run_chem_chat(
     if artifacts.get("retrosynthesis", {}).get("routes"):
         suggestions.insert(0, "Выбрать лучший маршрут и посчитать масштаб")
 
+    fallback_answer = "\n".join(answer_lines)
+    answer = _final_answer_with_llm(query, plan, artifacts, fallback_answer)
+
     return {
         "status": "ok",
         "intent": intent,
-        "answer": "\n".join(answer_lines),
+        "model": CHEM_CHAT_MODEL,
+        "plan": plan,
+        "answer": answer,
         "tools_used": tools_used,
         "artifacts": artifacts,
         "suggested_next_actions": suggestions[:4],

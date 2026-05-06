@@ -123,6 +123,7 @@ function AssistantMessage({ message }) {
         </div>
         {result?.tools_used?.length > 0 && (
           <div className="chemchat-tools">
+            {result.model && <span>model: {result.model}</span>}
             {result.tools_used.map(tool => <span key={tool}>{tool}</span>)}
           </div>
         )}

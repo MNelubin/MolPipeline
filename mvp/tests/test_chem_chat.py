@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from ..chem_chat import classify_chem_intent, run_chem_chat
+from ..chem_chat import CHEM_CHAT_MODEL, classify_chem_intent, run_chem_chat
 
 
 def test_general_question_uses_research_without_molecule_resolution():
@@ -14,7 +14,8 @@ def test_general_question_uses_research_without_molecule_resolution():
         "evidence": [],
     }
 
-    with patch("mvp.chem_chat._resolve_molecule") as mock_resolve, \
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule") as mock_resolve, \
          patch("mvp.chem_chat.run_research_workspace", return_value=research_result) as mock_research:
         result = run_chem_chat("Чем SN1 отличается от SN2?")
 
@@ -55,7 +56,8 @@ def test_retrosynthesis_question_extracts_target_and_runs_safety_gate_first():
         "source_errors": {},
     }
 
-    with patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
          patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
          patch("mvp.chem_chat.search_and_rank", return_value=retro), \
          patch("mvp.chem_chat._attach_procedure_steps"):
@@ -65,6 +67,26 @@ def test_retrosynthesis_question_extracts_target_and_runs_safety_gate_first():
     assert result["tools_used"] == ["resolve_molecule", "safety_check", "retrosynthesis_search"]
     assert result["artifacts"]["molecule"]["query_used"] == "aspirin"
     assert "Найдено маршрутов: 1" in result["answer"]
+
+def test_chat_uses_fixed_deepseek_model_for_planning_and_answering():
+    plan = {
+        "intent": "general",
+        "target_molecules": [],
+        "tools": ["research_analyze"],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "general chemistry question",
+    }
+    final = {"answer": "LLM final answer", "suggested_next_actions": []}
+
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, final]) as mock_llm, \
+         patch("mvp.chem_chat.run_research_workspace", return_value={"summary": "tool summary", "sources": [], "evidence": []}):
+        result = run_chem_chat("Explain SN1 vs SN2")
+
+    assert result["model"] == CHEM_CHAT_MODEL == "deepseek/deepseek-v4-flash"
+    assert result["plan"]["used_llm"] is True
+    assert result["answer"] == "LLM final answer"
+    assert mock_llm.call_count == 2
 
 
 def test_safety_stop_blocks_retrosynthesis_tool():
@@ -81,7 +103,8 @@ def test_safety_stop_blocks_retrosynthesis_tool():
         "ppe_recommendations": [],
     }
 
-    with patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
          patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
          patch("mvp.chem_chat.search_and_rank") as mock_retro:
         result = run_chem_chat("найди путь синтеза кокаина")
@@ -108,7 +131,8 @@ def test_availability_question_extracts_multiple_reagents_from_text():
             "availability_level": "catalog",
         }
 
-    with patch("mvp.chem_chat._resolve_molecule", side_effect=fake_resolve), \
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", side_effect=fake_resolve), \
          patch("mvp.chem_chat.check_reagent_availability", side_effect=fake_availability):
         result = run_chem_chat("Можно ли купить бензальдегид и этанол?")
 

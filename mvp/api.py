@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from . import config as _cfg  # noqa: F401
 from .admet import analyze_admet
 from .availability import check_reagent_availability, summarize_availability
-from .chem_chat import TOOL_REGISTRY, run_chem_chat
+from .chem_chat import CHEM_CHAT_MODEL, TOOL_REGISTRY, run_chem_chat
 from .config import DATA_DIR
 from .graph import build_graph
 from .research_workspace import run_research_workspace
@@ -290,6 +290,8 @@ class ChemChatRequest(BaseModel):
 class ChemChatResponse(BaseModel):
     status: str
     intent: str
+    model: str | None = None
+    plan: dict[str, Any] = Field(default_factory=dict)
     answer: str
     tools_used: list[str]
     artifacts: dict[str, Any]
@@ -804,6 +806,7 @@ async def health():
 async def chat_tools():
     """Expose chemistry tools available to the general chat orchestrator."""
     return {
+        "model": CHEM_CHAT_MODEL,
         "tools": [
             {
                 "name": spec.name,
