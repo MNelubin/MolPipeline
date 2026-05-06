@@ -1,11 +1,78 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://hack.humaneconomy.ru'
 
 export function useChemChat() {
   const [status, setStatus] = useState('idle')
   const [messages, setMessages] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [activeSessionId, setActiveSessionId] = useState(null)
   const [error, setError] = useState(null)
+
+  const normalizeStoredMessage = item => {
+    const payload = item.payload || {}
+    return {
+      id: `stored-${item.id}`,
+      role: item.role,
+      content: item.content || '',
+      result: payload.result,
+      progress: payload.progress || [],
+      error: Boolean(payload.error),
+      streaming: false,
+      ts: item.created_at ? Date.parse(item.created_at) : Date.now(),
+    }
+  }
+
+  const refreshSessions = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/chat/sessions?limit=50`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+      const data = await res.json()
+      setSessions(data.sessions || [])
+      return data.sessions || []
+    } catch (e) {
+      console.warn('Failed to load ChemChat sessions', e)
+      return []
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshSessions()
+  }, [refreshSessions])
+
+  const loadSession = useCallback(async sessionId => {
+    if (!sessionId || status === 'running') return null
+    const res = await fetch(`${API_BASE}/chat/sessions/${encodeURIComponent(sessionId)}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+    const data = await res.json()
+    setActiveSessionId(data.id)
+    setMessages((data.messages || []).map(normalizeStoredMessage))
+    setStatus('done')
+    setError(null)
+    return data
+  }, [status])
+
+  const startNewSession = useCallback(() => {
+    if (status === 'running') return
+    setActiveSessionId(null)
+    setMessages([])
+    setStatus('idle')
+    setError(null)
+  }, [status])
+
+  const deleteSession = useCallback(async sessionId => {
+    if (!sessionId || status === 'running') return
+    const res = await fetch(`${API_BASE}/chat/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+    if (activeSessionId === sessionId) {
+      setActiveSessionId(null)
+      setMessages([])
+      setStatus('idle')
+    }
+    await refreshSessions()
+  }, [activeSessionId, refreshSessions, status])
 
   const sendMessage = useCallback(async (message, options = {}) => {
     const text = message.trim()
@@ -40,6 +107,7 @@ export function useChemChat() {
       if (!event) return
       if (event.type === 'final') {
         const data = event.result
+        if (data?.session_id) setActiveSessionId(data.session_id)
         updateAssistant({
           content: data?.answer || 'Результат получен, но текстовый ответ пуст.',
           result: data,
@@ -58,6 +126,7 @@ export function useChemChat() {
         setStatus('error')
         return
       }
+      if (event.session_id) setActiveSessionId(event.session_id)
       updateAssistant(item => ({
         ...item,
         progress: [...(item.progress || []), event],
@@ -78,6 +147,7 @@ export function useChemChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          session_id: options.sessionId || activeSessionId,
           message: text,
           history,
           source_mode: options.sourceMode || 'auto',
@@ -127,6 +197,7 @@ export function useChemChat() {
 
       updateAssistant(item => ({ ...item, streaming: false }))
       setStatus(finalResult ? 'done' : 'done')
+      await refreshSessions()
       return finalResult
     } catch (e) {
       setError(e.message)
@@ -138,19 +209,23 @@ export function useChemChat() {
       setStatus('error')
       throw e
     }
-  }, [messages])
+  }, [activeSessionId, messages, refreshSessions])
 
   const reset = useCallback(() => {
-    setStatus('idle')
-    setMessages([])
-    setError(null)
-  }, [])
+    startNewSession()
+  }, [startNewSession])
 
   return {
     status,
     messages,
+    sessions,
+    activeSessionId,
     error,
     sendMessage,
+    loadSession,
+    startNewSession,
+    deleteSession,
+    refreshSessions,
     reset,
   }
 }

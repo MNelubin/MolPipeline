@@ -18,6 +18,13 @@ const SOURCE_OPTIONS = [
   { id: 'aizynthfinder', label: 'AiZynthFinder' },
 ]
 
+function formatSessionTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 function renderInlineMarkdown(text) {
   const parts = []
   const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|(https?:\/\/[^\s)]+))/g
@@ -299,7 +306,17 @@ export default function ChemChatPage() {
   const [input, setInput] = useState('')
   const [sourceMode, setSourceMode] = useState('auto')
   const textareaRef = useRef(null)
-  const { status, messages, sendMessage, reset } = useChemChat()
+  const {
+    status,
+    messages,
+    sessions,
+    activeSessionId,
+    sendMessage,
+    loadSession,
+    startNewSession,
+    deleteSession,
+    reset,
+  } = useChemChat()
   const isRunning = status === 'running'
 
   const handleSubmit = useCallback(async () => {
@@ -322,6 +339,12 @@ export default function ChemChatPage() {
     textareaRef.current?.focus()
   }, [])
 
+  const handleLoadSession = useCallback(async sessionId => {
+    if (isRunning) return
+    await loadSession(sessionId)
+    textareaRef.current?.focus()
+  }, [isRunning, loadSession])
+
   return (
     <>
       <div className="topbar">
@@ -343,6 +366,51 @@ export default function ChemChatPage() {
             <option key={option.id} value={option.id}>{option.label}</option>
           ))}
         </select>
+      </div>
+
+      <div className="chemchat-session-panel">
+        <button
+          type="button"
+          className="chemchat-session-new"
+          onClick={startNewSession}
+          disabled={isRunning}
+        >
+          Новый чат
+        </button>
+        <div className="chemchat-session-list">
+          {sessions.length === 0 ? (
+            <span className="chemchat-session-empty">История чатов пока пустая</span>
+          ) : (
+            sessions.map(session => (
+              <div
+                key={session.id}
+                className={`chemchat-session-item${session.id === activeSessionId ? ' active' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="chemchat-session-open"
+                  onClick={() => handleLoadSession(session.id)}
+                  disabled={isRunning}
+                  title={session.title}
+                >
+                  <span className="chemchat-session-title">{session.title}</span>
+                  <span className="chemchat-session-meta">
+                    {formatSessionTime(session.updated_at)} · {session.message_count || 0} сообщ.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="chemchat-session-delete"
+                  onClick={() => deleteSession(session.id)}
+                  disabled={isRunning}
+                  aria-label="Удалить чат"
+                >
+                  ×
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <div className="messages chemchat-messages">

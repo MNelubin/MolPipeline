@@ -2726,6 +2726,108 @@ a.ext-link:hover { color: var(--cyan); }
   font-size: 12px;
 }
 
+.chemchat-session-panel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: stretch;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(7, 11, 18, 0.48);
+}
+
+.chemchat-session-new,
+.chemchat-session-open,
+.chemchat-session-delete {
+  border: 1px solid var(--border-hi);
+  background: rgba(255,255,255,0.025);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.chemchat-session-new {
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  color: var(--cyan);
+  border-color: var(--cyan-border);
+  background: var(--cyan-bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.chemchat-session-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 1px;
+}
+
+.chemchat-session-empty {
+  align-self: center;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.chemchat-session-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(130px, 220px) auto;
+  align-items: stretch;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: rgba(18, 29, 46, 0.72);
+  overflow: hidden;
+}
+
+.chemchat-session-item.active {
+  border-color: var(--cyan-border);
+  box-shadow: 0 0 0 1px rgba(6,214,240,0.16);
+}
+
+.chemchat-session-open {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: none;
+  text-align: left;
+  background: transparent;
+}
+
+.chemchat-session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chemchat-session-meta {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.chemchat-session-delete {
+  width: 28px;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-3);
+  background: rgba(255,255,255,0.02);
+  font-size: 16px;
+}
+
+.chemchat-session-new:hover,
+.chemchat-session-open:hover,
+.chemchat-session-delete:hover {
+  color: var(--cyan);
+  background: rgba(6,214,240,0.08);
+}
+
 .chemchat-messages { gap: 18px; }
 
 .chemchat-empty {
@@ -3582,4 +3684,6 @@ a.ext-link:hover { color: var(--cyan); }
   .molecule-editor-header { flex-direction: column; }
   .molecule-editor-actions { justify-content: flex-start; }
   .molecule-editor-shell { min-height: 360px; height: 52vh; }
+  .chemchat-session-panel { grid-template-columns: 1fr; }
+  .chemchat-session-item { grid-template-columns: minmax(150px, 1fr) auto; }
 }
