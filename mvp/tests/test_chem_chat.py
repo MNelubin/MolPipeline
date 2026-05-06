@@ -7,23 +7,48 @@ from unittest.mock import patch
 from ..chem_chat import CHEM_CHAT_MODEL, classify_chem_intent, run_chem_chat
 
 
-def test_general_question_uses_research_without_molecule_resolution():
-    research_result = {
-        "summary": "SN1 идет через карбкатион, SN2 через concerted backside attack.",
-        "sources": [],
-        "evidence": [],
+def test_broad_general_question_answers_directly_without_research():
+    plan = {
+        "intent": "general",
+        "target_molecules": [],
+        "tools": ["research_analyze"],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "broad educational question",
     }
+    final = {"answer": "Химия изучает вещества и их превращения."}
 
-    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, final]), \
          patch("mvp.chem_chat._resolve_molecule") as mock_resolve, \
-         patch("mvp.chem_chat.run_research_workspace", return_value=research_result) as mock_research:
-        result = run_chem_chat("Чем SN1 отличается от SN2?")
+         patch("mvp.chem_chat.run_research_workspace") as mock_research:
+        result = run_chem_chat("что такое химия и какие самые популярные элементы там")
 
     assert result["intent"] == "general"
-    assert result["tools_used"] == ["research_analyze"]
-    assert "общий химический research-режим" in result["answer"]
+    assert result["tools_used"] == []
+    assert result["answer"] == "Химия изучает вещества и их превращения."
     mock_resolve.assert_not_called()
-    mock_research.assert_called_once()
+    mock_research.assert_not_called()
+
+
+def test_broad_general_question_falls_back_when_model_refuses_russian():
+    plan = {
+        "intent": "general",
+        "target_molecules": [],
+        "tools": [],
+        "source_mode": "auto",
+        "research_mode": "literature",
+        "reasoning": "broad educational question",
+    }
+    refusal = {"answer": "Извините, я не могу распознать ваш запрос. Пожалуйста, уточните."}
+
+    with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, refusal]), \
+         patch("mvp.chem_chat.run_research_workspace") as mock_research:
+        result = run_chem_chat("что такое химия и какие самые популярные элементы там")
+
+    assert "Химия — это наука о веществах" in result["answer"]
+    assert "водород" in result["answer"]
+    assert result["tools_used"] == []
+    mock_research.assert_not_called()
 
 
 def test_retrosynthesis_question_extracts_target_and_runs_safety_gate_first():
@@ -72,7 +97,7 @@ def test_chat_uses_fixed_deepseek_model_for_planning_and_answering():
     plan = {
         "intent": "general",
         "target_molecules": [],
-        "tools": ["research_analyze"],
+        "tools": [],
         "source_mode": "auto",
         "research_mode": "literature",
         "reasoning": "general chemistry question",
@@ -80,13 +105,14 @@ def test_chat_uses_fixed_deepseek_model_for_planning_and_answering():
     final = {"answer": "LLM final answer", "suggested_next_actions": []}
 
     with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, final]) as mock_llm, \
-         patch("mvp.chem_chat.run_research_workspace", return_value={"summary": "tool summary", "sources": [], "evidence": []}):
+         patch("mvp.chem_chat.run_research_workspace") as mock_research:
         result = run_chem_chat("Explain SN1 vs SN2")
 
     assert result["model"] == CHEM_CHAT_MODEL == "deepseek/deepseek-v4-flash"
     assert result["plan"]["used_llm"] is True
     assert result["answer"] == "LLM final answer"
     assert mock_llm.call_count == 2
+    mock_research.assert_not_called()
 
 
 def test_chat_emits_progress_events():
@@ -94,20 +120,21 @@ def test_chat_emits_progress_events():
     plan = {
         "intent": "general",
         "target_molecules": [],
-        "tools": ["research_analyze"],
+        "tools": [],
         "source_mode": "auto",
         "research_mode": "literature",
         "reasoning": "general chemistry question",
     }
 
     with patch("mvp.chem_chat._chat_llm_json", side_effect=[plan, {"answer": "ok"}]), \
-         patch("mvp.chem_chat.run_research_workspace", return_value={"summary": "tool summary", "sources": [], "evidence": []}):
+         patch("mvp.chem_chat.run_research_workspace") as mock_research:
         run_chem_chat("Explain SN1 vs SN2", progress_callback=events.append)
 
     event_types = [event["type"] for event in events]
     assert "plan" in event_types
-    assert any(event.get("tool") == "research_analyze" and event["type"] == "tool_start" for event in events)
+    assert not any(event["type"] == "tool_start" for event in events)
     assert any(event.get("stage") == "final_answer" for event in events)
+    mock_research.assert_not_called()
 
 
 def test_safety_stop_blocks_retrosynthesis_tool():

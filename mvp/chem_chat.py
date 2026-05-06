@@ -316,9 +316,11 @@ def _normalize_llm_plan(plan: dict[str, Any] | None, message: str) -> dict[str, 
     raw_tools = plan.get("tools")
     tools = [str(tool).strip() for tool in raw_tools] if isinstance(raw_tools, list) else []
     tools = [tool for tool in tools if tool in VALID_TOOLS]
+    if intent == "general" and tools == ["research_analyze"] and _is_broad_educational_question(message):
+        tools = []
     if not tools:
         if intent == "general":
-            tools = ["research_analyze"]
+            tools = []
         elif intent == "retrosynthesis":
             tools = ["resolve_molecule", "safety_check", "retrosynthesis_search"]
         elif intent == "admet":
@@ -365,6 +367,21 @@ def _normalize_llm_plan(plan: dict[str, Any] | None, message: str) -> dict[str, 
     }
 
 
+def _is_broad_educational_question(message: str) -> bool:
+    text = message.casefold()
+    broad_markers = (
+        "что такое", "расскажи про", "объясни", "какие самые", "в чем разница",
+        "what is", "explain", "overview", "basics",
+    )
+    research_markers = (
+        "источник", "источники", "ссылка", "ссылки", "литература", "статья", "статьи",
+        "pubmed", "patent", "paper", "evidence", "source", "sources", "citation",
+    )
+    return any(marker in text for marker in broad_markers) and not any(
+        marker in text for marker in research_markers
+    )
+
+
 def _plan_with_llm(message: str, source_mode: str, research_mode: str) -> dict[str, Any]:
     system = (
         "You are the planner for MolPipeline ChemChat, a chemistry-specific assistant. "
@@ -374,8 +391,9 @@ def _plan_with_llm(message: str, source_mode: str, research_mode: str) -> dict[s
         "intent must be one of: general, molecule, safety, retrosynthesis, availability, admet, research, mixed. "
         "tools must be selected from: resolve_molecule, safety_check, retrosynthesis_search, "
         "availability_check, admet_screen, research_analyze. "
+        "For broad educational questions such as definitions, basic concepts, or simple comparisons, use an empty tools list. "
+        "Use research_analyze only when the user explicitly asks for sources, literature, web evidence, PubMed, papers, patents, or current/external data. "
         "For synthesis/route/retrosynthesis requests include resolve_molecule, safety_check, retrosynthesis_search. "
-        "For general chemistry questions that do not need a concrete molecule, use research_analyze only. "
         "For supplier/price/buyability requests use availability_check and extract every reagent if possible. "
         "For safety/ADMET requests include resolve_molecule and safety_check. "
         "target_molecules should contain English/common molecule names or SMILES extracted from the user text."
@@ -477,8 +495,9 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
 def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[str, Any], fallback: str) -> str:
     system = (
         "You are MolPipeline ChemChat running on deepseek/deepseek-v4-flash. "
-        "Answer in the user's language, usually Russian. "
+        "Answer in the user's language, usually Russian; Russian Cyrillic text is valid user input. "
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
+        "If no tools were selected, answer as a normal chemistry tutor from general chemistry knowledge and use fallback_summary as guidance. "
         "Do not invent synthesis routes, prices, safety classifications or citations. "
         "When research/web sources include URLs, cite them as Markdown links: [title](url). "
         "If tools did not find enough data, say exactly what is missing and what to try next. "
@@ -502,7 +521,41 @@ def _final_answer_with_llm(message: str, plan: dict[str, Any], artifacts: dict[s
         return _append_research_source_links(fallback, artifacts)
     answer = data.get("answer")
     answer_text = answer.strip() if isinstance(answer, str) and answer.strip() else fallback
+    if fallback and _looks_like_unhelpful_refusal(answer_text):
+        answer_text = fallback
     return _append_research_source_links(answer_text, artifacts)
+
+
+def _looks_like_unhelpful_refusal(answer: str) -> bool:
+    text = answer.casefold()
+    markers = (
+        "не могу распознать",
+        "не могу понять",
+        "уточните, что именно",
+        "please clarify",
+        "cannot recognize",
+        "can't recognize",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _direct_general_fallback(message: str) -> str:
+    text = message.casefold()
+    if "хим" in text and ("элемент" in text or "популяр" in text or "что такое" in text):
+        return (
+            "Химия — это наука о веществах: из чего они состоят, как устроены, "
+            "какими свойствами обладают и как превращаются друг в друга в реакциях.\n\n"
+            "Если под «популярными элементами» понимать самые часто встречающиеся и важные в учебной/практической химии, "
+            "то обычно называют: **водород (H)**, **кислород (O)**, **углерод (C)**, **азот (N)**, "
+            "**натрий (Na)**, **хлор (Cl)**, **железо (Fe)**, **алюминий (Al)**, **кремний (Si)**, "
+            "**кальций (Ca)**, **сера (S)** и **фосфор (P)**.\n\n"
+            "Важно: «популярность» можно понимать по-разному — распространенность в земной коре, роль в живых организмах, "
+            "частота в промышленности или частота в школьной программе."
+        )
+    return (
+        "Это общий химический вопрос, для него не нужен отдельный инструмент MolPipeline. "
+        "Я могу объяснить базовую теорию, привести примеры или перейти к конкретной молекуле/реакции."
+    )
 
 
 def _append_research_source_links(answer: str, artifacts: dict[str, Any]) -> str:
@@ -846,11 +899,27 @@ def run_chem_chat(
             "Могу продолжить в режим ретросинтеза, ADMET, поставщиков или исследования по этой молекуле."
         )
 
-    suggestions = [
-        "Построить ретросинтез и сравнить маршруты",
-        "Проверить доступность исходных реагентов",
-        "Сделать ADMET и safety-разбор",
-    ]
+    if intent == "general" and not tools_used:
+        answer_lines.append(_direct_general_fallback(query))
+
+    if not tools_used and intent == "general":
+        suggestions = [
+            "Объяснить на примерах из органической химии",
+            "Показать самые распространенные элементы по критериям",
+            "Перейти к вопросу про конкретную молекулу",
+        ]
+    elif "research_analyze" in tools_used:
+        suggestions = [
+            "Попросить источники и ссылки подробнее",
+            "Сузить вопрос до конкретной реакции или молекулы",
+            "Сравнить найденные данные с ADMET/safety",
+        ]
+    else:
+        suggestions = [
+            "Построить ретросинтез и сравнить маршруты",
+            "Проверить доступность исходных реагентов",
+            "Сделать ADMET и safety-разбор",
+        ]
     if artifacts.get("retrosynthesis", {}).get("routes"):
         suggestions.insert(0, "Выбрать лучший маршрут и посчитать масштаб")
 

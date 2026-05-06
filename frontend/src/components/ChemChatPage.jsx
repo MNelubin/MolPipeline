@@ -92,6 +92,16 @@ function MarkdownText({ text }) {
     tableRows = []
   }
 
+  const isTableLine = (line, index) => {
+    if (!line.includes('|')) return false
+    if (/^[-*]\s+/.test(line)) return false
+    if (/\[[^\]]+\]\(https?:\/\/[^)]+\)/.test(line)) return false
+    const currentLooksTable = /^\|.+\|$/.test(line) || line.split('|').length >= 4
+    const next = lines[index + 1]?.trim() || ''
+    const nextIsSeparator = /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(next)
+    return currentLooksTable && (nextIsSeparator || tableRows.length > 0)
+  }
+
   lines.forEach((line, index) => {
     const trimmed = line.trim()
     if (!trimmed) {
@@ -99,7 +109,7 @@ function MarkdownText({ text }) {
       flushTable()
       return
     }
-    if (trimmed.includes('|') && trimmed.split('|').length >= 3) {
+    if (isTableLine(trimmed, index)) {
       flushList()
       tableRows.push(trimmed)
       return
