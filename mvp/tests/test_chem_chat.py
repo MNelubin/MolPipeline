@@ -142,7 +142,7 @@ def test_chat_passes_recent_history_to_planner_and_final_answer():
     plan = {
         "intent": "admet",
         "target_molecules": ["aspirin"],
-        "tools": ["resolve_molecule", "safety_check", "admet_screen"],
+        "tools": ["resolve_molecule", "research_analyze"],
         "source_mode": "auto",
         "research_mode": "literature",
         "reasoning": "follow-up asks for ADMET of previous aspirin target",
@@ -172,10 +172,12 @@ def test_chat_passes_recent_history_to_planner_and_final_answer():
     with patch("mvp.chem_chat._chat_llm_json", side_effect=fake_llm), \
          patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
          patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
+         patch("mvp.chem_chat.run_research_workspace") as mock_research, \
          patch("mvp.chem_chat.analyze_admet", return_value=admet):
         result = run_chem_chat("а теперь проверь ADMET", history=history)
 
     assert result["tools_used"] == ["resolve_molecule", "safety_check", "admet_screen"]
+    mock_research.assert_not_called()
     assert "conversation_history" in captured_payloads[0]
     assert "Найди путь синтеза аспирина" in captured_payloads[0]
     assert "conversation_history" in captured_payloads[1]

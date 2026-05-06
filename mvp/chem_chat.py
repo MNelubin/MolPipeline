@@ -335,6 +335,21 @@ def _normalize_llm_plan(
     raw_tools = plan.get("tools")
     tools = [str(tool).strip() for tool in raw_tools] if isinstance(raw_tools, list) else []
     tools = [tool for tool in tools if tool in VALID_TOOLS]
+
+    # Keep the model as planner, but reconcile impossible plans where intent and
+    # tools disagree. Otherwise a follow-up like "now check ADMET" can be routed
+    # to research without ever calling the ADMET pipeline.
+    if intent == "retrosynthesis" and "retrosynthesis_search" not in tools:
+        tools.append("retrosynthesis_search")
+    if intent == "admet" and "admet_screen" not in tools:
+        tools.append("admet_screen")
+    if intent in {"safety", "molecule"} and "safety_check" not in tools:
+        tools.append("safety_check")
+    if any(tool in tools for tool in {"retrosynthesis_search", "admet_screen", "safety_check"}) and "resolve_molecule" not in tools:
+        tools.insert(0, "resolve_molecule")
+    if intent in {"retrosynthesis", "admet", "safety", "molecule"} and not _mentions_external_evidence(message):
+        tools = [tool for tool in tools if tool != "research_analyze"]
+
     if (
         intent == "general"
         and tools == ["research_analyze"]
@@ -393,13 +408,16 @@ def _is_broad_educational_question(message: str) -> bool:
         "что такое", "расскажи про", "объясни", "какие самые", "в чем разница",
         "what is", "explain", "overview", "basics",
     )
+    return any(marker in text for marker in broad_markers) and not _mentions_external_evidence(message)
+
+
+def _mentions_external_evidence(message: str) -> bool:
+    text = message.casefold()
     research_markers = (
         "источник", "источники", "ссылка", "ссылки", "литература", "статья", "статьи",
-        "pubmed", "patent", "paper", "evidence", "source", "sources", "citation",
+        "web", "pubmed", "patent", "paper", "evidence", "source", "sources", "citation",
     )
-    return any(marker in text for marker in broad_markers) and not any(
-        marker in text for marker in research_markers
-    )
+    return any(marker in text for marker in research_markers)
 
 
 def _plan_with_llm(
