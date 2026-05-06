@@ -118,3 +118,4 @@ def test_availability_question_extracts_multiple_reagents_from_text():
 
 def test_intent_classifier_routes_non_molecule_questions_to_general():
     assert classify_chem_intent("Почему реакция Гриньяра боится воды?") == "general"
+    assert classify_chem_intent("safety aspirin") == "safety"

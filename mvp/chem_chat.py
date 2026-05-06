@@ -277,7 +277,10 @@ def classify_chem_intent(message: str) -> Intent:
     admet_words = ("admet", "фармако", "абсорб", "токсикокин", "drug", "bbb", "lipinski")
     availability_words = ("постав", "купить", "цена", "стоимость", "доступ", "supplier", "buy", "price")
     research_words = ("литератур", "патент", "стать", "исслед", "pubmed", "patent", "paper", "evidence")
-    safety_words = ("безопас", "опас", "ghs", "сиз", "ppe", "ban", "запрещ")
+    safety_words = (
+        "безопас", "опас", "ghs", "сиз", "ppe", "ban", "запрещ",
+        "safety", "hazard", "risk", "toxic", "toxicity",
+    )
     molecule_words = ("молекул", "веществ", "соединен", "smiles", "cas", "формул", "масса")
 
     hits = {
