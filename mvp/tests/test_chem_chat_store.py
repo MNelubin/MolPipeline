@@ -62,6 +62,48 @@ def test_store_scopes_sessions_by_client_id(monkeypatch, tmp_path):
     assert chem_chat_store.get_session(first_id, client_id="client-a") is not None
 
 
+def test_context_messages_include_compact_tool_memory(monkeypatch, tmp_path):
+    _use_temp_store(monkeypatch, tmp_path)
+
+    session_id = chem_chat_store.ensure_session(None, "Find aspirin route", "auto", client_id="client-a")
+    chem_chat_store.append_message(session_id, "user", "Find aspirin route")
+    chem_chat_store.append_message(
+        session_id,
+        "assistant",
+        "Aspirin route found.",
+        {
+            "result": {
+                "tools_used": ["resolve_molecule", "retrosynthesis_search"],
+                "artifacts": {
+                    "molecule": {
+                        "query_used": "aspirin",
+                        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+                        "pubchem_cid": 2244,
+                        "validation": {"molecular_formula": "C9H8O4"},
+                    },
+                    "retrosynthesis": {
+                        "total_found": 1,
+                        "total_unique": 1,
+                        "sources_used": ["ord"],
+                        "routes": [{
+                            "source": "ord",
+                            "final_score": 0.86,
+                            "reactants": "CC(=O)OC(C)=O.O=C(O)c1ccccc1O",
+                        }],
+                    },
+                },
+            },
+        },
+    )
+
+    context = chem_chat_store.get_context_messages(session_id, client_id="client-a")
+    assert context[-1]["role"] == "assistant"
+    assert "Tool memory from previous assistant turn" in context[-1]["content"]
+    assert "molecule: label=aspirin" in context[-1]["content"]
+    assert "route_1:" in context[-1]["content"]
+    assert "CC(=O)OC(C)=O.O=C(O)c1ccccc1O" in context[-1]["content"]
+
+
 def test_chat_request_persists_user_and_assistant_messages(monkeypatch, tmp_path):
     _use_temp_store(monkeypatch, tmp_path)
     result_payload = {

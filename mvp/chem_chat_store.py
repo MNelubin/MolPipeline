@@ -187,6 +187,107 @@ def append_message(
     }
 
 
+def _short_text(value: Any, limit: int = 240) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
+def _compact_tool_memory(payload: dict[str, Any]) -> str:
+    result = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(result, dict):
+        return ""
+    artifacts = result.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return ""
+
+    lines: list[str] = []
+    tools = result.get("tools_used") or []
+    if tools:
+        lines.append(f"tools_used: {', '.join(str(tool) for tool in tools[:8])}")
+
+    molecule = artifacts.get("molecule") or {}
+    if molecule:
+        validation = molecule.get("validation") or {}
+        label = molecule.get("query_used") or molecule.get("query")
+        parts = [
+            f"label={_short_text(label, 80)}" if label else "",
+            f"smiles={molecule.get('smiles')}" if molecule.get("smiles") else "",
+            f"formula={validation.get('molecular_formula')}" if validation.get("molecular_formula") else "",
+            f"cid={molecule.get('pubchem_cid')}" if molecule.get("pubchem_cid") else "",
+        ]
+        lines.append("molecule: " + "; ".join(part for part in parts if part))
+
+    safety = artifacts.get("safety") or {}
+    if safety:
+        reason = (
+            (safety.get("molecule_check") or {}).get("reason")
+            or (safety.get("explosive_check") or {}).get("reason")
+            or (safety.get("reaction_check") or {}).get("reason")
+        )
+        lines.append(
+            "safety: "
+            f"overall={safety.get('overall_status') or 'UNKNOWN'}"
+            + (f"; reason={_short_text(reason, 180)}" if reason else "")
+        )
+
+    retro = artifacts.get("retrosynthesis") or {}
+    routes = retro.get("routes") or []
+    if retro:
+        lines.append(
+            "retrosynthesis: "
+            f"total_found={retro.get('total_found')}; "
+            f"total_unique={retro.get('total_unique')}; "
+            f"sources={', '.join(str(source) for source in (retro.get('sources_used') or [])[:6])}"
+        )
+        for index, route in enumerate(routes[:3], start=1):
+            lines.append(
+                f"route_{index}: "
+                f"source={route.get('source_label') or route.get('source')}; "
+                f"score={route.get('final_score')}; "
+                f"reactants={_short_text(route.get('reactants'), 360)}"
+            )
+
+    availability = artifacts.get("availability") or {}
+    items = availability.get("items") or []
+    if availability:
+        lines.append(f"availability: summary={_short_text(availability.get('summary'), 360)}")
+        for index, item in enumerate(items[:8], start=1):
+            lines.append(
+                f"availability_item_{index}: "
+                f"label={_short_text(item.get('label') or item.get('input'), 120)}; "
+                f"smiles={item.get('smiles') or item.get('canonical_smiles')}; "
+                f"available={item.get('available')}; "
+                f"source={item.get('source_label') or item.get('source')}; "
+                f"ppg={item.get('ppg')}"
+            )
+
+    admet = artifacts.get("admet") or {}
+    if admet:
+        overall = admet.get("overall") or {}
+        lines.append(
+            "admet: "
+            f"score={overall.get('score')}; "
+            f"risk={overall.get('risk_level')}; "
+            f"safety_overlay={_short_text(admet.get('safety_overlay'), 260)}"
+        )
+
+    research = artifacts.get("research") or {}
+    if research:
+        lines.append(f"research: summary={_short_text(research.get('summary'), 420)}")
+        for index, source in enumerate((research.get("sources") or [])[:6], start=1):
+            lines.append(
+                f"source_{index}: "
+                f"title={_short_text(source.get('title') or source.get('name'), 160)}; "
+                f"url={source.get('url')}"
+            )
+
+    if not lines:
+        return ""
+    return "[Tool memory from previous assistant turn]\n" + "\n".join(lines[:32])
+
+
 def list_sessions(limit: int = 50, client_id: str | None = None) -> list[dict[str, Any]]:
     safe_client_id = _safe_client_id(client_id)
     with _connect() as conn:
@@ -269,11 +370,19 @@ def get_context_messages(
     if not session:
         return []
     messages = session.get("messages", [])
-    return [
-        {"role": item["role"], "content": item["content"]}
-        for item in messages
-        if item.get("role") in {"user", "assistant"} and item.get("content")
-    ][-limit:]
+    context: list[dict[str, str]] = []
+    for item in messages:
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant"} or not content:
+            continue
+        text = str(content)
+        if role == "assistant":
+            memory = _compact_tool_memory(item.get("payload") or {})
+            if memory:
+                text = f"{text}\n\n{memory}"
+        context.append({"role": role, "content": text[:6000]})
+    return context[-limit:]
 
 
 def delete_session(session_id: str, client_id: str | None = None) -> bool:
