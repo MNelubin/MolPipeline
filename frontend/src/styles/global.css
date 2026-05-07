@@ -1685,6 +1685,196 @@ a.ext-link:hover { color: var(--cyan); }
   text-align: right;
 }
 
+.retro-tree-block {
+  border: 1px solid var(--cyan-border);
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(circle at top left, rgba(6,214,240,0.10), transparent 34%),
+    rgba(6, 214, 240, 0.035);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.retro-tree-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.retro-tree-header p {
+  margin: 3px 0 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.retro-tree-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 220px;
+}
+
+.retro-tree-stats span,
+.retro-tree-selected span,
+.retro-tree-route span {
+  color: var(--cyan);
+  border: 1px solid var(--cyan-border);
+  background: var(--cyan-bg);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.retro-tree-selected {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.retro-tree-selected code,
+.retro-tree-route code {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.retro-tree-canvas {
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.retro-tree-node {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: rgba(7, 11, 18, 0.58);
+  padding: 9px;
+  margin-top: 8px;
+}
+
+.retro-tree-node.root {
+  margin-top: 0;
+  border-color: var(--cyan-border);
+}
+
+.retro-tree-node.status-buyable,
+.retro-tree-node.status-restricted {
+  border-color: var(--green-border);
+}
+
+.retro-tree-node.status-unresolved,
+.retro-tree-node.status-depth_limit,
+.retro-tree-node.status-timeout,
+.retro-tree-node.status-circular,
+.retro-tree-node.status-invalid_smiles {
+  border-color: var(--amber-border);
+}
+
+.retro-tree-node.status-banned {
+  border-color: var(--red-border);
+}
+
+.retro-tree-node-main {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.retro-tree-depth,
+.retro-tree-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.retro-tree-depth {
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.retro-tree-status {
+  color: var(--text-2);
+  border: 1px solid var(--border-hi);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.retro-tree-status.status-buyable,
+.retro-tree-status.status-restricted {
+  color: var(--green);
+  border-color: var(--green-border);
+  background: var(--green-bg);
+}
+
+.retro-tree-status.status-unresolved,
+.retro-tree-status.status-depth_limit,
+.retro-tree-status.status-timeout,
+.retro-tree-status.status-circular,
+.retro-tree-status.status-invalid_smiles {
+  color: var(--amber);
+  border-color: var(--amber-border);
+  background: var(--amber-bg);
+}
+
+.retro-tree-status.status-banned {
+  color: var(--red);
+  border-color: var(--red-border);
+  background: var(--red-bg);
+}
+
+.retro-tree-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.retro-tree-title strong {
+  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.retro-tree-title code {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  word-break: break-all;
+}
+
+.retro-tree-route {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--border);
+}
+
+.retro-tree-warning {
+  margin-top: 7px;
+  color: var(--amber);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.retro-tree-children {
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border-hi);
+}
+
 .score-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

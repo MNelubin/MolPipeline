@@ -49,6 +49,18 @@ const AVAILABILITY_LEVEL_LABEL = {
   invalid: 'Ошибка',
 }
 
+const TREE_STATUS_LABEL = {
+  intermediate: 'Промежуточный узел',
+  buyable: 'Доступен',
+  restricted: 'Доступен с ограничениями',
+  unresolved: 'Не раскрыт',
+  banned: 'Заблокирован',
+  depth_limit: 'Лимит глубины',
+  timeout: 'Таймаут',
+  circular: 'Цикл',
+  invalid_smiles: 'Ошибка SMILES',
+}
+
 function ScoreBar({ value, max = 1 }) {
   const pct = Math.round((value / max) * 100)
   const level = pct > 70 ? 'high' : pct > 40 ? 'medium' : 'low'
@@ -58,6 +70,87 @@ function ScoreBar({ value, max = 1 }) {
         <div className={`score-fill ${level}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="score-value">{value.toFixed(2)}</span>
+    </div>
+  )
+}
+
+function formatTreeName(node) {
+  return node.name || node.smiles || 'unknown'
+}
+
+function TreeNode({ node, isRoot = false }) {
+  if (!node) return null
+  const children = node.children || []
+  const route = node.route || null
+  const status = node.status || 'unknown'
+
+  return (
+    <div className={`retro-tree-node status-${status}${isRoot ? ' root' : ''}`}>
+      <div className="retro-tree-node-main">
+        <span className="retro-tree-depth">d{node.depth ?? 0}</span>
+        <span className={`retro-tree-status status-${status}`}>
+          {isRoot ? 'Цель' : (TREE_STATUS_LABEL[status] || status)}
+        </span>
+        <div className="retro-tree-title">
+          <strong>{formatTreeName(node)}</strong>
+          {node.smiles && node.name && <code>{node.smiles}</code>}
+        </div>
+      </div>
+
+      {route?.reactants && (
+        <div className="retro-tree-route">
+          <span>Разбиение</span>
+          <code>{route.reactants}</code>
+        </div>
+      )}
+
+      {node.guard?.status && node.guard.status !== 'clear' && (
+        <div className="retro-tree-warning">
+          {node.guard.reason || node.guard.status}
+        </div>
+      )}
+
+      {children.length > 0 && (
+        <div className="retro-tree-children">
+          {children.map((child, index) => (
+            <TreeNode key={`${child.smiles || child.status}-${index}`} node={child} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MultiStepTreeBlock({ treeResult }) {
+  const tree = treeResult?.tree
+  const stats = treeResult?.stats || {}
+  if (!tree) return null
+
+  return (
+    <div className="retro-tree-block">
+      <div className="retro-tree-header">
+        <div>
+          <div className="section-title">Многостадийное дерево ретросинтеза</div>
+          <p>Расширение лучшего маршрута до доступных или нераскрытых исходных веществ.</p>
+        </div>
+        <div className="retro-tree-stats">
+          <span>узлов: {stats.total_nodes ?? 'n/a'}</span>
+          <span>доступно: {stats.buyable_count ?? 0}</span>
+          <span>не раскрыто: {stats.unresolved_count ?? 0}</span>
+          <span>глубина: {stats.max_depth_reached ?? 0}</span>
+        </div>
+      </div>
+
+      {treeResult.selected_route?.reactants && (
+        <div className="retro-tree-selected">
+          <span>Выбранный one-step маршрут</span>
+          <code>{treeResult.selected_route.reactants}</code>
+        </div>
+      )}
+
+      <div className="retro-tree-canvas">
+        <TreeNode node={tree} isRoot />
+      </div>
     </div>
   )
 }
@@ -241,6 +334,7 @@ export default function RetroCard({ retroResult }) {
 
   const totalUnique = retroResult.total_unique || routes.length
   const searchMode = retroResult.source_mode || 'auto'
+  const multiStepTree = retroResult.multi_step_tree
 
   return (
     <div>
@@ -267,6 +361,8 @@ export default function RetroCard({ retroResult }) {
           </div>
         </div>
       </div>
+
+      {multiStepTree && <MultiStepTreeBlock treeResult={multiStepTree} />}
 
       {routes.length === 0 ? (
         <div className="retro-empty">Маршруты синтеза не найдены</div>
