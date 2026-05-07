@@ -55,13 +55,14 @@ def _find_top_routes(smiles: str, top_n: int = 5) -> list[dict[str, Any]]:
     """Find up to top_n ranked routes using the shared retrosynthesis collectors."""
     search_smiles = _canonicalize(smiles) or smiles
     try:
-        results, _sources = collect_candidate_routes(
+        collected = collect_candidate_routes(
             search_smiles,
             ord_limit=top_n * 3,
             model_top_n=top_n + 2,
             use_web=False,
             include_experimental=RETRO_TREE_INCLUDE_EXPERIMENTAL,
         )
+        results = collected[0]
     except Exception as e:
         logger.warning("[tree] route collection failed for %s: %s", search_smiles[:30], e)
         return []
