@@ -25,6 +25,7 @@ from ..tools import (
     get_smiles_by_cid,
     get_compound_properties,
     banlist_check,
+    build_safety_taxonomy,
     explosive_alias_check,
     explosive_hazard_check,
     reaction_banlist_check,
@@ -296,12 +297,13 @@ def _determine_overall_status(
     mol_status: str,
     rxn_status: str,
     explosive_status: str = "clear",
+    taxonomy_status: str = "clear",
 ) -> Literal["SAFE", "WARNING", "CRITICAL_STOP"]:
     critical = {"banned", "prohibited", "blocked"}
     warning = {"restricted", "warning"}
-    if mol_status in critical or rxn_status in critical or explosive_status in critical:
+    if mol_status in critical or rxn_status in critical or explosive_status in critical or taxonomy_status in critical:
         return "CRITICAL_STOP"
-    if mol_status in warning or rxn_status in warning or explosive_status in warning:
+    if mol_status in warning or rxn_status in warning or explosive_status in warning or taxonomy_status in warning:
         return "WARNING"
     return "SAFE"
 
@@ -319,6 +321,12 @@ def _run_safety_checks(
         alias_check = explosive_alias_check(reaction_description)
         if alias_check.get("status") != "clear":
             explosive_check = alias_check
+    taxonomy = build_safety_taxonomy(
+        molecule_check=mol_check,
+        reaction_check=rxn_check,
+        explosive_check=explosive_check,
+        safety_data=safety,
+    )
 
     h_phrases_str = ",".join(safety.get("h_phrases", []))
     ppe = ppe_recommender(smiles, h_phrases_str)
@@ -327,12 +335,14 @@ def _run_safety_checks(
         mol_status=mol_check.get("status", "clear"),
         rxn_status=rxn_check.get("status", "allowed"),
         explosive_status=explosive_check.get("status", "clear"),
+        taxonomy_status=taxonomy.get("status", "clear"),
     )
 
     return {
         "overall_status": overall,
         "molecule_check": mol_check,
         "explosive_check": explosive_check,
+        "safety_taxonomy": taxonomy,
         "reaction_check": rxn_check,
         "safety_data": safety,
         "ppe_recommendations": ppe,

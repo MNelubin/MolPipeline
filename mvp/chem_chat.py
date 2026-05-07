@@ -639,13 +639,26 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
         }
     safety = artifacts.get("safety")
     if safety:
+        taxonomy = safety.get("safety_taxonomy") or {}
         compact["safety"] = {
             "overall_status": safety.get("overall_status"),
+            "taxonomy_status": taxonomy.get("status"),
+            "taxonomy_categories": [
+                {
+                    "type": item.get("hazard_type"),
+                    "status": item.get("status"),
+                    "level": item.get("danger_level"),
+                    "reason": item.get("reason"),
+                    "h_codes": item.get("h_codes"),
+                }
+                for item in (taxonomy.get("categories") or [])[:8]
+            ],
             "molecule_status": (safety.get("molecule_check") or {}).get("status"),
             "explosive_status": (safety.get("explosive_check") or {}).get("status"),
             "explosive_reason": (safety.get("explosive_check") or {}).get("reason"),
-            "reason": (safety.get("molecule_check") or {}).get("reason")
+            "reason": (((taxonomy.get("blocked_categories") or taxonomy.get("warning_categories") or [{}])[0]).get("reason"))
             or (safety.get("explosive_check") or {}).get("reason")
+            or (safety.get("molecule_check") or {}).get("reason")
             or (safety.get("reaction_check") or {}).get("reason"),
             "h_phrases": (safety.get("safety_data") or {}).get("h_phrases", [])[:6],
         }
@@ -1149,8 +1162,9 @@ def run_chem_chat(
         answer_lines.append(f"Целевая молекула: {query_used}; SMILES `{smiles}`. Safety gate: {status}.")
         if status == "CRITICAL_STOP":
             reason = (
-                safety_guard.get("molecule_check", {}).get("reason")
+                (((safety_guard.get("safety_taxonomy") or {}).get("blocked_categories") or [{}])[0].get("reason"))
                 or safety_guard.get("explosive_check", {}).get("reason")
+                or safety_guard.get("molecule_check", {}).get("reason")
                 or safety_guard.get("reaction_check", {}).get("reason")
                 or "критический safety-stop"
             )
@@ -1272,8 +1286,15 @@ def run_chem_chat(
 
     if resolved_ok and wants_safety_only and safety_guard:
         mol_check = safety_guard.get("molecule_check", {})
+        taxonomy = safety_guard.get("safety_taxonomy") or {}
         h_phrases = safety_guard.get("safety_data", {}).get("h_phrases") or []
-        answer_lines.append(mol_check.get("reason") or "Критичных banlist-флагов не найдено.")
+        safety_reason = (
+            (((taxonomy.get("blocked_categories") or taxonomy.get("warning_categories") or [{}])[0]).get("reason"))
+            or (safety_guard.get("explosive_check") or {}).get("reason")
+            or mol_check.get("reason")
+            or "Критичных safety-флагов не найдено."
+        )
+        answer_lines.append(safety_reason)
         if h_phrases:
             answer_lines.append(f"GHS-фразы: {', '.join(h_phrases[:5])}.")
 

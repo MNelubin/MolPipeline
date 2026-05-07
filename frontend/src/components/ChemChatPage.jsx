@@ -176,6 +176,12 @@ function ArtifactBlock({ result }) {
   const admet = artifacts.admet
   const availability = artifacts.availability
   const research = artifacts.research
+  const safetyCategories = safety?.safety_taxonomy?.categories || []
+  const safetyPrimaryReason = safety?.safety_taxonomy?.blocked_categories?.[0]?.reason
+    || safety?.explosive_check?.reason
+    || safety?.safety_taxonomy?.warning_categories?.[0]?.reason
+    || safety?.molecule_check?.reason
+    || safety?.reaction_check?.reason
 
   return (
     <div className="chemchat-artifacts">
@@ -201,11 +207,21 @@ function ArtifactBlock({ result }) {
         <div className={`chemchat-artifact-card safety-${safety.overall_status || 'SAFE'}`}>
           <div className="chemchat-artifact-title">Safety gate</div>
           <div className="chemchat-status-line">{safety.overall_status || 'UNKNOWN'}</div>
-          <p>{safety.molecule_check?.reason || safety.explosive_check?.reason || safety.reaction_check?.reason || 'Критичных флагов не найдено.'}</p>
+          <p>{safetyPrimaryReason || 'Критичных флагов не найдено.'}</p>
           {safety.explosive_check?.status && safety.explosive_check.status !== 'clear' && (
             <div className="chemchat-kv">
               <span>Тип риска</span>
               <strong>{safety.explosive_check.hazard_type || 'explosive'}</strong>
+            </div>
+          )}
+          {safetyCategories.length > 0 && (
+            <div className="chemchat-safety-taxonomy">
+              {safetyCategories.slice(0, 5).map((item, index) => (
+                <div key={`${item.hazard_type || 'hazard'}-${index}`} className={`chemchat-safety-chip ${item.status || 'warning'}`}>
+                  <strong>{item.label_ru || item.hazard_type || 'risk'}</strong>
+                  <span>{item.status || 'warning'} · {item.danger_level || 'unknown'}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

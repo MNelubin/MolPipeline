@@ -32,6 +32,8 @@ class GuardResult(TypedDict, total=False):
     """Safety check result from the guard / validate_and_guard node."""
     overall_status: Literal["SAFE", "WARNING", "CRITICAL_STOP"]
     molecule_check: dict
+    explosive_check: dict
+    safety_taxonomy: dict
     reaction_check: dict
     safety_data: dict
     ppe_recommendations: list[str]

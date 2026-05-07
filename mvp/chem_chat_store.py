@@ -221,9 +221,11 @@ def _compact_tool_memory(payload: dict[str, Any]) -> str:
 
     safety = artifacts.get("safety") or {}
     if safety:
+        taxonomy = safety.get("safety_taxonomy") or {}
         reason = (
-            (safety.get("molecule_check") or {}).get("reason")
+            (((taxonomy.get("blocked_categories") or taxonomy.get("warning_categories") or [{}])[0]).get("reason"))
             or (safety.get("explosive_check") or {}).get("reason")
+            or (safety.get("molecule_check") or {}).get("reason")
             or (safety.get("reaction_check") or {}).get("reason")
         )
         lines.append(
@@ -231,6 +233,12 @@ def _compact_tool_memory(payload: dict[str, Any]) -> str:
             f"overall={safety.get('overall_status') or 'UNKNOWN'}"
             + (f"; reason={_short_text(reason, 180)}" if reason else "")
         )
+        categories = [
+            f"{item.get('hazard_type')}:{item.get('status')}/{item.get('danger_level')}"
+            for item in (taxonomy.get("categories") or [])[:6]
+        ]
+        if categories:
+            lines.append(f"safety_taxonomy: {', '.join(categories)}")
 
     retro = artifacts.get("retrosynthesis") or {}
     routes = retro.get("routes") or []

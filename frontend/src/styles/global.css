@@ -3127,6 +3127,45 @@ a.ext-link:hover { color: var(--cyan); }
   background: var(--amber-bg);
 }
 
+.chemchat-safety-taxonomy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chemchat-safety-chip {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.03);
+}
+
+.chemchat-safety-chip.blocked {
+  border-color: var(--red-border);
+  background: rgba(255, 77, 109, 0.08);
+}
+
+.chemchat-safety-chip.warning {
+  border-color: var(--amber-border);
+  background: rgba(255, 183, 3, 0.08);
+}
+
+.chemchat-safety-chip strong {
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.chemchat-safety-chip span {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .chemchat-score {
   font-family: var(--font-mono);
   font-size: 32px;

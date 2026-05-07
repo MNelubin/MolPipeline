@@ -48,3 +48,5 @@ from .explosive import (  # noqa: F401
     explosive_alias_check,
     explosive_hazard_check,
 )
+
+from .safety_taxonomy import build_safety_taxonomy  # noqa: F401

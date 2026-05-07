@@ -123,9 +123,12 @@ def _build_safety_overlay(safety_guard: dict[str, Any] | None) -> dict[str, Any]
         }
     molecule_check = safety_guard.get("molecule_check", {}) or {}
     safety_data = safety_guard.get("safety_data", {}) or {}
+    taxonomy = safety_guard.get("safety_taxonomy", {}) or {}
     return {
         "available": True,
         "overall_status": safety_guard.get("overall_status", "SAFE"),
+        "taxonomy_status": taxonomy.get("status", "clear"),
+        "taxonomy_categories": (taxonomy.get("categories") or [])[:8],
         "molecule_status": molecule_check.get("status", "clear"),
         "molecule_reason": molecule_check.get("reason"),
         "molecule_category": molecule_check.get("category"),

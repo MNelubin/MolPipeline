@@ -62,6 +62,20 @@
       "smiles": "CC1(C)OOOC(C)(C)OOOC(C)(C)OOO1",
       "danger_level": "high",
       "hazard_family": "organic_peroxide_explosive"
+    },
+    {
+      "name": "Ammonium nitrate",
+      "aliases": ["ammonium nitrate", "AN", "аммонийная селитра", "нитрат аммония"],
+      "smiles": "[NH4+].[O-][N+](=O)[O-]",
+      "danger_level": "high",
+      "hazard_family": "oxidizer_explosive_precursor"
+    },
+    {
+      "name": "Lead azide",
+      "aliases": ["lead azide", "азид свинца"],
+      "smiles": "[Pb+2].[N-]=[N+]=[N-].[N-]=[N+]=[N-]",
+      "danger_level": "high",
+      "hazard_family": "primary_explosive"
     }
   ],
   "motifs": [
