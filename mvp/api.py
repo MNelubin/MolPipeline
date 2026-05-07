@@ -251,6 +251,7 @@ class ResearchAnalyzeResponse(BaseModel):
     analysis: dict[str, Any] = Field(default_factory=dict)
     candidates: list[dict[str, Any]]
     sources: list[dict[str, Any]]
+    citations: list[dict[str, Any]] = Field(default_factory=list)
     evidence: list[dict[str, Any]]
     rag_results: list[dict[str, Any]]
     source_errors: dict[str, str] = Field(default_factory=dict)

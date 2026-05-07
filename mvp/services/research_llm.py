@@ -163,11 +163,13 @@ def llm_analyze_research_evidence(
 
     source_lines: list[str] = []
     for idx, item in enumerate(evidence[:8], start=1):
+        citation_id = item.get("citation_id") or f"S{idx}"
         source_lines.append(
             "\n".join([
-                f"[S{idx}] {item.get('title') or item.get('url') or 'Untitled source'}",
+                f"[{citation_id}] {item.get('title') or item.get('url') or 'Untitled source'}",
                 f"Type: {item.get('source_type', 'web')}",
                 f"URL: {item.get('url', '')}",
+                f"Markdown citation: {item.get('citation_markdown') or ''}",
                 f"Excerpt: {(item.get('excerpt') or item.get('snippet') or '')[:1200]}",
             ])
         )
@@ -189,6 +191,7 @@ def llm_analyze_research_evidence(
         "You are a chemistry research analyst embedded in a molecule synthesis assistant. "
         "Use only the provided evidence, candidates and local RAG snippets. "
         "Do not invent citations. If evidence is weak, say so. "
+        "When a claim is based on a web source, include the matching source marker like [S1] in the claim text. "
         "Reply with JSON only using this schema: "
         "{"
         "\"answer\": string, "

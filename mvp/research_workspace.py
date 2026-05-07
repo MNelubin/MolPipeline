@@ -10,6 +10,7 @@ import logging
 import re
 from collections import Counter
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from .models.research import WebSource
 from .services.web_scraper import extract_pubmed_abstract, fetch_and_extract
@@ -27,6 +28,33 @@ ResearchMode = Literal["molecule", "literature", "patent"]
 _PMID_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
 _MAX_QUERIES = 8
 _MAX_CANDIDATES = 12
+
+
+def _source_domain(url: str) -> str:
+    try:
+        host = urlparse(url).netloc.lower()
+    except Exception:
+        return ""
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _safe_markdown_url(url: str) -> str:
+    return str(url or "").replace("(", "%28").replace(")", "%29")
+
+
+def _source_payload(source: WebSource, index: int) -> dict[str, Any]:
+    citation_id = f"S{index}"
+    title = source.title or source.url or citation_id
+    url = source.url or ""
+    return {
+        **source.model_dump(mode="json"),
+        "citation_id": citation_id,
+        "domain": _source_domain(url),
+        "citation_markdown": f"[{citation_id}]({_safe_markdown_url(url)})" if url else citation_id,
+        "title_markdown": f"[{title}]({_safe_markdown_url(url)})" if url else title,
+    }
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -252,7 +280,7 @@ def run_research_workspace(
 
     evidence: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
-    for source in all_sources[:max_sources]:
+    for index, source in enumerate(all_sources[:max_sources], start=1):
         try:
             text = _fetch_source_text(source)
         except Exception as exc:
@@ -260,11 +288,16 @@ def run_research_workspace(
             text = ""
         if text:
             counts.update(extract_molecules_from_text(text))
+        source_info = _source_payload(source, index)
         evidence.append({
+            "citation_id": source_info["citation_id"],
             "url": source.url,
             "title": source.title,
             "snippet": source.snippet,
             "source_type": source.source_type,
+            "domain": source_info["domain"],
+            "citation_markdown": source_info["citation_markdown"],
+            "title_markdown": source_info["title_markdown"],
             "excerpt": _make_excerpt(text or source.snippet, query),
         })
 
@@ -293,6 +326,11 @@ def run_research_workspace(
         rag_results,
     )
 
+    source_payloads = [
+        _source_payload(source, index)
+        for index, source in enumerate(all_sources[:max_sources], start=1)
+    ]
+
     return {
         "status": "ok" if evidence or candidates or rag_results else "empty",
         "query": query,
@@ -302,7 +340,8 @@ def run_research_workspace(
         "summary": summary,
         "analysis": analysis,
         "candidates": [candidate.model_dump(mode="json") for candidate in candidates],
-        "sources": [source.model_dump(mode="json") for source in all_sources[:max_sources]],
+        "sources": source_payloads,
+        "citations": source_payloads,
         "evidence": evidence,
         "rag_results": rag_results,
         "source_errors": source_errors,

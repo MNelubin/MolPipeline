@@ -27,7 +27,7 @@ function formatSessionTime(value) {
 
 function renderInlineMarkdown(text) {
   const parts = []
-  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|(https?:\/\/[^\s<]+))/g
+  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|(https?:\/\/[^\s<]+))/g
   let lastIndex = 0
   let match
   while ((match = pattern.exec(text)) !== null) {
@@ -43,11 +43,14 @@ function renderInlineMarkdown(text) {
     } else if (match[5]) {
       parts.push(<strong key={match.index}>{match[5]}</strong>)
     } else if (match[6]) {
+      const trailing = match[6].match(/[),.;:!?]+$/)?.[0] || ''
+      const href = trailing ? match[6].slice(0, -trailing.length) : match[6]
       parts.push(
-        <a key={match.index} href={match[6]} target="_blank" rel="noreferrer">
-          {match[6]}
+        <a key={match.index} href={href} target="_blank" rel="noreferrer">
+          {href}
         </a>
       )
+      if (trailing) parts.push(trailing)
     }
     lastIndex = pattern.lastIndex
   }
@@ -254,12 +257,12 @@ function ArtifactBlock({ result }) {
                 <div key={`${source.url || source.title}-${index}`}>
                   {source.url ? (
                     <a href={source.url} target="_blank" rel="noreferrer">
-                      {source.title || source.name || source.url}
+                      {source.citation_id ? `[${source.citation_id}] ` : ''}{source.title || source.name || source.url}
                     </a>
                   ) : (
                     <strong>{source.title || source.name || 'Источник'}</strong>
                   )}
-                  <span>{source.source_type || source.type || 'source'}</span>
+                  <span>{source.domain || source.source_type || source.type || 'source'}</span>
                 </div>
               ))}
             </div>

@@ -696,11 +696,23 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
             "analysis": research.get("analysis"),
             "sources": [
                 {
+                    "citation_id": source.get("citation_id"),
                     "title": source.get("title") or source.get("name") or source.get("url"),
                     "url": source.get("url"),
                     "type": source.get("source_type") or source.get("type"),
+                    "domain": source.get("domain"),
+                    "citation_markdown": source.get("citation_markdown"),
                 }
                 for source in (research.get("sources") or [])[:8]
+            ],
+            "evidence": [
+                {
+                    "citation_id": item.get("citation_id"),
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "excerpt": (item.get("excerpt") or item.get("snippet") or "")[:600],
+                }
+                for item in (research.get("evidence") or [])[:6]
             ],
             "sources_count": len(research.get("sources") or []),
             "evidence_count": len(research.get("evidence") or []),
@@ -725,7 +737,8 @@ def _final_answer_with_llm(
         "For real-world materials and product composition, do not force a single-molecule framing: explain mixtures, mineral phases, additives, coatings and likely variability. "
         "For hazardous or dual-use synthesis topics, including nitration of toluene, explosives and narcotics, keep the answer high-level and non-operational: do not provide temperatures, reagent ratios, step-by-step procedures, purification instructions, yields, procurement advice or scale-up guidance. "
         "Do not invent synthesis routes, prices, safety classifications or citations. "
-        "When research/web sources include URLs, cite them as Markdown links: [title](url). "
+        "When research/web sources include citation_id fields, attach source markers like [S1] to source-backed claims. "
+        "When research/web sources include URLs, cite them as Markdown links: [title](url) or [S1](url). "
         "If tools did not find enough data, say exactly what is missing and what to try next. "
         "Keep the answer concise but useful for a chemist."
     )
@@ -785,21 +798,36 @@ def _direct_general_fallback(message: str) -> str:
     )
 
 
+def _link_citation_markers(answer: str, sources: list[dict[str, Any]]) -> str:
+    linked = answer
+    for index, source in enumerate(sources, start=1):
+        citation_id = str(source.get("citation_id") or f"S{index}")
+        url = source.get("url")
+        if not url:
+            continue
+        safe_url = str(url).replace("(", "%28").replace(")", "%29")
+        linked = linked.replace(f"[{citation_id}]", f"[{citation_id}]({safe_url})")
+        linked = linked.replace(f"[{citation_id}]({safe_url})({safe_url})", f"[{citation_id}]({safe_url})")
+    return linked
+
+
 def _append_research_source_links(answer: str, artifacts: dict[str, Any]) -> str:
     research = artifacts.get("research") or {}
-    sources = research.get("sources") or []
+    sources = research.get("citations") or research.get("sources") or []
+    answer = _link_citation_markers(answer, sources)
     links: list[str] = []
     seen: set[str] = set()
-    for source in sources:
+    for index, source in enumerate(sources, start=1):
         url = source.get("url")
         title = source.get("title") or source.get("name") or url
         if not url or not title or url in seen:
             continue
         seen.add(url)
-        if url in answer:
+        citation_id = source.get("citation_id") or f"S{index}"
+        if url in answer or f"]({url})" in answer:
             continue
         safe_url = str(url).replace("(", "%28").replace(")", "%29")
-        links.append(f"- [{title}]({safe_url})")
+        links.append(f"- [{citation_id}] [{title}]({safe_url})")
         if len(links) >= 6:
             break
     if not links:

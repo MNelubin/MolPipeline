@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from ..chem_chat import CHEM_CHAT_MODEL, classify_chem_intent, run_chem_chat
+from ..chem_chat import CHEM_CHAT_MODEL, _append_research_source_links, classify_chem_intent, run_chem_chat
 
 
 def test_broad_general_question_answers_directly_without_research():
@@ -104,6 +104,32 @@ def test_source_followup_research_uses_previous_topic():
     assert result["tools_used"] == ["research_analyze"]
     assert "нитрование толуола" in captured_queries[0]
     assert "citation formatting" in captured_queries[0]
+
+
+def test_research_source_markers_are_linked_and_listed():
+    artifacts = {
+        "research": {
+            "sources": [
+                {
+                    "citation_id": "S1",
+                    "title": "PVC window composition",
+                    "url": "https://example.org/pvc-windows",
+                    "source_type": "web",
+                },
+                {
+                    "citation_id": "S2",
+                    "title": "PVC stabilizers",
+                    "url": "https://example.org/pvc-stabilizers",
+                    "source_type": "web",
+                },
+            ]
+        }
+    }
+
+    answer = _append_research_source_links("PVC profiles use additives [S1].", artifacts)
+
+    assert "[S1](https://example.org/pvc-windows)" in answer
+    assert "- [S2] [PVC stabilizers](https://example.org/pvc-stabilizers)" in answer
 
 
 def test_retrosynthesis_question_extracts_target_and_runs_safety_gate_first():
