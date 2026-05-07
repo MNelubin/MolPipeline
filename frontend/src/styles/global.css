@@ -1717,6 +1717,23 @@ a.ext-link:hover { color: var(--cyan); }
   min-width: 220px;
 }
 
+.retro-tree-graph-btn {
+  border: 1px solid var(--cyan-border);
+  background: var(--cyan-bg);
+  color: var(--cyan);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.retro-tree-graph-btn:hover {
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  background: color-mix(in srgb, var(--cyan) 16%, transparent);
+}
+
 .retro-tree-stats span,
 .retro-tree-selected span,
 .retro-tree-route span {
@@ -1748,6 +1765,25 @@ a.ext-link:hover { color: var(--cyan); }
 .retro-tree-canvas {
   overflow-x: auto;
   padding: 2px;
+}
+
+.retro-tree-preview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--r-sm);
+  padding: 9px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.retro-tree-preview code {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
 }
 
 .retro-tree-node {

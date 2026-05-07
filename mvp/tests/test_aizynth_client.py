@@ -19,6 +19,13 @@ class TestAiZynthClientHelpers:
         }
         assert _extract_first_disconnection(tree) == ("CC=O.O", "CCO")
 
+    def test_extract_first_disconnection_removes_atom_maps(self):
+        tree = {
+            "metadata": {"mapped_reaction_smiles": "[CH3:1][CH2:2][OH:3]>>[CH3:1][CH:2]=[O:3].[OH2:4]"},
+            "children": [],
+        }
+        assert _extract_first_disconnection(tree) == ("CC=O.O", "CCO")
+
     def test_extract_first_disconnection_recurses_into_children(self):
         tree = {
             "metadata": {},

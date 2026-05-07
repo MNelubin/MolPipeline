@@ -14,9 +14,8 @@ import logging
 import time
 from typing import Any
 
-from rdkit import Chem
-
 from .config import RETRO_TREE_INCLUDE_EXPERIMENTAL
+from .smiles_normalization import canonicalize_smiles, canonicalize_smiles_list
 from .tools.retro_tools import (
     _is_buyable,
     collect_candidate_routes,
@@ -39,11 +38,8 @@ def _get_predict_retro():
 
 
 def _canonicalize(smiles: str) -> str | None:
-    """Canonicalize SMILES via RDKit. Returns None if invalid."""
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
-    return Chem.MolToSmiles(mol, isomericSmiles=True)
+    """Canonicalize SMILES via RDKit and strip planner atom maps."""
+    return canonicalize_smiles(smiles)
 
 
 def _resolve_name(smiles: str) -> str | None:
@@ -57,21 +53,22 @@ def _resolve_name(smiles: str) -> str | None:
 
 def _find_top_routes(smiles: str, top_n: int = 5) -> list[dict[str, Any]]:
     """Find up to top_n ranked routes using the shared retrosynthesis collectors."""
+    search_smiles = _canonicalize(smiles) or smiles
     try:
         results, _sources = collect_candidate_routes(
-            smiles,
+            search_smiles,
             ord_limit=top_n * 3,
             model_top_n=top_n + 2,
             use_web=False,
             include_experimental=RETRO_TREE_INCLUDE_EXPERIMENTAL,
         )
     except Exception as e:
-        logger.warning("[tree] route collection failed for %s: %s", smiles[:30], e)
+        logger.warning("[tree] route collection failed for %s: %s", search_smiles[:30], e)
         return []
     for route in results:
         score_route(route)
     results.sort(key=lambda r: r.get("final_score", 0), reverse=True)
-    logger.debug("[tree] %d ranked results for %s", len(results[:top_n]), smiles[:30])
+    logger.debug("[tree] %d ranked results for %s", len(results[:top_n]), search_smiles[:30])
     return results[:top_n]
 
 
@@ -257,6 +254,7 @@ def _build_node(
 
     route = chosen_route
     reactants_str = route.get("reactants", "")
+    display_reactants = canonicalize_smiles_list(reactants_str) or reactants_str
     reactant_parts = [s.strip() for s in reactants_str.split(".") if s.strip()]
     children = []
     for reactant_smi in reactant_parts:
@@ -272,6 +270,8 @@ def _build_node(
 
     # Clean route for serialization (remove heavy template field)
     clean_route = {k: v for k, v in route.items() if k != "template"}
+    if display_reactants:
+        clean_route["reactants"] = display_reactants
 
     return {
         "smiles": canonical,
@@ -321,6 +321,7 @@ def expand_tree(
         }
 
     # Build children from the selected route's reactants
+    display_reactants = canonicalize_smiles_list(reactants) or reactants
     reactant_parts = [s.strip() for s in reactants.split(".") if s.strip()]
     visited = {canonical_target}
 
@@ -345,7 +346,7 @@ def expand_tree(
         "depth": 0,
         "is_buyable": False,
         "guard": guard,
-        "route": {"reactants": reactants, "source": "selected"},
+        "route": {"reactants": display_reactants, "source": "selected"},
         "children": children,
     }
 

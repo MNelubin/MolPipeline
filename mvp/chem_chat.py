@@ -184,13 +184,33 @@ def _multi_step_tree_tool(
             "tree": None,
             "stats": {},
         }
-    result = expand_tree(target_smiles, reactants, max_depth=max_depth, timeout_sec=timeout_sec)
+    planner_result: dict[str, Any] | None = None
+    provenance = route.get("provenance") if isinstance(route.get("provenance"), dict) else {}
+    raw_tree = provenance.get("raw_tree")
+    if route.get("source") == "aizynthfinder" and isinstance(raw_tree, dict):
+        try:
+            from .services.planner_tree_adapter import adapt_aizynth_tree_to_runtime
+
+            planner_result = adapt_aizynth_tree_to_runtime(
+                raw_tree,
+                target_smiles=target_smiles,
+                selected_route=route,
+            )
+        except Exception as exc:
+            logger.warning("[chem_chat] AiZynth tree adapter failed: %s", exc)
+
+    expanded_result = expand_tree(target_smiles, reactants, max_depth=max_depth, timeout_sec=timeout_sec)
+    planner_depth = ((planner_result or {}).get("stats") or {}).get("max_depth_reached", -1)
+    expanded_depth = (expanded_result.get("stats") or {}).get("max_depth_reached", -1)
+    result = planner_result if planner_result and planner_depth >= expanded_depth else expanded_result
     result["status"] = "ok"
     result["selected_route"] = {
         "source": route.get("source_label") or route.get("source"),
         "reactants": reactants,
         "score": route.get("final_score"),
     }
+    if planner_result:
+        result["planner_adapter"] = planner_result.get("adapter")
     result["max_depth"] = max_depth
     result["timeout_sec"] = timeout_sec
     return result

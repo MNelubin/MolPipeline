@@ -53,6 +53,9 @@ class TestCanonicalize:
         assert result is not None
         assert "C(=O)" in result
 
+    def test_strips_atom_mapping_from_planner_smiles(self):
+        assert _canonicalize("[CH3:1][OH:2]") == "CO"
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # _resolve_name
@@ -127,6 +130,11 @@ class TestFindTopRoutes:
              patch("mvp.tree_expansion.collect_candidate_routes", return_value=([], [])) as mock_collect:
             _find_top_routes("CCO")
         assert mock_collect.call_args.kwargs["include_experimental"] is False
+
+    def test_unmaps_smiles_before_route_collection(self):
+        with patch("mvp.tree_expansion.collect_candidate_routes", return_value=([], [])) as mock_collect:
+            _find_top_routes("[CH3:1][OH:2]")
+        assert mock_collect.call_args.args[0] == "CO"
 
 
 # ═════════════════════════════════════════════════════════════════════════════

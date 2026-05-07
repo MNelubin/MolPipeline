@@ -8,6 +8,7 @@ from typing import Any
 import requests
 
 from ..config import RETRO_ENABLE_RETROCAST
+from ..smiles_normalization import canonicalize_smiles_list
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,10 @@ def _extract_first_disconnection(route_tree: dict[str, Any]) -> tuple[str, str] 
             product = product.strip()
             reactants = reactants.strip()
             if product and reactants:
-                return reactants, product
+                return (
+                    canonicalize_smiles_list(reactants) or reactants,
+                    canonicalize_smiles_list(product) or product,
+                )
 
     for child in route_tree.get("children", []) or []:
         if isinstance(child, dict):
@@ -153,6 +157,8 @@ def normalize_aizynth_routes(
             continue
         else:
             reactants, product = extracted
+        reactants = canonicalize_smiles_list(reactants) or reactants
+        product = canonicalize_smiles_list(product) or product
         reaction_smiles = f"{reactants}>>{product}"
         route = {
             "reactants": reactants,

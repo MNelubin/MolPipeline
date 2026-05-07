@@ -17,6 +17,7 @@
  */
 
 import { useState } from 'react'
+import SynthesisGraph from './SynthesisGraph'
 
 const SOURCE_LABEL = {
   ord:          { text: 'ORD',   color: 'var(--green)' },
@@ -122,9 +123,11 @@ function TreeNode({ node, isRoot = false }) {
 }
 
 function MultiStepTreeBlock({ treeResult }) {
+  const [showGraph, setShowGraph] = useState(false)
   const tree = treeResult?.tree
   const stats = treeResult?.stats || {}
   if (!tree) return null
+  const isShallow = (stats.max_depth_reached ?? 0) <= 1 && (stats.unresolved_count ?? 0) > 0
 
   return (
     <div className="retro-tree-block">
@@ -139,7 +142,16 @@ function MultiStepTreeBlock({ treeResult }) {
           <span>не раскрыто: {stats.unresolved_count ?? 0}</span>
           <span>глубина: {stats.max_depth_reached ?? 0}</span>
         </div>
+        <button type="button" className="retro-tree-graph-btn" onClick={() => setShowGraph(true)}>
+          Открыть граф
+        </button>
       </div>
+
+      {isShallow && (
+        <div className="retro-tree-warning">
+          Дерево пока раскрыто только на один шаг: планировщик не нашел надежного продолжения для крупного интермедиата.
+        </div>
+      )}
 
       {treeResult.selected_route?.reactants && (
         <div className="retro-tree-selected">
@@ -148,9 +160,14 @@ function MultiStepTreeBlock({ treeResult }) {
         </div>
       )}
 
-      <div className="retro-tree-canvas">
-        <TreeNode node={tree} isRoot />
+      <div className="retro-tree-preview">
+        <span>Граф использует общий компонент дерева синтеза из вкладки анализа молекул.</span>
+        <code>{tree.name || tree.smiles}</code>
       </div>
+
+      {showGraph && (
+        <SynthesisGraph tree={tree} stats={stats} onClose={() => setShowGraph(false)} />
+      )}
     </div>
   )
 }
