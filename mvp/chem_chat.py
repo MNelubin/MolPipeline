@@ -19,12 +19,14 @@ from .config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, SOCKS_PROXY
 from .nodes.validate_and_guard_node import _resolve_molecule, _run_safety_checks
 from .research_workspace import run_research_workspace
 from .tools.retro_tools import search_and_rank
+from .tree_expansion import expand_tree
 
 logger = logging.getLogger(__name__)
 
 CHEM_CHAT_MODEL = "deepseek/deepseek-v4-flash"
 VALID_INTENTS: set[str] = {"general", "retrosynthesis", "admet", "availability", "research", "safety", "molecule", "mixed"}
 VALID_TOOLS: set[str] = {"resolve_molecule", "safety_check", "retrosynthesis_search", "admet_screen", "availability_check", "research_analyze"}
+VALID_RETRO_DEPTH_MODES: set[str] = {"one_step", "multi_step"}
 
 Intent = Literal[
     "general",
@@ -164,6 +166,33 @@ def _safety_tool(smiles: str, cid: int | None = None, reaction_description: str 
 def _retro_tool(smiles: str, top_n: int = 5, source_mode: str = "auto") -> dict[str, Any]:
     result = search_and_rank(smiles, top_n=top_n, source_mode=source_mode)
     _attach_procedure_steps(result.get("routes", []))
+    return result
+
+
+def _multi_step_tree_tool(
+    target_smiles: str,
+    route: dict[str, Any],
+    *,
+    max_depth: int = 6,
+    timeout_sec: float = 45.0,
+) -> dict[str, Any]:
+    reactants = route.get("reactants") or ""
+    if not reactants:
+        return {
+            "status": "skipped",
+            "reason": "Selected route has no reactants to expand.",
+            "tree": None,
+            "stats": {},
+        }
+    result = expand_tree(target_smiles, reactants, max_depth=max_depth, timeout_sec=timeout_sec)
+    result["status"] = "ok"
+    result["selected_route"] = {
+        "source": route.get("source_label") or route.get("source"),
+        "reactants": reactants,
+        "score": route.get("final_score"),
+    }
+    result["max_depth"] = max_depth
+    result["timeout_sec"] = timeout_sec
     return result
 
 
@@ -428,15 +457,69 @@ def _normalize_llm_plan(
     if research_mode not in {"molecule", "literature", "patent"}:
         research_mode = "literature"
 
+    retro_depth_mode = _normalize_retrosynthesis_depth_mode(
+        plan.get("retrosynthesis_depth_mode"),
+        message=message,
+        context=planning_context,
+        source_mode=source_mode,
+    )
+
     return {
         "intent": intent,
         "tools": tools,
         "target_molecules": targets,
         "source_mode": source_mode,
         "research_mode": research_mode,
+        "retrosynthesis_depth_mode": retro_depth_mode,
         "reasoning": str(plan.get("reasoning") or "").strip(),
         "used_llm": isinstance(plan, dict) and bool(plan),
     }
+
+
+def _normalize_retrosynthesis_depth_mode(
+    raw_mode: Any,
+    *,
+    message: str,
+    context: str,
+    source_mode: str,
+) -> str:
+    value = str(raw_mode or "").strip().lower().replace("-", "_")
+    aliases = {
+        "one": "one_step",
+        "single": "one_step",
+        "single_step": "one_step",
+        "onestep": "one_step",
+        "one_step": "one_step",
+        "multi": "multi_step",
+        "multistep": "multi_step",
+        "multi_step": "multi_step",
+        "tree": "multi_step",
+        "full": "multi_step",
+    }
+    if value in aliases:
+        return aliases[value]
+
+    text = f"{context}\n{message}".casefold()
+    multi_markers = (
+        "multi-step", "multistep", "full route", "route tree", "synthetic tree",
+        "from buyable", "from purchasable", "starting materials", "complete route",
+        "многостадий", "многошаг", "полный маршрут", "полную схему", "дерево",
+        "от доступных", "из доступных", "до доступных", "исходных реагентов",
+        "все стадии", "цепочку", "полный путь", "план синтеза",
+    )
+    one_step_markers = (
+        "one-step", "onestep", "single-step", "first disconnection",
+        "direct precursors", "precursors only", "одношаг", "одностадий",
+        "первый шаг", "первую реакцию", "предшественники", "только реакцию",
+        "одно разбиение", "disconnection",
+    )
+    if any(marker in text for marker in one_step_markers):
+        return "one_step"
+    if any(marker in text for marker in multi_markers):
+        return "multi_step"
+    if source_mode == "aizynthfinder":
+        return "multi_step"
+    return "one_step"
 
 
 def _is_broad_educational_question(message: str) -> bool:
@@ -504,7 +587,7 @@ def _plan_with_llm(
         "Choose which project tools must be called before answering. "
         "Do not answer chemistry facts directly in this planning step. "
         "Use conversation_history to resolve follow-up questions, but current user message has priority. "
-        "Return JSON only with keys: intent, target_molecules, tools, source_mode, research_mode, reasoning. "
+        "Return JSON only with keys: intent, target_molecules, tools, source_mode, research_mode, retrosynthesis_depth_mode, reasoning. "
         "intent must be one of: general, molecule, safety, retrosynthesis, availability, admet, research, mixed. "
         "tools must be selected from: resolve_molecule, safety_check, retrosynthesis_search, "
         "availability_check, admet_screen, research_analyze. "
@@ -512,6 +595,7 @@ def _plan_with_llm(
         "Use research_analyze when the user asks for sources, literature, web evidence, PubMed, papers, patents, current/external data, or selects a web/all source mode. "
         "Also use research_analyze for real-world product/material composition questions, industrial formulations, consumer goods, and 'what is this usually made of/used in' questions, because those require external/web evidence rather than pure textbook recall. "
         "For synthesis/route/retrosynthesis requests include resolve_molecule, safety_check, retrosynthesis_search. "
+        "For retrosynthesis_depth_mode use one_step for direct precursor/disconnection requests and multi_step for full route/tree/from-buyable-starting-materials requests. "
         "For supplier/price/buyability requests use availability_check and extract every reagent if possible. "
         "For safety/ADMET requests include resolve_molecule and safety_check. "
         "target_molecules should contain English/common molecule names or SMILES extracted from the user text."
@@ -522,6 +606,7 @@ def _plan_with_llm(
             "conversation_history": _compact_chat_history(history),
             "default_source_mode": source_mode,
             "default_research_mode": research_mode,
+            "default_retrosynthesis_depth_mode": "one_step",
         },
         ensure_ascii=False,
     )
@@ -569,10 +654,12 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
         routes = retro.get("routes") or []
         best = routes[0] if routes else {}
         compact["retrosynthesis"] = {
+            "depth_mode": retro.get("depth_mode"),
             "total_found": retro.get("total_found"),
             "total_unique": retro.get("total_unique"),
             "sources_used": retro.get("sources_used"),
             "source_errors": retro.get("source_errors"),
+            "tree_stats": (retro.get("multi_step_tree") or {}).get("stats"),
             "best_route": {
                 "source": best.get("source_label") or best.get("source"),
                 "reactants": best.get("reactants"),
@@ -633,6 +720,7 @@ def _final_answer_with_llm(
         "Answer in the user's language, usually Russian; Russian Cyrillic text is valid user input. "
         "Use conversation_history to keep continuity in follow-up questions, but do not override current tool outputs. "
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
+        "For retrosynthesis, explicitly distinguish one-step disconnection results from multi-step route-tree results when a depth_mode or tree_stats field is present. "
         "If no tools were selected, answer as a normal chemistry tutor from general chemistry knowledge and use fallback_summary as guidance. "
         "For real-world materials and product composition, do not force a single-molecule framing: explain mixtures, mineral phases, additives, coatings and likely variability. "
         "For hazardous or dual-use synthesis topics, including nitration of toluene, explosives and narcotics, keep the answer high-level and non-operational: do not provide temperatures, reagent ratios, step-by-step procedures, purification instructions, yields, procurement advice or scale-up guidance. "
@@ -822,6 +910,20 @@ def _route_summary(retro: dict[str, Any]) -> list[str]:
     return summary
 
 
+def _multi_step_summary(tree_result: dict[str, Any]) -> list[str]:
+    if not tree_result or tree_result.get("status") != "ok":
+        reason = (tree_result or {}).get("reason") or "multi-step expansion did not run."
+        return [f"Multi-step expansion: {reason}"]
+    stats = tree_result.get("stats") or {}
+    return [
+        "Multi-step route tree built: "
+        f"nodes={stats.get('total_nodes', 0)}, "
+        f"buyable_leaves={stats.get('buyable_count', 0)}, "
+        f"unresolved={stats.get('unresolved_count', 0)}, "
+        f"max_depth={stats.get('max_depth_reached', 0)}."
+    ]
+
+
 def _admet_summary(admet: dict[str, Any]) -> list[str]:
     overall = admet.get("overall", {})
     return [
@@ -957,6 +1059,7 @@ def run_chem_chat(
     selected_tools = set(plan["tools"])
     selected_source_mode = plan.get("source_mode") or source_mode
     selected_research_mode = plan.get("research_mode") or research_mode
+    selected_retro_depth_mode = plan.get("retrosynthesis_depth_mode") or "one_step"
     tools_used: list[str] = []
     artifacts: dict[str, Any] = {}
     answer_lines: list[str] = []
@@ -967,6 +1070,7 @@ def run_chem_chat(
         "intent": intent,
         "tools": plan["tools"],
         "target_molecules": plan.get("target_molecules", []),
+        "retrosynthesis_depth_mode": selected_retro_depth_mode,
         "used_llm": plan.get("used_llm", False),
     })
 
@@ -1040,6 +1144,7 @@ def run_chem_chat(
             "source_mode": selected_source_mode,
         })
         retro = _retro_tool(smiles, top_n=top_n, source_mode=selected_source_mode)
+        retro["depth_mode"] = selected_retro_depth_mode
         tools_used.append("retrosynthesis_search")
         artifacts["retrosynthesis"] = retro
         answer_lines.extend(_route_summary(retro))
@@ -1050,6 +1155,26 @@ def run_chem_chat(
             "routes": len(retro.get("routes") or []),
             "sources_used": retro.get("sources_used", []),
         })
+
+        best_route = retro.get("best_route") or ((retro.get("routes") or [None])[0])
+        if selected_retro_depth_mode == "multi_step" and best_route:
+            _emit_progress(progress_callback, {
+                "type": "tool_start",
+                "tool": "retrosynthesis_tree_expand",
+                "label": "Расширяю лучший маршрут до multi-step дерева",
+                "source_mode": selected_source_mode,
+            })
+            tree_result = _multi_step_tree_tool(smiles, best_route)
+            tools_used.append("retrosynthesis_tree_expand")
+            retro["multi_step_tree"] = tree_result
+            answer_lines.extend(_multi_step_summary(tree_result))
+            _emit_progress(progress_callback, {
+                "type": "tool_done",
+                "tool": "retrosynthesis_tree_expand",
+                "label": "Multi-step дерево построено",
+                "status": tree_result.get("status"),
+                "stats": tree_result.get("stats", {}),
+            })
 
     if resolved_ok and wants_admet:
         _emit_progress(progress_callback, {

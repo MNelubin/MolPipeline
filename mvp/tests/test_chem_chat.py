@@ -178,6 +178,78 @@ def test_availability_after_retrosynthesis_checks_route_reactants_not_target():
 
     mock_availability.assert_called_once_with("CC(=O)OC(C)=O.O=C(O)c1ccccc1O")
 
+
+def test_retrosynthesis_defaults_to_one_step_without_tree_expansion():
+    resolved = {
+        "validation": {"is_valid": True, "input_type": "name"},
+        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+        "pubchem_cid": 2244,
+    }
+    safety = {
+        "overall_status": "SAFE",
+        "molecule_check": {"status": "clear", "reason": "Not found in banlists."},
+        "reaction_check": {"status": "allowed"},
+        "safety_data": {},
+    }
+    retro = {
+        "routes": [{"source": "ord", "reactants": "CC(=O)OC(C)=O.O=C(O)c1ccccc1O"}],
+        "best_route": {"source": "ord", "reactants": "CC(=O)OC(C)=O.O=C(O)c1ccccc1O"},
+        "total_unique": 1,
+        "source_errors": {},
+    }
+
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+         patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
+         patch("mvp.chem_chat.search_and_rank", return_value=retro), \
+         patch("mvp.chem_chat._attach_procedure_steps"), \
+         patch("mvp.chem_chat.expand_tree") as mock_expand:
+        result = run_chem_chat("Find synthesis route for aspirin")
+
+    assert result["plan"]["retrosynthesis_depth_mode"] == "one_step"
+    assert result["artifacts"]["retrosynthesis"]["depth_mode"] == "one_step"
+    assert "multi_step_tree" not in result["artifacts"]["retrosynthesis"]
+    mock_expand.assert_not_called()
+
+
+def test_retrosynthesis_multistep_request_expands_best_route_tree():
+    resolved = {
+        "validation": {"is_valid": True, "input_type": "name"},
+        "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+        "pubchem_cid": 2244,
+    }
+    safety = {
+        "overall_status": "SAFE",
+        "molecule_check": {"status": "clear", "reason": "Not found in banlists."},
+        "reaction_check": {"status": "allowed"},
+        "safety_data": {},
+    }
+    retro = {
+        "routes": [{"source": "ord", "reactants": "CC(=O)OC(C)=O.O=C(O)c1ccccc1O"}],
+        "best_route": {"source": "ord", "reactants": "CC(=O)OC(C)=O.O=C(O)c1ccccc1O"},
+        "total_unique": 1,
+        "source_errors": {},
+    }
+    tree = {
+        "tree": {"status": "intermediate", "children": []},
+        "stats": {"total_nodes": 3, "buyable_count": 2, "unresolved_count": 0, "max_depth_reached": 1},
+    }
+
+    with patch("mvp.chem_chat._chat_llm_json", return_value=None), \
+         patch("mvp.chem_chat._resolve_molecule", return_value=resolved), \
+         patch("mvp.chem_chat._run_safety_checks", return_value=safety), \
+         patch("mvp.chem_chat.search_and_rank", return_value=retro), \
+         patch("mvp.chem_chat._attach_procedure_steps"), \
+         patch("mvp.chem_chat.expand_tree", return_value=tree) as mock_expand:
+        result = run_chem_chat("Build a full multi-step route tree for aspirin from buyable starting materials")
+
+    assert result["plan"]["retrosynthesis_depth_mode"] == "multi_step"
+    assert result["artifacts"]["retrosynthesis"]["depth_mode"] == "multi_step"
+    assert result["artifacts"]["retrosynthesis"]["multi_step_tree"]["stats"]["total_nodes"] == 3
+    assert "Multi-step route tree built" in result["answer"]
+    mock_expand.assert_called_once()
+
+
 def test_chat_uses_fixed_deepseek_model_for_planning_and_answering():
     plan = {
         "intent": "general",

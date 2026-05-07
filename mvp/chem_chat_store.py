@@ -237,10 +237,14 @@ def _compact_tool_memory(payload: dict[str, Any]) -> str:
     if retro:
         lines.append(
             "retrosynthesis: "
+            f"depth_mode={retro.get('depth_mode')}; "
             f"total_found={retro.get('total_found')}; "
             f"total_unique={retro.get('total_unique')}; "
             f"sources={', '.join(str(source) for source in (retro.get('sources_used') or [])[:6])}"
         )
+        tree = retro.get("multi_step_tree") or {}
+        if tree:
+            lines.append(f"multi_step_tree: stats={_short_text(tree.get('stats'), 360)}")
         for index, route in enumerate(routes[:3], start=1):
             lines.append(
                 f"route_{index}: "
