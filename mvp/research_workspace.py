@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import logging
 import re
+import json
 from collections import Counter
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -28,6 +31,8 @@ ResearchMode = Literal["molecule", "literature", "patent"]
 _PMID_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
 _MAX_QUERIES = 8
 _MAX_CANDIDATES = 12
+_DATA_DIR = Path(__file__).resolve().parent / "data"
+_CURATED_CORPUS_PATH = _DATA_DIR / "research_corpus.json"
 
 
 def _source_domain(url: str) -> str:
@@ -55,6 +60,79 @@ def _source_payload(source: WebSource, index: int) -> dict[str, Any]:
         "citation_markdown": f"[{citation_id}]({_safe_markdown_url(url)})" if url else citation_id,
         "title_markdown": f"[{title}]({_safe_markdown_url(url)})" if url else title,
     }
+
+
+@lru_cache(maxsize=1)
+def _load_curated_corpus() -> list[dict[str, Any]]:
+    if not _CURATED_CORPUS_PATH.exists():
+        return []
+    try:
+        data = json.loads(_CURATED_CORPUS_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("[research_workspace] curated corpus load failed: %s", exc)
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _query_tokens(query: str) -> set[str]:
+    return {token for token in re.split(r"[^a-zA-Z0-9+-]+", query.lower()) if len(token) >= 3}
+
+
+def _curated_score(query: str, doc: dict[str, Any]) -> int:
+    normalized_query = " ".join(query.lower().split())
+    tokens = _query_tokens(query)
+    score = 0
+    for keyword in doc.get("keywords") or []:
+        key = str(keyword).lower().strip()
+        if not key:
+            continue
+        if " " in key:
+            if key in normalized_query:
+                score += 3
+        elif key in tokens:
+            score += 2
+    for author in doc.get("authors") or []:
+        last_name = str(author).split()[-1].lower().strip(",.")
+        if last_name and last_name in tokens:
+            score += 3
+    title = str(doc.get("title") or "").lower()
+    score += len(tokens & _query_tokens(title))
+    return score
+
+
+def _curated_matches(query: str, *, limit: int = 3) -> list[dict[str, Any]]:
+    scored = [
+        (_curated_score(query, doc), doc)
+        for doc in _load_curated_corpus()
+    ]
+    matches = [doc for score, doc in sorted(scored, key=lambda item: item[0], reverse=True) if score >= 4]
+    return matches[:limit]
+
+
+def _curated_text(doc: dict[str, Any]) -> str:
+    lines: list[str] = []
+    for excerpt in doc.get("excerpts") or []:
+        page = excerpt.get("page")
+        section = excerpt.get("section")
+        prefix_parts = []
+        if page:
+            prefix_parts.append(f"page {page}")
+        if section:
+            prefix_parts.append(str(section))
+        prefix = " - ".join(prefix_parts)
+        text = str(excerpt.get("text") or "").strip()
+        if text:
+            lines.append(f"{prefix}: {text}" if prefix else text)
+    return "\n\n".join(lines)
+
+
+def _curated_source(doc: dict[str, Any]) -> WebSource:
+    return WebSource(
+        url=str(doc.get("url") or doc.get("related_url") or ""),
+        title=str(doc.get("title") or doc.get("id") or "Curated research source"),
+        snippet=_curated_text(doc)[:500],
+        source_type="curated_pdf",
+    )
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -265,6 +343,7 @@ def run_research_workspace(
     research_query = formulate_search_queries(query)
     base_queries = research_query.search_queries or [query]
     search_queries = _mode_queries(base_queries, mode)
+    curated_docs = _curated_matches(query)
 
     all_sources: list[WebSource] = []
     seen_urls: set[str] = set()
@@ -279,8 +358,33 @@ def run_research_workspace(
             source_errors[search_query] = str(exc)
 
     evidence: list[dict[str, Any]] = []
+    source_payloads: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
-    for index, source in enumerate(all_sources[:max_sources], start=1):
+
+    for doc in curated_docs[:max_sources]:
+        source = _curated_source(doc)
+        index = len(source_payloads) + 1
+        source_info = _source_payload(source, index)
+        source_payloads.append(source_info)
+        text = _curated_text(doc)
+        if text:
+            counts.update(extract_molecules_from_text(text))
+        evidence.append({
+            "citation_id": source_info["citation_id"],
+            "url": source.url,
+            "title": source.title,
+            "snippet": source.snippet,
+            "source_type": source.source_type,
+            "domain": source_info["domain"],
+            "citation_markdown": source_info["citation_markdown"],
+            "title_markdown": source_info["title_markdown"],
+            "excerpt": _make_excerpt(text or source.snippet, query, limit=1600),
+            "curated_source_id": doc.get("id"),
+        })
+
+    remaining_slots = max(max_sources - len(source_payloads), 0)
+    for source in all_sources[:remaining_slots]:
+        index = len(source_payloads) + 1
         try:
             text = _fetch_source_text(source)
         except Exception as exc:
@@ -289,6 +393,7 @@ def run_research_workspace(
         if text:
             counts.update(extract_molecules_from_text(text))
         source_info = _source_payload(source, index)
+        source_payloads.append(source_info)
         evidence.append({
             "citation_id": source_info["citation_id"],
             "url": source.url,
@@ -325,11 +430,6 @@ def run_research_workspace(
         evidence,
         rag_results,
     )
-
-    source_payloads = [
-        _source_payload(source, index)
-        for index, source in enumerate(all_sources[:max_sources], start=1)
-    ]
 
     return {
         "status": "ok" if evidence or candidates or rag_results else "empty",

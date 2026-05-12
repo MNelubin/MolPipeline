@@ -1,0 +1,919 @@
+                                                   Unit
+
+
+                                              13
+                                             AMINES
+
+I. Multiple Choice Questions (Type-I)
+1.   Which of the following is a 3° amine?
+       (i)   1-methylcyclohexylamine
+     (ii)    Triethylamine
+     (iii)   tert-butylamine
+     (iv)    N-methylaniline
+
+2.   The correct IUPAC name for CH2==CHCH2 NHCH3 is
+       (i)   Allylmethylamine
+     (ii)    2-amino-4-pentene
+     (iii)   4-aminopent-1-ene
+     (iv)    N-methylprop-2-en-1-amine
+
+3.   Amongst the following, the strongest base in aqueous medium is ____________.
+       (i)   CH3NH2
+     (ii)    NCCH2NH2
+     (iii)   (CH3)2 NH
+     (iv)    C6H5NHCH3
+
+4.   Which of the following is the weakest Brönsted base?
+
+
+       (i)
+
+
+
+     (ii)
+
+
+
+
+                                                                             23/04/18
+     (iii)
+
+
+     (iv)    CH3NH2
+
+
+5.   Benzylamine may be alkylated as shown in the following equation :
+
+                C6H5CH2NH2 + R—X → C6H5CH2NHR
+     Which of the following alkylhalides is best suited for this reaction through
+     SN1 mechanism?
+       (i)   CH3Br
+     (ii)    C6H5Br
+     (iii)   C6H5CH2Br
+     (iv)    C2H5 Br
+
+6.   Which of the following reagents would not be a good choice for reducing an
+     aryl nitro compound to an amine?
+       (i)   H2 (excess)/Pt
+     (ii)    LiAlH4 in ether
+     (iii)   Fe and HCl
+     (iv)    Sn and HCl
+
+7.   In order to prepare a 1° amine from an alkyl halide with simultaneous addition
+     of one CH2 group in the carbon chain, the reagent used as source of nitrogen
+     is ___________.
+       (i)   Sodium amide, NaNH2
+     (ii)    Sodium azide, NaN3
+     (iii)   Potassium cyanide, KCN
+                                                –   +
+     (iv)    Potassium phthalimide, C6H4(CO)2N K
+
+8.   The source of nitrogen in Gabriel synthesis of amines is _____________.
+       (i)   Sodium azide, NaN3
+     (ii)    Sodium nitrite, NaNO2
+     (iii)   Potassium cyanide, KCN
+                                                –   +
+     (iv)    Potassium phthalimide, C6H4(CO)2N K
+
+9.   Amongst the given set of reactants, the most appropriate for preparing 2°
+     amine is _____.
+       (i)   2° R—Br + NH3
+     (ii)    2° R—Br + NaCN followed by H2/Pt
+
+                                                                            181 Amines
+
+
+
+
+                                                                                      23/04/18
+          (iii)    1° R—NH2 + RCHO followed by H2/Pt
+           (iv)    1° R—Br (2 mol) + potassium phthalimide followed by H3O+/heat
+
+     10. The best reagent for converting               2–phenylpropanamide         into
+         2-phenylpropanamine is _____.
+            (i)    excess H2
+           (ii)    Br2 in aqueous NaOH
+          (iii)    iodine in the presence of red phosphorus
+           (iv)    LiAlH4 in ether
+
+     11. The best reagent for converting, 2-phenylpropanamide into
+         1- phenylethanamine is ____.
+            (i)    excess H2/Pt
+           (ii)    NaOH/Br2
+          (iii)    NaBH4/methanol
+           (iv)    LiAlH4/ether
+
+     12. Hoffmann Bromamide Degradation reaction is shown by __________.
+            (i)    ArNH2
+           (ii)    ArCONH2
+          (iii)    ArNO2
+           (iv)    ArCH2NH2
+
+     13. The correct increasing order of basic strength for the following compounds is
+         _________.
+
+
+
+
+             (I)                         (II)                 (III)
+
+            (i)    II < III < I
+           (ii)    III < I < II
+          (iii)    III < II < I
+           (iv)    II < I < III
+     14. Methylamine reacts with HNO2 to form _________.
+            (i)    CH3—O—N ==O
+           (ii)    CH3—O—CH3
+
+
+Exemplar Problems, Chemistry 182
+
+
+
+
+                                                                                    23/04/18
+     (iii)   CH3OH
+     (iv)    CH3CHO
+
+15. The gas evolved when methylamine reacts with nitrous acid is __________.
+       (i)   NH3
+     (ii)    N2
+     (iii)   H2
+     (iv)    C2H6
+
+16. In the nitration of benzene using a mixture of conc. H2SO4 and conc. HNO3,
+    the species which initiates the reaction is __________.
+       (i)   NO2
+                  +
+     (ii)    NO
+                  +
+     (iii)   NO2
+                  –
+     (iv)    NO2
+
+17. Reduction of aromatic nitro compounds using Fe and HCl gives __________.
+       (i)   aromatic oxime
+     (ii)    aromatic hydrocarbon
+     (iii)   aromatic primary amine
+     (iv)    aromatic amide
+
+18. The most reactive amine towards dilute hydrochloric acid is ___________.
+       (i)   CH3—NH2
+
+     (ii)
+
+
+     (iii)
+
+
+
+
+     (iv)
+
+
+
+19. Acid anhydrides on reaction with primary amines give ____________.
+       (i)   amide
+     (ii)    imide
+     (iii)   secondary amine
+     (iv)    imine
+
+
+
+                                                                         183 Amines
+
+
+
+
+                                                                                 23/04/18
+                         +   – Cu/HCl
+     20. The reaction Ar N2Cl → ArCl + N2 + CuCl is named as _________.
+            (i)   Sandmeyer reaction
+           (ii)   Gatterman reaction
+          (iii)   Claisen reaction
+           (iv)   Carbylamine reaction
+
+     21. Best method for preparing primary amines from alkyl halides without
+         changing the number of carbon atoms in the chain is
+            (i)   Hoffmann Bromamide reaction
+           (ii)   Gabriel phthalimide synthesis
+          (iii)   Sandmeyer reaction
+           (iv)   Reaction with NH3
+
+     22. Which of the following compound will not undergo azo coupling reaction
+         with benzene diazonium chloride.
+            (i)   Aniline
+           (ii)   Phenol
+          (iii)   Anisole
+           (iv)   Nitrobenzene
+
+     23. Which of the following compounds is the weakest Brönsted base?
+
+
+
+
+            (i)
+
+
+
+
+           (ii)
+
+
+
+
+          (iii)
+
+
+
+
+           (iv)
+
+
+
+Exemplar Problems, Chemistry 184
+
+
+
+
+                                                                            23/04/18
+24. Among the following amines, the strongest Brönsted base is __________.
+
+
+
+
+       (i)
+
+
+      (ii)   NH3
+
+
+
+
+     (iii)
+
+
+
+
+      (iv)
+
+
+
+25. The correct decreasing order of basic strength of the following species is _______.
+                       –       –
+     H2O, NH3, OH , NH2
+                   –       –
+       (i)   NH2 > OH > NH3 > H2O
+                   –       –
+      (ii)   OH > NH2 > H2O > NH3
+                                   –        –
+     (iii)   NH3 > H2O > NH2 > OH
+                                   –        –
+      (iv)   H2O > NH3 > OH > NH2
+
+26. Which of the following should be most volatile?
+
+
+        (I) CH3CH2CH2NH2               (II) (CH3)3N   (III)          (IV) CH3CH2CH3
+
+       (i)   II
+      (ii)   IV
+     (iii)   I
+      (iv)   III
+
+27. Which of the following methods of preparation of amines will give same number
+    of carbon atoms in the chain of amines as in the reactant?
+       (i)   Reaction of nitrite with LiAlH4.
+      (ii)   Reaction of amide with LiAlH4 followed by treatment with water.
+     (iii)   Heating alkylhalide with potassium salt of phthalimide followed by
+             hydrolysis.
+      (iv)   Treatment of amide with bromine in aqueous solution of sodium hydroxide.
+
+                                                                                185 Amines
+
+
+
+
+                                                                                          23/04/18
+      II. Multiple Choice Questions (Type-II)
+      Note : In the following questions two or more options may be correct.
+
+      28. Which of the following cannot be prepared by Sandmeyer’s reaction?
+             (i)   Chlorobenzene
+            (ii)   Bromobenzene
+           (iii)   Iodobenzene
+           (iv)    Fluorobenzene
+      29. Reduction of nitrobenzene by which of the following reagent gives aniline?
+             (i)   Sn/HCl
+            (ii)   Fe/HCl
+           (iii)   H2-Pd
+           (iv)    Sn/NH4OH
+      30. Which of the following species are involved in the carbylamine test?
+             (i)   R—NC
+            (ii)   CHCl3
+           (iii)   COCl2
+           (iv)    NaNO2 + HCl
+      31. The reagents that can be used to convert benzenediazonium chloride to
+          benzene are __________.
+             (i)   SnCl2/HCl
+            (ii)   CH3CH2OH
+           (iii)   H3PO2
+           (iv)    LiAlH4
+      32. The product of the following reaction is __________.
+
+
+
+
+             (i)
+
+
+
+
+Exemplar Problems, Chemistry 186
+
+
+
+
+                                                                                  23/04/18
+      (ii)
+
+
+
+
+     (iii)
+
+
+
+
+     (iv)
+
+
+
+
+33. Arenium ion involved in the bromination of aniline is __________.
+
+
+
+
+       (i)
+
+
+
+
+      (ii)
+
+
+
+
+     (iii)
+
+
+
+
+     (iv)
+
+
+                                                                        187 Amines
+
+
+
+
+                                                                             23/04/18
+     34. Which of the following amines can be prepared by Gabriel synthesis.
+            (i)   Isobutyl amine
+           (ii)   2-Phenylethylamine
+          (iii)   N-methylbenzylamine
+           (iv)   Aniline
+
+     35. Which of the following reactions are correct?
+
+
+
+            (i)
+
+
+
+
+           (ii)
+
+
+
+          (iii)
+
+
+
+           (iv)
+
+
+     36. Under which of the following reaction conditions, aniline gives p-nitro derivative
+         as the major product?
+            (i)   Acetyl chloride/pyridine followed by reaction with conc. H2SO4 +
+                  conc. HNO3.
+           (ii)   Acetic anyhdride/pyridine followed by conc. H2SO4 + conc. HNO3.
+          (iii)   Dil. HCl followed by reaction with conc. H2SO4 + conc. HNO3.
+           (iv)   Reaction with conc. HNO3 + conc.H2SO4.
+
+     37. Which of the following reactions belong to electrophilic aromatic substitution?
+            (i)   Bromination of acetanilide
+           (ii)   Coupling reaction of aryldiazonium salts
+          (iii)   Diazotisation of aniline
+           (iv)   Acylation of aniline
+
+
+
+     III. Short Answer Type
+     38. What is the role of HNO3 in the nitrating mixture used for nitration of benzene?
+     39. Why is NH2 group of aniline acetylated before carrying out nitration?
+     40. What is the product when C6H5CH2NH2 reacts with HNO2?
+
+Exemplar Problems, Chemistry 188
+
+
+
+
+                                                                                       23/04/18
+41. What is the best reagent to convert nitrile to primary amine?
+42. Give the structure of ‘A’ in the following reaction.
+
+
+
+
+43. What is Hinsberg reagent?
+44. Why is benzene diazonium chloride not stored and is used immediately after
+    its preparation?
+45. Why does acetylation of —NH2 group of aniline reduce its activating effect?
+46. Explain why MeNH2 is stronger base than MeOH?
+47. What is the role of pyridine in the acylation reaction of amines?
+48. Under what reaction conditions (acidic/basic), the coupling reaction of
+    aryldiazonium chloride with aniline is carried out?
+49. Predict the product of reaction of aniline with bromine in non-polar solvent
+    such as CS2.
+50. Arrange the following compounds in increasing order of dipole moment.
+     CH3CH2CH3, CH3CH2NH2, CH3CH2OH
+
+51. What is the structure and IUPAC name of the compound, allyl amine?
+
+
+
+
+52. Write down the IUPAC name of
+
+
+53. A compound Z with molecular formula C3H9N reacts with C6H5SO2Cl to give a
+    solid, insoluble in alkali. Identify Z.
+54. A primary amine, RNH2 can be reacted with CH3—X to get secondary amine,
+    R—NHCH3 but the only disadvantage is that 3° amine and quaternary
+    ammonium salts are also obtained as side products. Can you suggest a method
+    where RNH2 forms only 2° amine?
+
+55. Complete the following reaction.
+
+
+
+
+                                                                          189 Amines
+
+
+
+
+                                                                                   23/04/18
+     56. Why is aniline soluble in aqueous HCl?
+
+     57. Suggest a route by which the following conversion can be accomplished.
+
+
+
+
+     58. Identify A and B in the following reaction.
+
+
+
+
+     59. How will you carry out the following conversions?
+          (i) toluene → p-toluidine
+          (ii) p-toluidine diazonium chloride → p-toluic acid
+
+     60. Write following conversions:
+          (i) nitrobenzene → acetanilide       (ii) acetanilide → p-nitroaniline
+
+     61. A solution contains 1 g mol. each of p-toluene diazonium chloride and p-
+         nitrophenyl diazonium chloride. To this 1 g mol. of alkaline solution of phenol
+         is added. Predict the major product. Explain your answer.
+
+     62. How will you bring out the following conversion?
+
+
+
+
+     63. How will you carry out the following conversion?
+
+                                                       NO2
+
+
+                                          →
+
+
+                                                       NH2
+
+Exemplar Problems, Chemistry 190
+
+
+
+
+                                                                                     23/04/18
+64. How will you carry out the following conversion?
+
+                                NH2                 NO2
+
+
+                                      →
+                                                            Br
+65. How will you carry out the following conversions?
+
+
+
+
+     (i)                                     (ii)
+
+
+
+
+IV. Matching Type
+Note : Match the items of Column I and Column II in the following questions.
+66. Match the reactions given in Column I with the statements given in Column II.
+
+                Column I                                  Column II
+       (i)   Ammonolysis                            (a) Amine with lesser number of
+                                                        carbon atoms
+
+     (ii)    Gabriel phthalimide synthesis          (b) Detection test for primary
+                                                        amines.
+
+     (iii)   Hoffmann Bromamide reaction            (c) Reaction of phthalimide with
+                                                        KOH and R—X
+
+     (iv)    Carbylamine reaction                   (d) Reaction of alkylhalides with
+                                                        NH3
+67. Match the compounds given in Column I with the items given in Column II.
+
+                Column I                                  Column II
+       (i)   Benzene sulphonyl chloride             (a)   Zwitter ion
+     (ii)    Sulphanilic acid                       (b)   Hinsberg reagent
+     (iii)   Alkyl diazonium salts                  (c)   Dyes
+     (iv)    Aryl diazonium salts                   (d)   Conversion to alcohols
+
+
+
+                                                                                   191 Amines
+
+
+
+
+                                                                                        23/04/18
+     V. Assertion and Reason Type
+     Note : In the following questions a statement of assertion followed by a
+     statement of reason is given. Choose the correct answer out of the following
+     choices.
+          (i) Both assertion and reason are wrong.
+          (ii) Both assertion and reason are correct statements but reason is not correct
+               explanation of assertion.
+         (iii) Assertion is correct statement but reason is wrong statement.
+         (iv) Both assertion and reason are correct statements and reason is correct
+              explanation of assertion.
+
+          (v) Assertion is wrong statement but reason is correct statement.
+     68. Assertion      :   Acylation of amines gives a monosubstituted product whereas
+                            alkylation of amines gives polysubstituted product.
+          Reason        :   Acyl group sterically hinders the approach of further acyl
+                            groups.
+     69. Assertion      :   Hoffmann’s bromamide reaction is given by primary amines.
+          Reason        :   Primary amines are more basic than secondary amines.
+     70. Assertion      :   N-Ethylbenzene sulphonamide is soluble in alkali.
+          Reason        :   Hydrogen attached to nitrogen in sulphonamide is strongly
+                            acidic.
+     71. Assertion      :   N, N-Diethylbenzene sulphonamide is insoluble in alkali.
+          Reason        :   Sulphonyl group attached to nitrogen atom is strong electron
+                            withdrawing group.
+     72. Assertion      :   Only a small amount of HCl is required in the reduction of
+                            nitro compounds with iron scrap and HCl in the presence of
+                            steam.
+          Reason        :   FeCl2 formed gets hydrolysed to release HCl during the
+                            reaction.
+     73. Assertion      :   Aromatic 1° amines can be prepared by Gabriel Phthalimide
+                            Synthesis.
+          Reason        :   Aryl halides undergo nucleophilic substitution with anion
+                            formed by phthalimide.
+     74. Assertion      :   Acetanilide is less basic than aniline.
+          Reason        :   Acetylation of aniline results in decrease of electron density
+                            on nitrogen.
+
+
+
+
+Exemplar Problems, Chemistry 192
+
+
+
+
+                                                                                      23/04/18
+VI. Long Answer Type
+75. A hydrocarbon ‘A’, (C4H8) on reaction with HCl gives a compound ‘B’, (C4H9Cl),
+    which on reaction with 1 mol of NH3 gives compound ‘C’, (C4H11N). On reacting
+    with NaNO2 and HCl followed by treatment with water, compound ‘C’ yields
+    an optically active alcohol, ‘D’. Ozonolysis of ‘A’ gives 2 mols of acetaldehyde.
+    Identify compounds ‘A’ to ‘D’. Explain the reactions involved.
+76. A colourless substance ‘A’ (C6H7N) is sparingly soluble in water and gives a
+    water soluble compound ‘B’ on treating with mineral acid. On reacting with
+    CHCl3 and alcoholic potash ‘A’ produces an obnoxious smell due to the
+    formation of compound ‘C’. Reaction of ‘A’ with benzenesulphonyl chloride
+    gives compound ‘D’ which is soluble in alkali. With NaNO2 and HCl, ‘A’ forms
+    compound ‘E’ which reacts with phenol in alkaline medium to give an orange
+    dye ‘F’. Identify compounds ‘A’ to ‘F’.
+77. Predict the reagent or the product in the following reaction sequence.
+
+
+
+
+                                                                              193 Amines
+
+
+
+
+                                                                                        23/04/18
+     ANSWERS
+     I. Multiple Choice Questions (Type-I)
+
+         1. (ii)           2. (iv)           3. (iii)        4. (i)      5. (iii)            6. (ii)
+         7. (iii)          8. (iv)           9. (iii)        10. (iv)    11. (ii)            12. (ii)
+         13. (iv)          14. (iii)         15. (ii)        16. (iii)   17. (iii)           18. (ii)
+         19. (i)           20. (ii)          21. (ii)        22. (iv)    23. (iii)           24. (iv)
+         25. (i)           26. (ii)          27. (iii)
+
+     II. Multiple Choice Questions (Type-II)
+
+         28. (iii), (iv)         29. (i), (ii), (iii)    30. (i), (ii)     31. (ii), (iii)
+         32. (i), (ii)           33. (i), (ii), (iii)    34. (i), (ii)     35. (i), (iii)
+         36. (i), (ii)           37. (i), (ii)
+
+     III. Short Answer Type
+
+         38.        HNO3 acts as a base in the nitrating mixture and provides the electrophile,
+                      +
+                    NO2 .
+         39.        See NCERT textbook for Class XII.
+         40.        C6H5CH2OH
+         41.        Reduction of nitriles with sodium/alcohol or LiAlH4 gives primary amine.
+
+         42.
+
+
+
+
+         43.        Benzene sulphonylchloride.
+         44.        Benzene diazonium chloride is very unstable.
+         45.        See NCERT textbook for Class XII.
+         46.        Nitrogen is less electronegative than oxygen therefore lone pair of electrons
+                    on nitrogen is readily available for donation. Hence, MeNH2 is more basic
+                    than MeOH.
+         47.        Pyridine and other bases are used to remove the side product i.e. HCl
+                    from the reaction mixture.
+         48.        Reaction is done in mild basic conditions.
+         49.        A mixture of 2-bromoaniline and 4-bromoaniline is formed.
+
+Exemplar Problems, Chemistry 194
+
+
+
+
+                                                                                                        23/04/18
+      (2-Bromoaniline)           (4-Bromoaniline)
+
+50.   CH3CH2CH3 < CH3CH2NH2 < CH3CH2OH
+
+51.   CH2== CH—CH2—NH2, prop-2-en-1-amine
+
+52.   N, N-Dimethylbenzenamine
+
+53.   Z is an aliphatic amine which gives a solid insoluble in base. This implies
+      that reaction with C6H5SO2Cl must give a product without any replaceable
+      hydrogen attached to nitrogen. In other words, the amine must be a
+      secondary amine. i.e. Z is ethylmethylamine.
+
+
+
+
+54.
+
+      Carbylamine reaction is shown by 1° amine only which results in the
+      replacement of two hydrogen atoms attached to nitrogen atom of NH2
+      group by one carbon atom. On catalytic reduction the isocyanide will
+      give a secondary amine with one methyl group.
+
+55.   The reaction exhibits azo-coupling of phenols. In mild alkaline conditions
+      phenol moiety participates in the azo-coupling and para position of phenol
+      is occupied.
+
+
+
+
+                                                                          195 Amines
+
+
+
+
+                                                                                    23/04/18
+         56.   Aniline forms the salt anilinium chloride which is water soluble.
+
+
+
+
+         57.
+
+
+
+
+         58.
+
+
+
+
+         59.
+
+
+
+
+               (i)
+
+
+
+
+Exemplar Problems, Chemistry 196
+
+
+
+
+                                                                                   23/04/18
+      (ii)
+
+
+
+
+60.
+
+
+
+
+       (i)
+
+
+
+
+      (ii)
+
+
+
+
+61.   This reaction is an example of electrophilic aromatic substitution. In
+      alkaline medium, phenol generates phenoxide ion which is more electron
+      rich than phenol and hence more reactive for electrophilic attack. The
+      electrophile in this reaction is aryldiazonium cation. Stronger the
+      electrophile faster is the reaction. p-Nitrophenyldiazonium cation is a
+      stronger electrophile than p-toluene diazonium cation. Therefore, it
+      couples preferentially with phenol.
+
+
+
+
+                                                                       197 Amines
+
+
+
+
+                                                                                23/04/18
+         62.
+
+
+
+
+         63.
+
+
+
+
+         64.
+
+
+
+
+Exemplar Problems, Chemistry 198
+
+
+
+
+                                   23/04/18
+  65. (i)
+
+
+
+
+)i()i(
+
+
+
+
+         (ii)   Conversion (A) given below is same as in part (i) given above after that
+                reaction (B) can be carried out.
+
+
+
+
+                (A)
+
+
+
+
+                (B)
+
+
+
+
+  IV. Matching Type
+         66.    (i) → (d)     (ii) → (c)          (iii) → (a)        (iv) → (b)
+         67.    (i) → (b)     (ii) → (a)          (iii) → (d)        (iv) → (c)
+
+  V. Assertion and Reason Type
+     68. (iii)  69. (iii) 70. (iv)          71. (ii)      72. (iv)    73. (i)     74. (iv)
+                                                                                    199 Amines
+
+
+
+
+                                                                                             23/04/18
+     VI. Long Answer Type
+
+         75.
+
+                                         Addition of HCl has occurred on ‘A’. This implies
+                                         ‘A’ is an alkene.
+
+                                         Cl in compound ‘B’ is substituted by NH2 to
+                                         give ‘C’.
+
+                                         ‘C’ gives a diazonium salt with NaNO2/HCl that
+                                         liberates N2 to give optically active alcohol. This
+                                         means that ‘C’ is an aliphatic amine. Number of
+                                         carbon atoms in amine is same as in compound ‘A’.
+
+               Since products of ozonolysis of compound ‘A’ are CH3 — CH == O
+               and O == CH—CH3. The compound ‘A’ is CH3—CH== CH—CH3
+               On the basis of structure of ‘A’ reactions can be explained as follows :
+
+
+
+
+                            (A)                        (B)
+
+
+
+
+                         (B)                                (C)
+
+
+
+
+                      (C)                             (D)
+
+
+         76.
+
+
+
+
+Exemplar Problems, Chemistry 200
+
+
+
+
+                                                                                        23/04/18
+                                 CH3
+
+
+77.   1. Sn-HCl             2.               3. H2O/H+
+                                       NO2
+                                 NHCOCH3
+
+
+           CH3
+
+
+      4.                    5. H3PO2/H2O
+                      NO2
+             +    –
+           N2 Cl
+                                                     201 Amines
+
+
+
+
+                                                          23/04/18
+

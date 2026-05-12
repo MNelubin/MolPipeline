@@ -1,0 +1,549 @@
+                                                      Unit
+
+
+
+
+                               ALDEHYDES, KETONES
+                                                   12
+                                AND CARBOXYLIC
+                                     ACIDS
+
+I. Multiple Choice Questions (Type-I)
+1.   Addition of water to alkynes occurs in acidic medium and in the presence of
+     Hg2+ ions as a catalyst. Which of the following products will be formed on
+     addition of water to but-1-yne under these conditions.
+
+
+
+       (i)                                  (ii)
+
+
+     (iii)                                  (iv)
+2.   Which of the following compounds is most reactive towards nucleophilic
+     addition reactions?
+
+
+       (i)                                  (ii)
+
+
+
+     (iii)                                  (iv)
+
+3.   The correct order of increasing acidic strength is _____________.
+       (i)   Phenol < Ethanol < Chloroacetic acid < Acetic acid
+     (ii)    Ethanol < Phenol < Chloroacetic acid < Acetic acid
+     (iii)   Ethanol < Phenol < Acetic acid < Chloroacetic acid
+     (iv)    Chloroacetic acid < Acetic acid < Phenol < Ethanol
+
+
+
+
+                                                                             23/04/18
+4.   Compound                     can be prepared by the reaction of _____________.
+       (i)   Phenol and benzoic acid in the presence of NaOH
+     (ii)    Phenol and benzoyl chloride in the presence of pyridine
+     (iii)   Phenol and benzoyl chloride in the presence of ZnCl2
+     (iv)    Phenol and benzaldehyde in the presence of palladium
+
+5.   The reagent which does not react with both, acetone and benzaldehyde.
+       (i)   Sodium hydrogensulphite
+     (ii)    Phenyl hydrazine
+     (iii)   Fehling’s solution
+     (iv)    Grignard reagent
+
+6.   Cannizaro’s reaction is not given by _____________.
+
+
+       (i)
+
+
+
+     (ii)
+
+     (iii)   H CHO
+     (iv)    CH3CHO
+
+7.   Which product is formed when the compound                         is treated with
+
+     concentrated aqueous KOH solution?
+
+
+       (i)
+
+
+
+     (ii)
+
+
+
+
+     (iii)
+
+
+
+
+     (iv)
+
+
+
+                                            169 Aldehydes, Ketones and Carboxylic Acids
+
+
+
+
+                                                                                         23/04/18
+     8.
+
+
+          Structure of ‘A’ and type of isomerism in the above reaction are respectively.
+            (i)   Prop–1–en–2–ol, metamerism
+           (ii)   Prop-1-en-1-ol, tautomerism
+          (iii)   Prop-2-en-2-ol, geometrical isomerism
+           (iv)   Prop-1-en-2-ol, tautomerism
+     9.   Compounds A and C in the following reaction are __________.
+
+
+
+
+            (i)   identical
+           (ii)   positional isomers
+          (iii)   functional isomers
+           (iv)   optical isomers
+     10. Which is the most suitable reagent for the following conversion?
+
+
+
+
+            (i)   Tollen’s reagent
+           (ii)   Benzoyl peroxide
+          (iii)   I2 and NaOH solution
+           (iv)   Sn and NaOH solution
+     11. Which of the following compounds will give butanone on oxidation with
+         alkaline KMnO4 solution?
+            (i)   Butan-1-ol
+           (ii)   Butan-2-ol
+          (iii)   Both of these
+           (iv)   None of these
+     12. In Clemmensen Reduction carbonyl compound is treated with _____________.
+            (i)   Zinc amalgam + HCl
+           (ii)   Sodium amalgam + HCl
+          (iii)   Zinc amalgam + nitric acid
+           (iv)   Sodium amalgam + HNO3
+
+
+
+
+Exemplar Problems, Chemistry 170
+
+
+
+
+                                                                                    23/04/18
+II. Multiple Choice Questions (Type-II)
+Note : In the following questions two or more options may be correct.
+13. Which of the following compounds do not undergo aldol condensation?
+
+
+       (i)   CH3—CHO                                (ii)
+
+
+
+
+     (iii)                                          (iv)
+
+
+
+
+14. Treatment of compound                       with NaOH solution yields
+       (i)   Phenol
+     (ii)    Sodium phenoxide
+     (iii)   Sodium benzoate
+     (iv)    Benzophenone
+
+15. Which of the following conversions can be carried out by Clemmensen
+    Reduction?
+       (i)   Benzaldehyde into benzyl alcohol
+     (ii)    Cyclohexanone into cyclohexane
+     (iii)   Benzoyl chloride into benzaldehyde
+     (iv)    Benzophenone into diphenyl methane
+16. Through which of the following reactions number of carbon atoms can be
+    increased in the chain?
+       (i)   Grignard reaction
+     (ii)    Cannizaro’s reaction
+     (iii)   Aldol condensation
+     (iv)    HVZ reaction
+17. Benzophenone can be obtained by ____________.
+       (i)   Benzoyl chloride + Benzene + AlCl3
+     (ii)    Benzoyl chloride + Diphenyl cadmium
+     (iii)   Benzoyl chloride + Phenyl magnesium chloride
+     (iv)    Benzene + Carbon monoxide + ZnCl2
+
+                                           171 Aldehydes, Ketones and Carboxylic Acids
+
+
+
+
+                                                                                 23/04/18
+     18. Which of the following is the correct representation for
+         intermediate of nucleophilic addition reaction to the given
+         carbonyl compound (A) :                                                (A)
+
+
+
+            (i)                                  (ii)
+
+
+
+
+          (iii)                                  (iv)
+
+
+
+     III. Short Answer Type
+     19. Why is there a large difference in the boiling points of butanal and butan-1-ol?
+     20. Write a test to differentiate between pentan-2-one and pentan-3-one.
+     21. Give the IUPAC names of the following compounds
+
+
+
+
+            (i)                                  (ii)
+
+
+           (iii)                                 (iv)    CH3—CH== CH—CHO
+
+
+     22. Give the structure of the following compounds.
+            (i)    4-Nitropropiophenone
+           (ii)    2-Hydroxycyclopentanecarbaldehyde
+           (iii)   Phenyl acetaldehyde
+
+     23. Write IUPAC names of the following structures.
+
+
+
+
+          (i)                      (ii)                         (iii)
+
+
+
+     24. Benzaldehyde can be obtained from benzal chloride. Write reactions for
+         obtaining benzalchloride and then benzaldehyde from it.
+
+
+
+Exemplar Problems, Chemistry 172
+
+
+
+
+                                                                                      23/04/18
+25. Name the electrophile produced in the reaction of benzene with benzoyl chloride
+    in the presence of anhydrous AlCl3. Name the reaction also.
+26. Oxidation of ketones involves carbon-carbon bond cleavage. Name the products
+    formed on oxidation of 2, 5-dimethylhexan-3-one.
+27. Arrange the following in decreasing order of their acidic strength and give reason
+    for your answer.
+     CH3CH2OH, CH3COOH, ClCH2COOH, FCH2COOH, C6H5CH2COOH
+28. What product will be formed on reaction of propanal with 2-methylpropanal in
+    the presence of NaOH? What products will be formed? Write the name of the
+    reaction also.
+29. Compound ‘A’ was prepared by oxidation of compound ‘B’ with alkaline KMnO4.
+    Compound ‘A’ on reduction with lithium aluminium hydride gets converted
+    back to compound ‘B’. When compound ‘A’ is heated with compound B in the
+    presence of H2SO4 it produces fruity smell of compound C to which family the
+    compounds ‘A’, ‘B’ and ‘C’ belong to?
+30. Arrange the following in decreasing order of their acidic strength. Give
+    explanation for the arrangement.
+     C6H5COOH, FCH2COOH, NO2CH2COOH
+
+31. Alkenes (           ) and carbonyl compounds (           ), both contain a π bond
+     but alkenes show electrophilic addition reactions whereas carbonyl
+     compounds show nucleophilic addition reactions. Explain.
+32. Carboxylic acids contain carbonyl group but do not show the nucleophilic
+    addition reaction like aldehydes or ketones. Why?
+33. Identify the compounds A, B and C in the following reaction.
+
+
+
+
+34. Why are carboxylic acids more acidic than alcohols or phenols although all of
+    them have hydrogen atom attached to a oxygen atom (—O—H)?
+35. Complete the following reaction sequence.
+
+
+
+
+36. Ethylbenzene is generally prepared by acetylation of benzene followed by
+    reduction and not by direct alkylation. Think of a possible reason.
+37. Can Gatterman-Koch reaction be considered similar to Friedel Craft’s acylation?
+    Discuss.
+
+
+
+                                             173 Aldehydes, Ketones and Carboxylic Acids
+
+
+
+
+                                                                                         23/04/18
+      IV. Matching Type
+      Note : Match the items of Column I and Column II in the following questions.
+      38. Match the common names given in Column I with the IUPAC names given in
+          Column II.
+                   Column I                           Column II
+                (Common names)                     (IUPAC names)
+               (i) Cinnamaldehyde                  (a)    Pentanal
+               (ii) Acetophenone                   (b)    Prop-2-enal
+          (iii) Valeraldehyde                       (c)   4-Methylpent-3-en-2-one
+           (iv) Acrolein                           (d)    3-Phenylprop-2-enal
+               (v) Mesityl oxide                    (e)   1-Phenylethanone
+
+      39. Match the acids given in Column I with their correct IUPAC names given in
+          Column II.
+                       Column I                       Column II
+                        (Acids)                    (IUPAC names)
+               (i) Phthalic acid                   (a)    Hexane-1,6-dioic acid
+               (ii) Oxalic acid                    (b)    Benzene-1,2-dicarboxylic acid
+          (iii) Succinic acid                       (c)   Pentane-1,5-dioic acid
+           (iv) Adipic acid                        (d)    Butane-1,4-dioic acid
+               (v) Glutaric acid                    (e)   Ethane-1,2-dioic acid
+
+      40. Match the reactions given in Column I with the suitable reagents given in
+          Column II.
+                        Column I                                    Column II
+                       (Reactions)                                  (Reagents)
+                 (i)    Benzophenone → Diphenylmethane        (a)    LiAlH4
+               (ii)     Benzaldehyde → 1-Phenylethanol       (b)     DIBAL—H
+               (iii)    Cyclohexanone → Cyclohexanol          (c)    Zn(Hg)/Conc. HCl
+               (iv)     Phenyl benzoate → Benzaldehyde       (d)     CH3MgBr
+
+      41. Match the example given in Column I with the name of the reaction in Column II.
+                       Column I                                           Column II
+                       (Example)                                          (Reaction)
+
+
+         (i)                                                        (a) Friedel Crafts acylation
+
+
+Exemplar Problems, Chemistry 174
+
+
+
+
+                                                                                            23/04/18
+   (ii)                                                    (b) HVZ reaction
+
+
+
+
+  (iii)                                                    (c) Aldol condensation
+
+
+
+  (iv)                                                     (d) Cannizaro’s reaction
+
+
+
+   (v)                                                     (e) Rosenmund’s reduction
+
+
+  (vi)                                                      (f) Stephen’s reaction
+
+
+
+V. Assertion and Reason Type
+Note : In the following questions a statement of assertion followed by a
+statement of reason is given. Choose the correct answer out of the following
+choices.
+          (i) Assertion and reason both are correct and reason is correct explanation
+              of assertion.
+      (ii) Assertion and reason both are wrong statements.
+     (iii) Assertion is correct statement but reason is wrong statement.
+     (iv) Assertion is wrong statement but reason is correct statement.
+      (v) Assertion and reason both are correct statements but reasson is not correct
+          explanation of assertion.
+42. Assertion         :   Formaldehyde is a planar molecule.
+          Reason      :   It contains sp2 hybridised carbon atom.
+43. Assertion         :   Compounds containing —CHO group are easily oxidised to
+                          corresponding carboxylic acids.
+          Reason      :   Carboxylic acids can be reduced to alcohols by treatment
+                          with LiAlH4.
+
+                                               175 Aldehydes, Ketones and Carboxylic Acids
+
+
+
+
+                                                                                        23/04/18
+     44. Assertion      :   The α-hydrogen atom in carbonyl compounds is less acidic.
+          Reason        :   The anion formed after the loss of α-hydrogen atom is
+                            resonance stabilised.
+     45. Assertion      :   Aromatic aldehydes and formaldehyde undergo Cannizaro
+                            reaction.
+          Reason        :   Aromatic aldehydes are almost as reactive as formaldehyde.
+     46. Assertion      :   Aldehydes and ketones, both react with Tollen’s reagent to
+                            form silver mirror.
+          Reason        :   Both, aldehydes and ketones contain a carbonyl group.
+
+
+     VI. Long Answer Type
+     47. An alkene ‘A’ (Mol. formula C5H10) on ozonolysis gives a mixture of two
+         compounds ‘B’ and ‘C’. Compound ‘B’ gives positive Fehling’s test and also
+         forms iodoform on treatment with I2 and NaOH. Compound ‘C’ does not give
+         Fehling’s test but forms iodoform. Identify the compounds A, B and C. Write
+         the reaction for ozonolysis and formation of iodoform from B and C.
+     48. An aromatic compound ‘A’ (Molecular formula C8H8O) gives positive
+         2, 4-DNP test. It gives a yellow precipitate of compound ‘B’ on treatment with
+         iodine and sodium hydroxide solution. Compound ‘A’ does not give Tollen’s
+         or Fehling’s test. On drastic oxidation with potassium permanganate it forms
+         a carboxylic acid ‘C’ (Molecular formula C7H6O2), which is also formed along
+         with the yellow compound in the above reaction. Identify A, B and C and
+         write all the reactions involved.
+     49. Write down functional isomers of a carbonyl compound with molecular
+         formula C3H6O. Which isomer will react faster with HCN and why? Explain
+         the mechanism of the reaction also. Will the reaction lead to the completion
+         with the conversion of whole reactant into product at reaction conditions? If a
+         strong acid is added to the reaction mixture what will be the effect on
+         concentration of the product and why?
+     50. When liquid ‘A’ is treated with a freshly prepared ammoniacal silver nitrate
+         solution, it gives bright silver mirror. The liquid forms a white crystalline solid
+         on treatment with sodium hydrogensulphite. Liquid ‘B’ also forms a white
+         crystalline solid with sodium hydrogensulphite but it does not give test with
+         ammoniacal silver nitrate. Which of the two liquids is aldehyde? Write the
+         chemical equations of these reactions also.
+
+
+
+
+Exemplar Problems, Chemistry 176
+
+
+
+
+                                                                                        23/04/18
+ANSWERS
+I. Multiple Choice Questions (Type-I)
+   1. (ii)           2. (i)              3. (iii)             4. (ii)              5. (iii)         6. (iv)
+   7. (ii)           8. (iv)             9. (ii)              10. (iii)            11. (ii)         12. (i)
+
+II. Multiple Choice Questions (Type-II)
+   13. (ii), (iv); [Hint : in compounds (ii) and (iv) α-hydrogen is absent.]
+   14. (ii), (iii)      15. (ii), (iv)             16. (i), (iii)          17. (i), (ii)      18. (i), (ii)
+
+III. Short Answer Type
+   19.       [Hint : Butan-1-ol has higher boiling point due to intermolecular hydrogen
+             bonding.]
+   20.       [Hint : Iodoform test]
+   21. (i) 3-Phenylprop-2-enal                                      (ii)      Cyclohexanecarbaldehyde
+         (iii) 3-oxopentanal                                        (iv)      But -2-enal
+
+
+
+   22. (i)                                                          (ii)
+
+
+
+         (iii)
+
+   23. (i) Ethane-1, 2 – dial                                       (ii)      Benzene-1, 4-dicarbaldehyde
+         (iii) 3-Bromobenzaldehyde
+   24.       See NCERT textbook for Class XII
+
+
+
+   25.                   benzoyliumcation or                                                  . Friedel Craft’s
+             acylation reaction.
+
+   26.
+
+
+
+
+                                                              177 Aldehydes, Ketones and Carboxylic Acids
+
+
+
+
+                                                                                                                  23/04/18
+         27.   Hint : FCH2COOH > ClCH2COOH > C6H5CH2COOH > CH3COOH >
+               CH3CH2OH
+
+         28.   It is cross Aldol condensation
+
+
+
+
+         29.   ‘A’ is a carboxylic acid, ‘B’ is an alcohol and ‘C’ is an ester.
+
+         30.   NO2CH2COOH > FCH2COOH > C6H5COOH
+
+               [Hint : electron withdrawing effect.]
+
+         31.   [Hint : Carbon atom in carbonyl compounds acquires slight positive
+               charge and is attacked by nucleophile.]
+
+         32.   [Hint : Due to resonance as shown below the partial positive charge on
+               carbonyl carbon atom is reduced.]
+
+
+
+
+         33.   A = CH3MgBr               B = CH3COOH                       C=
+                                                                                       +
+         34.   Hint : Compare the stability of anion formed after the loss of H ion. More
+               stable the anion formed, more easy will be the dissociation of O—H bond,
+               stronger will be the acids.
+
+
+
+         35.   Hint : A =                            B=                         C=
+
+
+
+     IV. Matching Type
+         38.   (i) — (d), (ii) — (e), (iii) — (a), (iv) — (b), (v) — (c)
+         39.   (i) — (b), (ii) — (e), (iii) — (d), (iv) — (a), (v) — (c)
+         40.   (i) — (c), (ii) — (d), (iii) — (a), (iv) — (b)
+         41.   (i) — (e), (ii) — (d), (iii) — (a), (iv) — (b), (v) — (f), (vi) — (c)
+Exemplar Problems, Chemistry 178
+
+
+
+
+                                                                                           23/04/18
+V. Assertion and Reason Type
+   42. (i)              43. (v)   44. (iv)      45. (iii)      46. (iv)
+
+
+VI. Long Answer Type
+
+
+   47.
+
+
+
+
+         Other isomers of ‘A’ will not give products corresponding to the given test.
+   48.        Hint :
+
+
+
+
+   49.        CH3CH2CHO             CH3COCH3
+                  (I)                   (II)
+              Compound I will react faster with HCN due to less steric hinderance and
+               electronic reasons than II.
+              No, It is a reversible reaction. Hence equilibrium is established.
+                                                                                –
+              Addition of acid inhibits the reaction because the formation of CN ions
+               is prevented.
+
+   50.        Hint : Liquid ‘A’
+                                                179 Aldehydes, Ketones and Carboxylic Acids
+
+
+
+
+                                                                                         23/04/18
+

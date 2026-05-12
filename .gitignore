@@ -22,6 +22,7 @@ data/retro_model/templates.jsonl
 # Logs
 logs/
 *.log
+validation_materials/runs/
 
 # Корневой мусор (старый код)
 /langgraph.json

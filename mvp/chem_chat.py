@@ -749,7 +749,7 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
                     "citation_id": item.get("citation_id"),
                     "title": item.get("title"),
                     "url": item.get("url"),
-                    "excerpt": (item.get("excerpt") or item.get("snippet") or "")[:600],
+                    "excerpt": (item.get("excerpt") or item.get("snippet") or "")[:1800],
                 }
                 for item in (research.get("evidence") or [])[:6]
             ],

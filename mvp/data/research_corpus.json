@@ -1,0 +1,44 @@
+[
+  {
+    "id": "segler_2018_nature_supplement",
+    "title": "Supporting Information for Planning Chemical Syntheses with Deep Neural Networks and Symbolic AI",
+    "authors": ["M. H. S. Segler", "M. Preuss", "M. P. Waller"],
+    "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fnature25978/MediaObjects/41586_2018_BFnature25978_MOESM1_ESM.pdf",
+    "related_url": "https://www.nature.com/articles/nature25978",
+    "source_type": "curated_pdf",
+    "keywords": [
+      "segler",
+      "preuss",
+      "waller",
+      "nature 2018",
+      "nature25978",
+      "planning chemical syntheses",
+      "deep neural networks",
+      "symbolic ai",
+      "retrosynthesis",
+      "route diversity",
+      "3n-mcts",
+      "mcts",
+      "bfs",
+      "neural bfs",
+      "supplementary information"
+    ],
+    "excerpts": [
+      {
+        "page": 3,
+        "section": "2 Analysing Route Diversity",
+        "text": "To assess route diversity, we retrieve 19 additional routes besides the route with highest scored. For 3N-MCTS, 600 s total simulation time was allocated for all 20 routes, while neural BFS received a budget of 600 s per retrieved route. Even though this means that BFS received 20 times more search time than MCTS, it retrieved less routes than MCTS, often not retrieving any routes at all."
+      },
+      {
+        "page": 3,
+        "section": "2.1 Depiction Method",
+        "text": "To depict the routes, counted AtomPair fingerprints with a maximum distance of four, folded to a length of 1024, and log (x + 1)-preprocessed, were calculated for each state using rdkit. These features were subjected to Principal Component Analysis (PCA), and the first two principal components were used to depict the states in 2D."
+      },
+      {
+        "page": 4,
+        "section": "2.2 Results and Discussion",
+        "text": "Both methods tend to find solutions in similar regions of chemical space, with the difference of MCTS being two orders of magnitude faster. In some cases, one of the methods finds more diverse routes than the other, but there is no consistent trend across the different targets."
+      }
+    ]
+  }
+]
