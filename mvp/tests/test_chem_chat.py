@@ -272,7 +272,7 @@ def test_retrosynthesis_multistep_request_expands_best_route_tree():
     assert result["plan"]["retrosynthesis_depth_mode"] == "multi_step"
     assert result["artifacts"]["retrosynthesis"]["depth_mode"] == "multi_step"
     assert result["artifacts"]["retrosynthesis"]["multi_step_tree"]["stats"]["total_nodes"] == 3
-    assert "Multi-step route tree built" in result["answer"]
+    assert "Многостадийное дерево построено" in result["answer"]
     mock_expand.assert_called_once()
 
 

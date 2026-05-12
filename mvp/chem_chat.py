@@ -686,13 +686,19 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
     if retro:
         routes = retro.get("routes") or []
         best = routes[0] if routes else {}
+        tree_stats = (retro.get("multi_step_tree") or {}).get("stats")
         compact["retrosynthesis"] = {
             "depth_mode": retro.get("depth_mode"),
             "total_found": retro.get("total_found"),
             "total_unique": retro.get("total_unique"),
             "sources_used": retro.get("sources_used"),
             "source_errors": retro.get("source_errors"),
-            "tree_stats": (retro.get("multi_step_tree") or {}).get("stats"),
+            "tree_stats": tree_stats,
+            "tree_stats_meaning": (
+                "total_nodes is graph nodes, not precursor count; "
+                "buyable_count is nodes marked buyable/restricted; "
+                "unresolved_count is the only unresolved counter and must not be inferred as total_nodes-buyable_count."
+            ) if tree_stats else None,
             "best_route": {
                 "source": best.get("source_label") or best.get("source"),
                 "reactants": best.get("reactants"),
@@ -766,6 +772,7 @@ def _final_answer_with_llm(
         "Use conversation_history to keep continuity in follow-up questions, but do not override current tool outputs. "
         "Use ONLY the provided tool outputs for molecule data, safety, retrosynthesis, ADMET, availability and sources. "
         "For retrosynthesis, explicitly distinguish one-step disconnection results from multi-step route-tree results when a depth_mode or tree_stats field is present. "
+        "When tree_stats are present, treat total_nodes as graph nodes, not as starting precursors. Never infer unresolved nodes as total_nodes minus buyable_count; use unresolved_count/unresolved_leaf_count exactly. If unresolved_count is 0, say there are no unresolved nodes. "
         "If no tools were selected, answer as a normal chemistry tutor from general chemistry knowledge and use fallback_summary as guidance. "
         "For real-world materials and product composition, do not force a single-molecule framing: explain mixtures, mineral phases, additives, coatings and likely variability. "
         "For hazardous or dual-use synthesis topics, including nitration of toluene, explosives and narcotics, keep the answer high-level and non-operational: do not provide temperatures, reagent ratios, step-by-step procedures, purification instructions, yields, procurement advice or scale-up guidance. "
@@ -976,12 +983,17 @@ def _multi_step_summary(tree_result: dict[str, Any]) -> list[str]:
         reason = (tree_result or {}).get("reason") or "multi-step expansion did not run."
         return [f"Multi-step expansion: {reason}"]
     stats = tree_result.get("stats") or {}
+    leaf_count = stats.get("leaf_count", 0)
+    buyable_leaves = stats.get("buyable_leaf_count", stats.get("buyable_count", 0))
+    unresolved_leaves = stats.get("unresolved_leaf_count", stats.get("unresolved_count", 0))
     return [
-        "Multi-step route tree built: "
-        f"nodes={stats.get('total_nodes', 0)}, "
-        f"buyable_leaves={stats.get('buyable_count', 0)}, "
-        f"unresolved={stats.get('unresolved_count', 0)}, "
-        f"max_depth={stats.get('max_depth_reached', 0)}."
+        "Многостадийное дерево построено: "
+        f"узлов={stats.get('total_nodes', 0)}, "
+        f"листьев={leaf_count}, "
+        f"доступных листьев={buyable_leaves}, "
+        f"не раскрыто={stats.get('unresolved_count', 0)}, "
+        f"не раскрытых листьев={unresolved_leaves}, "
+        f"глубина={stats.get('max_depth_reached', 0)}."
     ]
 
 

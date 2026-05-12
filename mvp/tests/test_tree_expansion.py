@@ -278,6 +278,9 @@ class TestExpandTree:
         assert stats["total_nodes"] == 3
         assert stats["buyable_count"] == 2
         assert stats["banned_count"] == 0
+        assert stats["leaf_count"] == 2
+        assert stats["buyable_leaf_count"] == 2
+        assert stats["unresolved_leaf_count"] == 0
         assert stats["elapsed_sec"] >= 0
 
     def test_root_has_selected_route(self):
@@ -307,6 +310,7 @@ class TestExpandTree:
              patch("mvp.tree_expansion._resolve_name", return_value=None):
             result = expand_tree("CCO", "C.O")
         for key in ("total_nodes", "buyable_count", "banned_count", "unresolved_count",
+                    "leaf_count", "buyable_leaf_count", "unresolved_leaf_count",
                     "max_depth_reached", "elapsed_sec"):
             assert key in result["stats"], f"Missing stat key: {key}"
 
@@ -322,6 +326,8 @@ class TestStats:
         assert stats["buyable_count"] == 0
         assert stats["banned_count"] == 0
         assert stats["unresolved_count"] == 1
+        assert stats["leaf_count"] == 1
+        assert stats["unresolved_leaf_count"] == 1
         assert stats["elapsed_sec"] == 1.5
 
     def test_walk_counts_all_nodes(self):

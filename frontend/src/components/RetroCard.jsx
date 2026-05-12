@@ -160,10 +160,7 @@ function MultiStepTreeBlock({ treeResult }) {
         </div>
       )}
 
-      <div className="retro-tree-preview">
-        <span>Граф использует общий компонент дерева синтеза из вкладки анализа молекул.</span>
-        <code>{tree.name || tree.smiles}</code>
-      </div>
+      <SynthesisGraph tree={tree} stats={stats} variant="inline" onClose={() => setShowGraph(true)} />
 
       {showGraph && (
         <SynthesisGraph tree={tree} stats={stats} onClose={() => setShowGraph(false)} />

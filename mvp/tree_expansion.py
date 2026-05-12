@@ -369,13 +369,25 @@ def expand_tree(
 
 def _collect_stats(node: dict, elapsed: float) -> dict[str, Any]:
     """Walk the tree and collect summary statistics."""
-    counts = {"total": 0, "buyable": 0, "banned": 0, "unresolved": 0, "max_depth": 0}
+    counts = {
+        "total": 0,
+        "buyable": 0,
+        "banned": 0,
+        "unresolved": 0,
+        "max_depth": 0,
+        "leaf": 0,
+        "buyable_leaf": 0,
+        "unresolved_leaf": 0,
+    }
     _walk(node, counts)
     return {
         "total_nodes": counts["total"],
         "buyable_count": counts["buyable"],
         "banned_count": counts["banned"],
         "unresolved_count": counts["unresolved"],
+        "leaf_count": counts["leaf"],
+        "buyable_leaf_count": counts["buyable_leaf"],
+        "unresolved_leaf_count": counts["unresolved_leaf"],
         "max_depth_reached": counts["max_depth"],
         "elapsed_sec": round(elapsed, 2),
     }
@@ -385,13 +397,20 @@ def _walk(node: dict, counts: dict):
     counts["total"] += 1
     counts["max_depth"] = max(counts["max_depth"], node.get("depth", 0))
     status = node.get("status", "")
+    children = node.get("children", [])
+    if not children:
+        counts["leaf"] += 1
+        if status in ("buyable", "restricted"):
+            counts["buyable_leaf"] += 1
+        elif status in ("unresolved", "depth_limit", "timeout", "circular", "invalid_smiles"):
+            counts["unresolved_leaf"] += 1
     if status in ("buyable", "restricted"):
         counts["buyable"] += 1
     elif status == "banned":
         counts["banned"] += 1
     elif status in ("unresolved", "depth_limit", "timeout", "circular", "invalid_smiles"):
         counts["unresolved"] += 1
-    for child in node.get("children", []):
+    for child in children:
         _walk(child, counts)
 
 
@@ -401,6 +420,9 @@ def _empty_stats(elapsed: float) -> dict[str, Any]:
         "buyable_count": 0,
         "banned_count": 0,
         "unresolved_count": 1,
+        "leaf_count": 1,
+        "buyable_leaf_count": 0,
+        "unresolved_leaf_count": 1,
         "max_depth_reached": 0,
         "elapsed_sec": round(elapsed, 2),
     }

@@ -178,13 +178,20 @@ def _walk_stats(node: dict[str, Any], counts: dict[str, int]) -> None:
     counts["total_nodes"] += 1
     counts["max_depth_reached"] = max(counts["max_depth_reached"], int(node.get("depth") or 0))
     status = node.get("status")
+    children = node.get("children") or []
+    if not children:
+        counts["leaf_count"] += 1
+        if status in ("buyable", "restricted"):
+            counts["buyable_leaf_count"] += 1
+        elif status in ("unresolved", "depth_limit", "timeout", "circular", "invalid_smiles"):
+            counts["unresolved_leaf_count"] += 1
     if status in ("buyable", "restricted"):
         counts["buyable_count"] += 1
     elif status == "banned":
         counts["banned_count"] += 1
     elif status in ("unresolved", "depth_limit", "timeout", "circular", "invalid_smiles"):
         counts["unresolved_count"] += 1
-    for child in node.get("children") or []:
+    for child in children:
         if isinstance(child, dict):
             _walk_stats(child, counts)
 
@@ -195,6 +202,9 @@ def _collect_stats(tree: dict[str, Any], elapsed: float) -> dict[str, Any]:
         "buyable_count": 0,
         "banned_count": 0,
         "unresolved_count": 0,
+        "leaf_count": 0,
+        "buyable_leaf_count": 0,
+        "unresolved_leaf_count": 0,
         "max_depth_reached": 0,
     }
     _walk_stats(tree, counts)

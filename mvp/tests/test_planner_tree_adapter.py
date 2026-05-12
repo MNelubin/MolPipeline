@@ -45,3 +45,6 @@ def test_adapts_nested_aizynth_tree_to_runtime_schema():
     assert tree["children"][0]["smiles"] == "CC=O"
     assert tree["children"][0]["children"][0]["smiles"] == "CO"
     assert result["stats"]["max_depth_reached"] == 2
+    assert result["stats"]["leaf_count"] == 2
+    assert result["stats"]["buyable_leaf_count"] == 2
+    assert result["stats"]["unresolved_leaf_count"] == 0

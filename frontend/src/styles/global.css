@@ -1767,25 +1767,6 @@ a.ext-link:hover { color: var(--cyan); }
   padding: 2px;
 }
 
-.retro-tree-preview {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-  border: 1px dashed var(--border-hi);
-  border-radius: var(--r-sm);
-  padding: 9px;
-  color: var(--text-3);
-  font-size: 11px;
-}
-
-.retro-tree-preview code {
-  color: var(--text-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  word-break: break-all;
-}
-
 .retro-tree-node {
   position: relative;
   border: 1px solid var(--border);
@@ -3780,6 +3761,17 @@ a.ext-link:hover { color: var(--cyan); }
   backdrop-filter: blur(8px);
 }
 
+.synth-inline {
+  height: 460px;
+  min-height: 360px;
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-md);
+  background: var(--bg-0);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .synth-header {
   display: flex;
   align-items: center;
@@ -3788,6 +3780,12 @@ a.ext-link:hover { color: var(--cyan); }
   padding: 10px var(--sp-lg);
   background: var(--bg-1);
   border-bottom: 1px solid var(--border);
+}
+
+.synth-inline .synth-header {
+  gap: 10px;
+  padding: 9px 12px;
+  flex-wrap: wrap;
 }
 
 .synth-title {
@@ -3837,6 +3835,10 @@ a.ext-link:hover { color: var(--cyan); }
   min-height: 0;
 }
 
+.synth-inline .synth-body {
+  min-height: 300px;
+}
+
 .synth-graph-area {
   flex: 1;
   min-width: 0;
@@ -3850,6 +3852,10 @@ a.ext-link:hover { color: var(--cyan); }
   overflow: auto;
   display: flex;
   flex-direction: column;
+}
+
+.synth-inline .synth-detail-panel {
+  width: min(320px, 42%);
 }
 
 .synth-detail-content { padding: var(--sp-md) 16px; flex: 1; }

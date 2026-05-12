@@ -289,11 +289,12 @@ function DetailPanel({ node, onClose }) {
   )
 }
 
-export default function SynthesisGraph({ tree, stats, onClose }) {
+export default function SynthesisGraph({ tree, stats, onClose, variant = 'overlay' }) {
   const { nodes: initNodes, edges: initEdges } = useMemo(() => buildGraph(tree), [tree])
   const [nodes, , onNodesChange] = useNodesState(initNodes)
   const [edges, , onEdgesChange] = useEdgesState(initEdges)
   const [selected, setSelected] = useState(null)
+  const isInline = variant === 'inline'
 
   const onNodeClick = useCallback((_, node) => {
     setSelected(prev => prev?.id === node.id ? null : node)
@@ -302,7 +303,7 @@ export default function SynthesisGraph({ tree, stats, onClose }) {
   const onPaneClick = useCallback(() => setSelected(null), [])
 
   return (
-    <div className="synth-overlay">
+    <div className={isInline ? 'synth-inline' : 'synth-overlay'}>
       {/* Header */}
       <div className="synth-header">
         <span className="synth-title">⬡ Дерево синтеза</span>
@@ -344,7 +345,11 @@ export default function SynthesisGraph({ tree, stats, onClose }) {
           <span className="synth-hint">← кликни по пустому месту чтобы сбросить выбор</span>
         )}
 
-        <button className="synth-close-btn" onClick={onClose}>✕ Закрыть</button>
+        {onClose && (
+          <button className="synth-close-btn" onClick={onClose}>
+            {isInline ? 'Открыть крупно' : '✕ Закрыть'}
+          </button>
+        )}
       </div>
 
       {/* Body: graph + side panel */}
