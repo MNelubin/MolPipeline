@@ -348,7 +348,10 @@ def run_research_workspace(
     all_sources: list[WebSource] = []
     seen_urls: set[str] = set()
     source_errors: dict[str, str] = {}
-    for search_query in search_queries:
+    # Curated matches are primary-source evidence already available to the
+    # workspace. Avoid slow/noisy web search for exact paper/supplement queries.
+    web_search_queries = [] if curated_docs else search_queries
+    for search_query in web_search_queries:
         try:
             for source in search_all(search_query, max_results=5):
                 if source.url and source.url not in seen_urls:
