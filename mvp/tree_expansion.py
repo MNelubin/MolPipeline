@@ -394,6 +394,9 @@ def _collect_stats(node: dict, elapsed: float) -> dict[str, Any]:
 
 
 def _walk(node: dict, counts: dict):
+    counts.setdefault("leaf", 0)
+    counts.setdefault("buyable_leaf", 0)
+    counts.setdefault("unresolved_leaf", 0)
     counts["total"] += 1
     counts["max_depth"] = max(counts["max_depth"], node.get("depth", 0))
     status = node.get("status", "")
