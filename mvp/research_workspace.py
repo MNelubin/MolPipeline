@@ -188,6 +188,7 @@ def _expand_linked_documents(sources: list[WebSource], *, limit: int) -> list[We
         html = fetch_page(source.url)
         if not html:
             continue
+        linked_count = 0
         for link in discover_document_links(html, source.url, limit=4):
             url = link.get("url") or ""
             if not url or url in seen:
@@ -199,8 +200,11 @@ def _expand_linked_documents(sources: list[WebSource], *, limit: int) -> list[We
                 snippet=f"Linked document discovered from {source.url}",
                 source_type="pdf" if link.get("source_type") == "pdf" else "web",
             ))
+            linked_count += 1
             if len(expanded) >= limit:
                 return expanded
+        if linked_count:
+            return expanded
     return expanded
 
 
