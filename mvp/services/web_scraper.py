@@ -90,7 +90,10 @@ def discover_document_links(html: str, base_url: str, *, limit: int = 8) -> list
         text = " ".join(link.get_text(" ", strip=True).split())
         haystack = f"{href} {text}".lower()
         is_pdf = ".pdf" in href.lower()
+        is_non_text_attachment = any(ext in href.lower() for ext in (".xlsx", ".xls", ".ppt", ".pptx", ".zip"))
         is_supplement = any(marker in haystack for marker in ("supplement", "supplementary", "supporting information"))
+        if is_non_text_attachment:
+            continue
         if not is_pdf and not is_supplement:
             continue
         absolute = urljoin(base_url, href)
