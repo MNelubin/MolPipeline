@@ -291,6 +291,11 @@ class HybridRetriever:
             meta = child_metas.get(cid) or {}
             pid = meta.get("parent_id", "")
             parent_row = parent_map.get(pid, {})
+            source_val = meta.get("source", "pmc")
+            try:
+                source = DocumentSource(source_val)
+            except ValueError:
+                source = DocumentSource.PMC
 
             results.append(RetrievalResult(
                 child_id=cid,
