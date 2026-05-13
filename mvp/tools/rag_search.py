@@ -83,6 +83,7 @@ def _format_result(r: RetrievalResult, idx: int) -> dict[str, Any]:
         "child_text": r.child_text[:1000],
         "parent_text": r.parent_text[:3000] if r.parent_text else "",
         "authors": r.authors[:5],
+        "metadata": r.metadata,
     }
 
 

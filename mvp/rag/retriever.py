@@ -299,8 +299,10 @@ class HybridRetriever:
                 child_text=child_docs.get(cid, ""),
                 parent_text=parent_row.get("text", ""),
                 score=scores_map.get(cid, 0.0),
+                source=source,
                 title=meta.get("title", ""),
                 doi=meta.get("doi", ""),
+                metadata=meta,
             ))
         return results
 

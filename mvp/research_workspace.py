@@ -135,6 +135,15 @@ def _optional_rag_results(query: str, mode: ResearchMode) -> list[dict[str, Any]
         return []
 
 
+def _has_strong_rag_hit(rag_results: list[dict[str, Any]]) -> bool:
+    if not rag_results:
+        return False
+    try:
+        return float(rag_results[0].get("score") or 0.0) >= 8.0
+    except (TypeError, ValueError):
+        return False
+
+
 def _build_summary(
     query: str,
     interpreted_intent: str,
@@ -265,11 +274,13 @@ def run_research_workspace(
     research_query = formulate_search_queries(query)
     base_queries = research_query.search_queries or [query]
     search_queries = _mode_queries(base_queries, mode)
+    rag_results = _optional_rag_results(query, mode)
 
     all_sources: list[WebSource] = []
     seen_urls: set[str] = set()
     source_errors: dict[str, str] = {}
-    for search_query in search_queries:
+    web_search_queries = [] if _has_strong_rag_hit(rag_results) else search_queries
+    for search_query in web_search_queries:
         try:
             for source in search_all(search_query, max_results=5):
                 if source.url and source.url not in seen_urls:
@@ -313,7 +324,6 @@ def run_research_workspace(
     candidates.sort(key=lambda candidate: candidate.confidence, reverse=True)
     candidates = candidates[:_MAX_CANDIDATES]
 
-    rag_results = _optional_rag_results(query, mode)
     summary = _build_summary(
         query,
         research_query.interpreted_intent,
