@@ -74,6 +74,7 @@ def _mode_queries(base_queries: list[str], mode: ResearchMode) -> list[str]:
     if mode == "patent":
         for query in base_queries:
             expanded.extend([
+                query,
                 f"{query} patent synthesis preparation",
                 f"{query} patents.google.com",
                 f"{query} patent example reaction conditions",
@@ -81,13 +82,15 @@ def _mode_queries(base_queries: list[str], mode: ResearchMode) -> list[str]:
     elif mode == "literature":
         for query in base_queries:
             expanded.extend([
+                query,
+                f"{query} PDF supplementary information",
                 f"{query} synthesis literature PubMed",
-                f"{query} reaction conditions experimental",
                 f"{query} review chemistry",
             ])
     else:
         for query in base_queries:
             expanded.extend([
+                query,
                 f"{query} molecule PubChem pharmacology",
                 f"{query} active compound SMILES",
             ])
@@ -308,7 +311,7 @@ def run_research_workspace(
 ) -> dict[str, Any]:
     """Run standalone research without changing the main synthesis flow."""
     research_query = formulate_search_queries(query)
-    base_queries = research_query.search_queries or [query]
+    base_queries = _dedupe([query] + (research_query.search_queries or []))
     search_queries = _mode_queries(base_queries, mode)
     rag_results = _optional_rag_results(query, mode)
 
