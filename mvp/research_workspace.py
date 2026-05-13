@@ -105,6 +105,9 @@ def _make_excerpt(text: str, query: str, *, limit: int = 900) -> str:
         return ""
     lower = text.lower()
     focus_query = query.rsplit(":", 1)[-1].strip()
+    section_match = re.search(r"\bsection\s+([^:]{1,120}):", query, flags=re.IGNORECASE)
+    if section_match:
+        focus_query = f"{section_match.group(0)} {focus_query}"
     if len(focus_query) < 20:
         focus_query = query
     keywords = list(dict.fromkeys(word for word in re.split(r"\W+", focus_query.lower()) if len(word) > 2))
