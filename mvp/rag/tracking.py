@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
-from src.rag.models import DocumentSource, IndexingStatus
+from .models import DocumentSource, IndexingStatus
 
 logger = logging.getLogger(__name__)
 

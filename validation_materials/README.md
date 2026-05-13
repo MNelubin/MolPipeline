@@ -76,7 +76,17 @@ Runner создает:
 - `graphs/by_level_accuracy.png` и `.svg` - сравнение по уровням.
 - `graphs/school_accuracy.png`, `graphs/university_accuracy.png`, `graphs/research_accuracy.png` и `.svg` - отдельные графики по уровням.
 
-Графики строятся через `matplotlib`. Если установлен `seaborn`, он используется только как оформление темы.
+Графики строятся через обычный `matplotlib` в стандартной темной теме.
+
+## Optional RAG Indexing
+
+Чтобы MolPipeline отвечал на research-level вопросы по локально сохраненным материалам не через hardcoded rules, а через RAG, проиндексируй `.txt` источники:
+
+```bash
+python scripts/index_literature_texts.py --source-dir validation_materials/sources --force
+```
+
+По умолчанию строится keyword/BM25-ready индекс без загрузки embedding-модели. Для vector search можно отдельно запустить с `--with-embeddings`, если окружение готово.
 
 ## Grading Rule
 

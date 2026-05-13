@@ -22,7 +22,7 @@ class WebSource(BaseModel):
     url: str
     title: str
     snippet: str = ""
-    source_type: Literal["pubmed", "web", "wikipedia", "curated_pdf"] = "web"
+    source_type: Literal["pubmed", "web", "wikipedia"] = "web"
 
 
 class CandidateMolecule(BaseModel):

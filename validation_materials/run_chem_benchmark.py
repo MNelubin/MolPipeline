@@ -253,15 +253,9 @@ def _load_plotting():
     try:
         import matplotlib.pyplot as plt
     except ImportError as exc:
-        raise RuntimeError("matplotlib is required for benchmark graphs: pip install matplotlib seaborn") from exc
+        raise RuntimeError("matplotlib is required for benchmark graphs: pip install matplotlib") from exc
 
-    try:
-        import seaborn as sns
-
-        sns.set_theme(style="whitegrid", context="talk")
-    except ImportError:
-        plt.style.use("seaborn-v0_8-whitegrid")
-
+    plt.style.use("dark_background")
     return plt
 
 
@@ -277,30 +271,14 @@ def _plot_bar_chart(title: str, rows: list[dict[str, Any]], path_base: Path) -> 
     labels = [row["label"] for row in rows]
     values = [row["accuracy"] * 100 for row in rows]
     notes = [f"{row['correct']}/{row['total']}" for row in rows]
-    colors = ["#f4a522" if row["system"] == "bare_model" else "#06d6f0" for row in rows]
 
-    fig, ax = plt.subplots(figsize=(10, 5.5), dpi=160)
-    fig.patch.set_facecolor("#07101c")
-    ax.set_facecolor("#07101c")
-    bars = ax.bar(labels, values, color=colors, edgecolor="#d9e7ff", linewidth=0.8)
-    ax.set_ylim(0, 105)
-    ax.set_ylabel("Accuracy, %", color="#d9e7ff")
-    ax.set_title(title, color="#e8f1ff", pad=16)
-    ax.tick_params(colors="#c8d7ee", axis="both")
-    ax.grid(axis="y", color="#263a56", alpha=0.65)
-    for spine in ax.spines.values():
-        spine.set_color("#29405f")
-
-    for bar, value, note in zip(bars, values, notes):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            min(value + 2, 102),
-            f"{value:.0f}%\n{note}",
-            ha="center",
-            va="bottom",
-            color="#e8f1ff",
-            fontsize=11,
-        )
+    fig, ax = plt.subplots(figsize=(8, 4.8), dpi=150)
+    bars = ax.bar(labels, values)
+    ax.set_ylim(0, 110)
+    ax.set_ylabel("Accuracy, %")
+    ax.set_title(title)
+    ax.grid(axis="y", alpha=0.25)
+    ax.bar_label(bars, labels=[f"{value:.0f}% ({note})" for value, note in zip(values, notes)], padding=4)
 
     fig.tight_layout()
     fig.savefig(path_base.with_suffix(".png"), bbox_inches="tight")
@@ -315,9 +293,7 @@ def _plot_grouped_by_level(summary: dict[str, Any], path_base: Path) -> None:
     width = 0.36
     x_positions = list(range(len(levels)))
 
-    fig, ax = plt.subplots(figsize=(11, 5.8), dpi=160)
-    fig.patch.set_facecolor("#07101c")
-    ax.set_facecolor("#07101c")
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=150)
 
     for offset_index, system in enumerate(systems):
         offset = (offset_index - (len(systems) - 1) / 2) * width
@@ -325,39 +301,24 @@ def _plot_grouped_by_level(summary: dict[str, Any], path_base: Path) -> None:
             summary["by_level"][level].get(system, {}).get("accuracy", 0.0) * 100
             for level in levels
         ]
-        color = "#f4a522" if system == "bare_model" else "#06d6f0"
         bars = ax.bar(
             [x + offset for x in x_positions],
             values,
             width=width,
             label=_system_label(system),
-            color=color,
-            edgecolor="#d9e7ff",
-            linewidth=0.8,
         )
         for bar, value, level in zip(bars, values, levels):
             stats = summary["by_level"][level].get(system, {})
             note = f"{int(stats.get('correct', 0))}/{int(stats.get('total', 0))}"
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                min(value + 2, 102),
-                note,
-                ha="center",
-                va="bottom",
-                color="#e8f1ff",
-                fontsize=10,
-            )
+            ax.text(bar.get_x() + bar.get_width() / 2, min(value + 2, 105), note, ha="center", va="bottom", fontsize=9)
 
     ax.set_xticks(x_positions)
     ax.set_xticklabels([level.title() for level in levels])
-    ax.set_ylim(0, 105)
-    ax.set_ylabel("Accuracy, %", color="#d9e7ff")
-    ax.set_title("Accuracy by Level: DeepSeek vs MolPipeline", color="#e8f1ff", pad=16)
-    ax.legend(facecolor="#0e1a2b", edgecolor="#29405f", labelcolor="#e8f1ff")
-    ax.tick_params(colors="#c8d7ee", axis="both")
-    ax.grid(axis="y", color="#263a56", alpha=0.65)
-    for spine in ax.spines.values():
-        spine.set_color("#29405f")
+    ax.set_ylim(0, 110)
+    ax.set_ylabel("Accuracy, %")
+    ax.set_title("Accuracy by Level: DeepSeek vs MolPipeline")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.25)
 
     fig.tight_layout()
     fig.savefig(path_base.with_suffix(".png"), bbox_inches="tight")

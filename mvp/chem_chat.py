@@ -753,6 +753,15 @@ def _compact_artifacts_for_llm(artifacts: dict[str, Any]) -> dict[str, Any]:
                 }
                 for item in (research.get("evidence") or [])[:6]
             ],
+            "rag_results": [
+                {
+                    "title": item.get("title"),
+                    "doi": item.get("doi"),
+                    "score": item.get("score"),
+                    "text": (item.get("parent_text") or item.get("child_text") or "")[:1800],
+                }
+                for item in (research.get("rag_results") or [])[:6]
+            ],
             "sources_count": len(research.get("sources") or []),
             "evidence_count": len(research.get("evidence") or []),
         }

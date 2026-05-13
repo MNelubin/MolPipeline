@@ -14,10 +14,10 @@ import logging
 from pathlib import Path
 from typing import Sequence
 
-from src.rag.bm25 import BM25Okapi
-from src.rag.embeddings import LiteratureEmbedder
-from src.rag.models import DocumentSource, RetrievalResult, SectionType
-from src.rag.tracking import TrackingDB
+from .bm25 import BM25Okapi
+from .embeddings import LiteratureEmbedder
+from .models import DocumentSource, RetrievalResult, SectionType
+from .tracking import TrackingDB
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,8 @@ class HybridRetriever:
             metadata={"hnsw:space": "cosine"},
         )
         self._tracking = TrackingDB(tracking_db_path)
-        self._embedder = embedder or LiteratureEmbedder(model_name=model_name)
+        self._embedder = embedder
+        self._model_name = model_name
 
         self._bm25: BM25Okapi | None = None
         self._bm25_ids: list[str] = []
@@ -105,11 +106,16 @@ class HybridRetriever:
         self._bm25 = BM25Okapi(all_tokens) if all_tokens else BM25Okapi([[""]])
         logger.info("BM25 index built with %d documents", len(all_ids))
 
+    def _ensure_embedder(self) -> LiteratureEmbedder:
+        if self._embedder is None:
+            self._embedder = LiteratureEmbedder(model_name=self._model_name)
+        return self._embedder
+
     # ------------------------------------------------------------------
     # Individual search methods
     # ------------------------------------------------------------------
     def _vector_search(self, query: str, top_k: int) -> list[tuple[str, float]]:
-        embedding = self._embedder.embed_query(query)
+        embedding = self._ensure_embedder().embed_query(query)
         results = self._collection.query(
             query_embeddings=[embedding],
             n_results=top_k,

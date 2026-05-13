@@ -34,25 +34,3 @@ def test_research_workspace_adds_stable_citation_metadata():
     assert result["sources"][0]["citation_markdown"] == "[S1](https://example.org/materials/pvc)"
     assert result["evidence"][0]["citation_id"] == "S1"
     assert result["citations"] == result["sources"]
-
-
-def test_research_workspace_uses_curated_pdf_corpus_for_retrosynthesis_paper():
-    query = (
-        "Segler, Preuss and Waller Nature 2018 supplementary information, "
-        "section Analysing Route Diversity: how many additional routes were retrieved?"
-    )
-
-    with patch("mvp.research_workspace.formulate_search_queries") as mock_queries, \
-         patch("mvp.research_workspace.search_all", return_value=[]), \
-         patch("mvp.research_workspace.extract_molecules_from_text", return_value=[]), \
-         patch("mvp.research_workspace.resolve_candidates", return_value=[]), \
-         patch("mvp.research_workspace._optional_rag_results", return_value=[]), \
-         patch("mvp.research_workspace._analyze_research_evidence", return_value={}):
-        mock_queries.return_value.search_queries = [query]
-        mock_queries.return_value.interpreted_intent = query
-        result = run_research_workspace(query, max_sources=4)
-
-    assert result["sources"][0]["source_type"] == "curated_pdf"
-    assert result["evidence"][0]["curated_source_id"] == "segler_2018_nature_supplement"
-    assert "19 additional routes" in result["evidence"][0]["excerpt"]
-    assert "600 s total simulation time" in result["evidence"][0]["excerpt"]

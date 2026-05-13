@@ -14,8 +14,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.rag.models import RetrievalResult, SectionType
-from src.rag.retriever import HybridRetriever
+from ..rag.models import RetrievalResult, SectionType
+from ..rag.retriever import HybridRetriever
 
 logger = logging.getLogger(__name__)
 
