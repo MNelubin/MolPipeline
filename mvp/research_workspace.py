@@ -12,6 +12,8 @@ from collections import Counter
 from typing import Any, Literal
 from urllib.parse import urlparse
 
+import requests
+
 from .models.research import WebSource
 from .services.web_scraper import discover_document_links, extract_pubmed_abstract, fetch_and_extract, fetch_page
 from .services.web_search import search_all
@@ -28,6 +30,7 @@ ResearchMode = Literal["molecule", "literature", "patent"]
 _PMID_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
 _MAX_QUERIES = 8
 _MAX_CANDIDATES = 12
+_CROSSREF_API = "https://api.crossref.org/works"
 
 
 def _source_domain(url: str) -> str:
@@ -130,6 +133,39 @@ def _fetch_source_text(source: WebSource) -> str:
             if text:
                 return text
     return fetch_and_extract(source.url) or ""
+
+
+def _crossref_sources(query: str, *, limit: int = 2) -> list[WebSource]:
+    """Find likely primary article pages from a bibliographic query."""
+    try:
+        resp = requests.get(
+            _CROSSREF_API,
+            params={"query.bibliographic": query, "rows": limit},
+            headers={"User-Agent": "MolPipeline/1.0 (mailto:molpipeline@example.org)"},
+            timeout=12,
+        )
+        if resp.status_code != 200:
+            return []
+        items = (resp.json().get("message") or {}).get("items") or []
+    except Exception as exc:
+        logger.info("[research_workspace] Crossref lookup failed: %s", exc)
+        return []
+
+    sources: list[WebSource] = []
+    for item in items[:limit]:
+        doi = str(item.get("DOI") or "").strip()
+        titles = item.get("title") or []
+        title = str(titles[0] if titles else doi or "Crossref result").strip()
+        url = str(item.get("URL") or (f"https://doi.org/{doi}" if doi else "")).strip()
+        if not url:
+            continue
+        sources.append(WebSource(
+            url=url,
+            title=title,
+            snippet=f"Crossref bibliographic match; DOI: {doi}" if doi else "Crossref bibliographic match",
+            source_type="web",
+        ))
+    return sources
 
 
 def _expand_linked_documents(sources: list[WebSource], *, limit: int) -> list[WebSource]:
@@ -319,6 +355,11 @@ def run_research_workspace(
     seen_urls: set[str] = set()
     source_errors: dict[str, str] = {}
     web_search_queries = [] if _has_strong_rag_hit(rag_results) else search_queries
+    if mode == "literature" and web_search_queries:
+        for source in _crossref_sources(query):
+            if source.url and source.url not in seen_urls:
+                seen_urls.add(source.url)
+                all_sources.append(source)
     for search_query in web_search_queries:
         try:
             for source in search_all(search_query, max_results=5):
