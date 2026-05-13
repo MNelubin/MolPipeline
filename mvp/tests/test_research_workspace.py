@@ -34,3 +34,35 @@ def test_research_workspace_adds_stable_citation_metadata():
     assert result["sources"][0]["citation_markdown"] == "[S1](https://example.org/materials/pvc)"
     assert result["evidence"][0]["citation_id"] == "S1"
     assert result["citations"] == result["sources"]
+
+
+def test_research_workspace_expands_supplementary_pdf_links():
+    sources = [
+        WebSource(
+            url="https://example.org/article",
+            title="Article with supplement",
+            snippet="Main article page.",
+            source_type="web",
+        )
+    ]
+    html = """
+    <html><body>
+      <a href="/supplement.pdf">Supplementary Information (download PDF)</a>
+    </body></html>
+    """
+
+    with patch("mvp.research_workspace.formulate_search_queries") as mock_queries, \
+         patch("mvp.research_workspace.search_all", return_value=sources), \
+         patch("mvp.research_workspace.fetch_page", return_value=html), \
+         patch("mvp.research_workspace.fetch_and_extract", side_effect=["Main text", "PDF says 19 additional routes."]), \
+         patch("mvp.research_workspace.extract_molecules_from_text", return_value=[]), \
+         patch("mvp.research_workspace.resolve_candidates", return_value=[]), \
+         patch("mvp.research_workspace._optional_rag_results", return_value=[]), \
+         patch("mvp.research_workspace._analyze_research_evidence", return_value={}):
+        mock_queries.return_value.search_queries = ["route diversity"]
+        mock_queries.return_value.interpreted_intent = "route diversity"
+        result = run_research_workspace("route diversity", max_sources=3)
+
+    assert [source["source_type"] for source in result["sources"][:2]] == ["web", "pdf"]
+    assert result["sources"][1]["url"] == "https://example.org/supplement.pdf"
+    assert "19 additional routes" in result["evidence"][1]["excerpt"]

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 import logging
+from urllib.parse import urljoin
 
 import requests
 
@@ -18,6 +20,8 @@ _TOOL_NAME = "ChemSynthAssistant"
 _TOOL_EMAIL = "chemsynthassistant@example.com"
 
 _MAX_TEXT_LENGTH = 15_000
+_MAX_DOCUMENT_TEXT_LENGTH = 60_000
+_MAX_PDF_PAGES = 40
 
 
 def fetch_page(url: str, *, timeout: int = _REQUEST_TIMEOUT) -> str | None:
@@ -37,6 +41,22 @@ def fetch_page(url: str, *, timeout: int = _REQUEST_TIMEOUT) -> str | None:
         return None
 
 
+def _get_response(url: str, *, timeout: int = _REQUEST_TIMEOUT) -> requests.Response | None:
+    try:
+        resp = requests.get(
+            url,
+            timeout=timeout,
+            headers={"User-Agent": _USER_AGENT},
+            allow_redirects=True,
+        )
+        if resp.status_code == 200:
+            return resp
+        logger.warning("GET %s returned %s", url, resp.status_code)
+    except requests.RequestException as exc:
+        logger.warning("GET failed (%s): %s", url, exc)
+    return None
+
+
 def extract_text(html: str) -> str:
     """Strip HTML tags, scripts, and styles — return clean plain text."""
     try:
@@ -53,6 +73,67 @@ def extract_text(html: str) -> str:
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     clean = "\n".join(lines)
     return clean[:_MAX_TEXT_LENGTH]
+
+
+def discover_document_links(html: str, base_url: str, *, limit: int = 8) -> list[dict[str, str]]:
+    """Return likely article attachments such as supplementary PDFs."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    soup = BeautifulSoup(html, "lxml")
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for link in soup.find_all("a", href=True):
+        href = str(link.get("href") or "").strip()
+        text = " ".join(link.get_text(" ", strip=True).split())
+        haystack = f"{href} {text}".lower()
+        is_pdf = ".pdf" in href.lower()
+        is_supplement = any(marker in haystack for marker in ("supplement", "supplementary", "supporting information"))
+        if not is_pdf and not is_supplement:
+            continue
+        absolute = urljoin(base_url, href)
+        if absolute in seen:
+            continue
+        seen.add(absolute)
+        out.append({
+            "url": absolute,
+            "title": text or absolute.rsplit("/", 1)[-1],
+            "source_type": "pdf" if is_pdf else "web",
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def extract_pdf_text(content: bytes) -> str:
+    """Extract text from a PDF byte stream using pypdf when available."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        logger.warning("pypdf not installed; cannot extract PDF text")
+        return ""
+
+    try:
+        reader = PdfReader(BytesIO(content))
+    except Exception as exc:
+        logger.warning("PDF parse failed: %s", exc)
+        return ""
+
+    parts: list[str] = []
+    for page in reader.pages[:_MAX_PDF_PAGES]:
+        try:
+            text = page.extract_text() or ""
+        except Exception:
+            text = ""
+        if text.strip():
+            parts.append(text)
+        if sum(len(part) for part in parts) >= _MAX_DOCUMENT_TEXT_LENGTH:
+            break
+    clean = "\n".join(parts)
+    clean = "\n".join(line.strip() for line in clean.splitlines() if line.strip())
+    return clean[:_MAX_DOCUMENT_TEXT_LENGTH]
 
 
 def extract_pubmed_abstract(pmid: str | int) -> str | None:
@@ -100,7 +181,10 @@ def extract_pubmed_abstract(pmid: str | int) -> str | None:
 
 def fetch_and_extract(url: str) -> str | None:
     """Convenience: fetch a page and extract its text in one call."""
-    html = fetch_page(url)
-    if html is None:
+    resp = _get_response(url)
+    if resp is None:
         return None
-    return extract_text(html)
+    content_type = (resp.headers.get("content-type") or "").lower()
+    if "application/pdf" in content_type or resp.url.lower().split("?", 1)[0].endswith(".pdf"):
+        return extract_pdf_text(resp.content) or None
+    return extract_text(resp.text)

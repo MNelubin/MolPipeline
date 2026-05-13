@@ -379,6 +379,7 @@ def main() -> int:
     parser.add_argument("--molpipeline-url", default=os.getenv("MOLPIPELINE_URL", DEFAULT_MOLPIPELINE_URL))
     parser.add_argument("--molpipeline-timeout-sec", type=int, default=int(os.getenv("MOLPIPELINE_TIMEOUT_SEC", "180")))
     parser.add_argument("--limit", type=int, default=0, help="Limit number of dataset rows for smoke tests.")
+    parser.add_argument("--levels", default="", help="Comma-separated level filter, for example: research or school,university.")
     parser.add_argument("--skip-bare", action="store_true")
     parser.add_argument("--skip-system", action="store_true")
     parser.add_argument("--validate-only", action="store_true", help="Only validate dataset shape; do not import or call model/system.")
@@ -386,6 +387,9 @@ def main() -> int:
     load_dotenv_file(args.env_file)
 
     rows = load_rows(args.dataset)
+    if args.levels.strip():
+        wanted_levels = {level.strip() for level in args.levels.split(",") if level.strip()}
+        rows = [row for row in rows if row["level"] in wanted_levels]
     if args.limit > 0:
         rows = rows[: args.limit]
     if args.validate_only:

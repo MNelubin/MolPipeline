@@ -13,7 +13,7 @@ from typing import Any, Literal
 from urllib.parse import urlparse
 
 from .models.research import WebSource
-from .services.web_scraper import extract_pubmed_abstract, fetch_and_extract
+from .services.web_scraper import discover_document_links, extract_pubmed_abstract, fetch_and_extract, fetch_page
 from .services.web_search import search_all
 from .tools.research import (
     extract_molecules_from_text,
@@ -98,13 +98,19 @@ def _make_excerpt(text: str, query: str, *, limit: int = 900) -> str:
     if not text:
         return ""
     lower = text.lower()
-    keywords = [word for word in re.split(r"\W+", query.lower()) if len(word) > 3]
+    keywords = list(dict.fromkeys(word for word in re.split(r"\W+", query.lower()) if len(word) > 3))
     start = 0
+    best_score = -1
     for keyword in keywords:
         idx = lower.find(keyword)
-        if idx >= 0:
-            start = max(0, idx - 220)
-            break
+        while idx >= 0:
+            candidate_start = max(0, idx - 220)
+            window = lower[candidate_start:candidate_start + limit]
+            score = sum(1 for item in keywords if item in window)
+            if score > best_score:
+                best_score = score
+                start = candidate_start
+            idx = lower.find(keyword, idx + len(keyword))
     excerpt = text[start:start + limit].strip()
     if start > 0:
         excerpt = "..." + excerpt
@@ -121,6 +127,36 @@ def _fetch_source_text(source: WebSource) -> str:
             if text:
                 return text
     return fetch_and_extract(source.url) or ""
+
+
+def _expand_linked_documents(sources: list[WebSource], *, limit: int) -> list[WebSource]:
+    expanded: list[WebSource] = []
+    seen: set[str] = set()
+    for source in sources:
+        if source.url and source.url not in seen:
+            seen.add(source.url)
+            expanded.append(source)
+        if len(expanded) >= limit:
+            break
+        if source.source_type == "pubmed" or source.url.lower().split("?", 1)[0].endswith(".pdf"):
+            continue
+        html = fetch_page(source.url)
+        if not html:
+            continue
+        for link in discover_document_links(html, source.url, limit=4):
+            url = link.get("url") or ""
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            expanded.append(WebSource(
+                url=url,
+                title=link.get("title") or f"Linked document from {source.title}",
+                snippet=f"Linked document discovered from {source.url}",
+                source_type="pdf" if link.get("source_type") == "pdf" else "web",
+            ))
+            if len(expanded) >= limit:
+                return expanded
+    return expanded
 
 
 def _optional_rag_results(query: str, mode: ResearchMode) -> list[dict[str, Any]]:
@@ -293,7 +329,8 @@ def run_research_workspace(
     source_payloads: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
 
-    for source in all_sources[:max_sources]:
+    expanded_sources = _expand_linked_documents(all_sources, limit=max_sources)
+    for source in expanded_sources[:max_sources]:
         index = len(source_payloads) + 1
         try:
             text = _fetch_source_text(source)
