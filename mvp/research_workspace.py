@@ -104,7 +104,10 @@ def _make_excerpt(text: str, query: str, *, limit: int = 900) -> str:
     if not text:
         return ""
     lower = text.lower()
-    keywords = list(dict.fromkeys(word for word in re.split(r"\W+", query.lower()) if len(word) > 3))
+    focus_query = query.rsplit(":", 1)[-1].strip()
+    if len(focus_query) < 20:
+        focus_query = query
+    keywords = list(dict.fromkeys(word for word in re.split(r"\W+", focus_query.lower()) if len(word) > 2))
     start = 0
     best_score = -1
     for keyword in keywords:
